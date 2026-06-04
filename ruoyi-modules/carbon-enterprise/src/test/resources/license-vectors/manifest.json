@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "license-vector-manifest.v1",
+  "algorithm": "RS256",
+  "keyId": "test-key-2026-01",
+  "publicKeyPem": [
+    "-----BEGIN PUBLIC KEY-----",
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtvFX4/guPpjzahQsfgwL",
+    "S/OHQmQg/JZZetJoSjZxn/EFg/OWUep4Ctdy+9fYjllSehW7yjUwuUO0HbkHn6JU",
+    "fAqnsimYkwUNHe9OS+ao7RK2+wwSwnc3TOCjyBLgDeCaWtNbK9guBnlbwmvxrFM+",
+    "HVaSndHBAEtEVUF+8t5Q1im0NZrYb6VoO5CcSe9tiI8s3X48M9XHQYxE+GsHTUQj",
+    "QCiaxQWS+FAkd/Qf8QqrUgu7Isl3yHbrku9Cpmc2VTRh+VIusizQtOy7TlrYQT6D",
+    "xxIXZF6ot1YHCtXWwLBfgj8ROOInMzVC4cPEczlp1tqU45+embweAXGv2AxWgXiW",
+    "hwIDAQAB",
+    "-----END PUBLIC KEY-----"
+  ],
+  "canonicalPayload": "Compact UTF-8 JSON payload with fields in docs/license-payload-contract.md order",
+  "expectedInstallId": "INSTALL-ENTERPRISE-001",
+  "verificationNow": "2026-06-04T00:00:00Z",
+  "maxObservedTimeForClockRollback": "2026-06-05T00:00:00Z",
+  "vectors": [
+    {
+      "file": "valid-license.json",
+      "expectSignatureValid": true,
+      "expectBusinessValid": true,
+      "reason": "baseline valid license"
+    },
+    {
+      "file": "tampered-license.json",
+      "expectSignatureValid": false,
+      "expectBusinessValid": false,
+      "reason": "payload changed after signing"
+    },
+    {
+      "file": "expired-license.json",
+      "expectSignatureValid": true,
+      "expectBusinessValid": false,
+      "reason": "valid signature but validTo is before verificationNow"
+    },
+    {
+      "file": "install-mismatch-license.json",
+      "expectSignatureValid": true,
+      "expectBusinessValid": false,
+      "reason": "valid signature but installId differs from expectedInstallId"
+    },
+    {
+      "file": "clock-rollback-license.json",
+      "expectSignatureValid": true,
+      "expectBusinessValid": false,
+      "reason": "valid signature but verificationNow is before maxObservedTimeForClockRollback"
+    }
+  ]
+}

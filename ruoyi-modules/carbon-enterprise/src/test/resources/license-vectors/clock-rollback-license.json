@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "license.v1",
+  "algorithm": "RS256",
+  "keyId": "test-key-2026-01",
+  "payload": {
+    "licenseId": "LIC-TEST-CLOCK-ROLLBACK-001",
+    "customerId": "CUST-001",
+    "customerName": "Test Manufacturing Co",
+    "edition": "enterprise",
+    "features": [
+      "capture",
+      "factor-sync",
+      "report-gate"
+    ],
+    "installId": "INSTALL-ENTERPRISE-001",
+    "validFrom": "2026-01-01T00:00:00Z",
+    "validTo": "2027-01-01T00:00:00Z",
+    "issuedAt": "2026-02-01T00:00:00Z",
+    "issuer": "carbon-vendor",
+    "keyId": "test-key-2026-01",
+    "templateEntitlements": [
+      {
+        "templateCode": "carbon-report-standard",
+        "templateVersion": "2026.1",
+        "scope": "read"
+      }
+    ]
+  },
+  "signature": "mEP7dSk7cf1p9wFX/cmj9FUg3JnnI83u+mi3+fwR9AF+BBuS2kkRl46q2oIrUg3qlXVyH5MJmCDN6Go1+ZgrIzqgwnQoFKz+PbV2r2E+otjDy9JWlYZBFCsszi5oTW/aiHFbDuXChdF/T4CW4G36yy/TdfFO6gqC5QIIPNgz+jGZ3YCq1ahLAiDaBCAyuQ4PVszmCc/qLSpffPqj/PLLMdLOpQ0k7vMZQ3BlnhyAKHynxFb7svKp01RPyAMH9+SJQ9Vw5IzPbZM9i7OMovL2QQ6sc2qaCaN21zK1V6TLx3iwwywMYXwI8ORhZaYy0bQqyj+f7jpt89RxETv2AmLEIg==",
+  "testVector": "clock-rollback"
+}

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "license.v1",
+  "algorithm": "RS256",
+  "keyId": "test-key-2026-01",
+  "payload": {
+    "licenseId": "LIC-TEST-INSTALL-MISMATCH-001",
+    "customerId": "CUST-001",
+    "customerName": "Test Manufacturing Co",
+    "edition": "enterprise",
+    "features": [
+      "capture",
+      "factor-sync",
+      "report-gate"
+    ],
+    "installId": "INSTALL-OTHER-999",
+    "validFrom": "2026-01-01T00:00:00Z",
+    "validTo": "2027-01-01T00:00:00Z",
+    "issuedAt": "2026-01-01T00:00:00Z",
+    "issuer": "carbon-vendor",
+    "keyId": "test-key-2026-01",
+    "templateEntitlements": [
+      {
+        "templateCode": "carbon-report-standard",
+        "templateVersion": "2026.1",
+        "scope": "read"
+      }
+    ]
+  },
+  "signature": "JhswfzHmW++/R+ftUOsPhkbTjqguVKF2PoWTG44jrSmJeOmj0IvWC9owwgZ9U/J3N/FNiaiJTquV7lCh5WNAwSmnyt3NSlHHLpswU/UIYqjX68rmQj9SbjYO3WzI+znNaJjY1FfjHoxmI0RkrO9RSXW3h7d8uPktMMG1IL9ggpgmvfNN3QKJWwVJHDI5s10Ze47UH77Es+QQvBAab6+JW9bDz1YdSLpgrIPBKAlmFkjEkGe8pVVOSgnimtItNsZ6Dzhw3v/3XlaX1UKUXQwd91laZBAeVjmggnDN6L+wIjA95Ln1upyY7BKlnoihE1H+pWkdFRHdEa9H5Kp3yBOLTg==",
+  "testVector": "install-id-mismatch"
+}
