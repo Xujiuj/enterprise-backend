@@ -27,6 +27,8 @@ target/
 
 ### VS CODE ###
 .vscode
+.codegraph/
+.cursor/
 
 ### JRebel ###
 rebel.xml
