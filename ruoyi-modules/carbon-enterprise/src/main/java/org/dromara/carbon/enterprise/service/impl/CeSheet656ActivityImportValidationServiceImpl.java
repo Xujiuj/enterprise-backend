@@ -10,6 +10,7 @@ import org.dromara.carbon.enterprise.service.ICeSheet656ActivityImportValidation
 import org.dromara.carbon.enterprise.service.ICeSheet656DerivedFieldResolver;
 import org.dromara.carbon.enterprise.service.ICeSheet656ValidationService;
 import org.dromara.common.core.utils.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +31,7 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
     private final List<CeSheet656FieldDescriptor> expectedHeaderFields;
     private final boolean derivedFieldResolverConfigured;
 
+    @Autowired
     public CeSheet656ActivityImportValidationServiceImpl(ObjectProvider<ICeSheet656DerivedFieldResolver> resolverProvider) {
         this(resolverProvider.getIfAvailable());
     }
