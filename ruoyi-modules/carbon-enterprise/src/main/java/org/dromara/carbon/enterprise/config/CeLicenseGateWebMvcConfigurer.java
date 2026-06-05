@@ -24,6 +24,7 @@ public class CeLicenseGateWebMvcConfigurer implements WebMvcConfigurer {
                 "/enterprise/capture-batch/**",
                 "/enterprise/capture-row/**",
                 "/enterprise/capture-cell/**",
+                "/enterprise/activity-import/**",
                 "/enterprise/template-version/**",
                 "/enterprise/template-sheet/**",
                 "/enterprise/template-field/**"

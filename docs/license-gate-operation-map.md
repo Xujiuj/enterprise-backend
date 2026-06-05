@@ -68,6 +68,7 @@ These endpoints should be treated as protected for EB-2 because they expose ente
 | `GET /enterprise/template-sheet/{id}` | `enterprise:templateSheet:query` | Template sheet details support enterprise validation/import behavior. |
 | `GET /enterprise/template-field/list` | `enterprise:templateField:list` | Template field inventory supports enterprise validation/import behavior. |
 | `GET /enterprise/template-field/{id}` | `enterprise:templateField:query` | Template field details support enterprise validation/import behavior. |
+| `POST /enterprise/activity-import/sheet-656/validate` | `enterprise:activityImportValidation:validate` | Validate-only import returns enterprise-local row/column validation results and should close with the license gate. |
 
 ## Exempt Operations
 

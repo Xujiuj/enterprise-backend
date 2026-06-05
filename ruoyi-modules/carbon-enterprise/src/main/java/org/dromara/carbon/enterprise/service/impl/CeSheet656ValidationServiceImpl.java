@@ -56,11 +56,15 @@ public class CeSheet656ValidationServiceImpl implements ICeSheet656ValidationSer
 
     private final ICeSheet656DerivedFieldResolver derivedFieldResolver;
 
+    public static List<CeSheet656FieldDescriptor> frozenFieldDescriptors() {
+        return FIELD_ORDER.stream()
+            .map(CeSheet656ValidationServiceImpl::toFieldDescriptor)
+            .toList();
+    }
+
     @Override
     public List<CeSheet656FieldDescriptor> listFrozenFields() {
-        return FIELD_ORDER.stream()
-            .map(this::toFieldDescriptor)
-            .toList();
+        return frozenFieldDescriptors();
     }
 
     @Override
@@ -231,7 +235,7 @@ public class CeSheet656ValidationServiceImpl implements ICeSheet656ValidationSer
         return value == null ? null : value.trim();
     }
 
-    private CeSheet656FieldDescriptor toFieldDescriptor(FieldDescriptor field) {
+    private static CeSheet656FieldDescriptor toFieldDescriptor(FieldDescriptor field) {
         CeSheet656FieldDescriptor descriptor = new CeSheet656FieldDescriptor();
         descriptor.setFieldOrder(field.fieldOrder());
         descriptor.setSourceColumnCode(field.sourceColumnCode());
