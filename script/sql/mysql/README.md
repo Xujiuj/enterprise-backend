@@ -10,7 +10,9 @@ Current status:
 - `carbon_enterprise_schema_v1.sql` is the first development DDL slice. It
   records Excel template versions, sheets, original fields, local capture
   batches/rows/cells, extension-field metadata, local license runtime state,
-  and factor cache versions.
+  factor cache versions, emission source configuration, factor confirmation,
+  activity data, green electricity certificates, intensity metrics, and report
+  template download metadata.
 - The schema is metadata-first so the full Excel field inventory can be loaded
   before generated CRUD tables are finalized.
 - Keep SQL Server migration compatibility in mind when adding MySQL types,

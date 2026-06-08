@@ -126,6 +126,137 @@ CREATE TABLE ce_extension_field (
 );
 GO
 
+CREATE TABLE ce_emission_source (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    source_code NVARCHAR(64) NOT NULL,
+    source_name NVARCHAR(255) NOT NULL,
+    source_category_code NVARCHAR(64) NOT NULL,
+    source_category_name NVARCHAR(255) NOT NULL,
+    facility_name NVARCHAR(255) NULL,
+    boundary_scope NVARCHAR(64) NOT NULL DEFAULT 'enterprise_local',
+    enabled_flag BIT NOT NULL DEFAULT 1,
+    create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT uk_ce_emission_source_code UNIQUE (source_code)
+);
+GO
+
+CREATE INDEX idx_ce_emission_source_category
+    ON ce_emission_source (source_category_code);
+GO
+
+CREATE TABLE ce_factor_confirmation (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    factor_code NVARCHAR(128) NOT NULL,
+    factor_name NVARCHAR(255) NOT NULL,
+    factor_version_code NVARCHAR(64) NOT NULL,
+    factor_unit NVARCHAR(64) NOT NULL,
+    factor_value DECIMAL(28, 10) NOT NULL,
+    confirmation_status NVARCHAR(32) NOT NULL DEFAULT 'pending',
+    confirmed_by NVARCHAR(64) NULL,
+    confirmed_time DATETIME2 NULL,
+    license_id NVARCHAR(128) NULL,
+    create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT uk_ce_factor_confirmation UNIQUE (factor_code, factor_version_code)
+);
+GO
+
+CREATE INDEX idx_ce_factor_confirmation_status
+    ON ce_factor_confirmation (confirmation_status);
+GO
+
+CREATE TABLE ce_activity_data (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    batch_id BIGINT NULL,
+    emission_source_id BIGINT NOT NULL,
+    activity_period NVARCHAR(32) NOT NULL,
+    activity_value DECIMAL(28, 10) NOT NULL,
+    activity_unit NVARCHAR(64) NOT NULL,
+    factor_confirmation_id BIGINT NULL,
+    calculated_emission DECIMAL(28, 10) NULL,
+    data_status NVARCHAR(32) NOT NULL DEFAULT 'draft',
+    create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT fk_ce_activity_data_batch
+        FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id),
+    CONSTRAINT fk_ce_activity_data_source
+        FOREIGN KEY (emission_source_id) REFERENCES ce_emission_source (id),
+    CONSTRAINT fk_ce_activity_data_factor
+        FOREIGN KEY (factor_confirmation_id) REFERENCES ce_factor_confirmation (id)
+);
+GO
+
+CREATE INDEX idx_ce_activity_data_period
+    ON ce_activity_data (activity_period, data_status);
+GO
+
+CREATE INDEX idx_ce_activity_data_source
+    ON ce_activity_data (emission_source_id);
+GO
+
+CREATE TABLE ce_green_power_certificate (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    certificate_code NVARCHAR(128) NOT NULL,
+    certificate_type NVARCHAR(64) NOT NULL,
+    energy_period NVARCHAR(32) NOT NULL,
+    energy_amount DECIMAL(28, 10) NOT NULL,
+    energy_unit NVARCHAR(64) NOT NULL DEFAULT 'MWh',
+    issuing_org NVARCHAR(255) NULL,
+    purchase_date DATETIME2 NULL,
+    expiry_date DATETIME2 NULL,
+    offset_source_code NVARCHAR(64) NULL,
+    proof_status NVARCHAR(32) NOT NULL DEFAULT 'draft',
+    create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT uk_ce_green_power_certificate UNIQUE (certificate_code)
+);
+GO
+
+CREATE INDEX idx_ce_green_power_period
+    ON ce_green_power_certificate (energy_period, proof_status);
+GO
+
+CREATE TABLE ce_intensity_metric (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    metric_code NVARCHAR(64) NOT NULL,
+    metric_name NVARCHAR(255) NOT NULL,
+    metric_period NVARCHAR(32) NOT NULL,
+    numerator_emission DECIMAL(28, 10) NOT NULL DEFAULT 0,
+    denominator_value DECIMAL(28, 10) NOT NULL DEFAULT 0,
+    denominator_unit NVARCHAR(64) NOT NULL,
+    intensity_value DECIMAL(28, 10) NULL,
+    metric_status NVARCHAR(32) NOT NULL DEFAULT 'draft',
+    create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT uk_ce_intensity_metric UNIQUE (metric_code, metric_period)
+);
+GO
+
+CREATE INDEX idx_ce_intensity_metric_status
+    ON ce_intensity_metric (metric_status);
+GO
+
+CREATE TABLE ce_report_template_file (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    template_code NVARCHAR(64) NOT NULL,
+    template_name NVARCHAR(255) NOT NULL,
+    template_type NVARCHAR(64) NOT NULL,
+    file_name NVARCHAR(255) NOT NULL,
+    file_path NVARCHAR(512) NOT NULL,
+    enabled_flag BIT NOT NULL DEFAULT 1,
+    create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT uk_ce_report_template_file UNIQUE (template_code)
+);
+GO
+
 CREATE TABLE ce_license_state (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     license_id NVARCHAR(128) NOT NULL,
@@ -152,6 +283,23 @@ CREATE TABLE ce_factor_cache_version (
     synced_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
     CONSTRAINT uk_ce_factor_cache_version UNIQUE (vendor_version_id, license_id)
 );
+GO
+
+IF NOT EXISTS (SELECT 1 FROM ce_report_template_file WHERE template_code = N'GHG_INVENTORY_V1')
+BEGIN
+    INSERT INTO ce_report_template_file (
+        template_code, template_name, template_type, file_name, file_path, enabled_flag, remark
+    )
+    VALUES (
+        N'GHG_INVENTORY_V1',
+        N'Greenhouse gas inventory report template',
+        N'inventory',
+        N'greenhouse-gas-inventory-template.xlsx',
+        N'enterprise/report-templates/greenhouse-gas-inventory-template.xlsx',
+        1,
+        N'Enterprise-side seed template; replace file_path during deployment'
+    );
+END
 GO
 
 CREATE VIEW rpt.v_LicenseGate AS

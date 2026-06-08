@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Thin validate-only import service for the frozen sheet_656 shape.
@@ -132,22 +134,36 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
         }
 
         List<CeSheet656ValidationResult> results = new ArrayList<>(rows.size());
+        Set<Integer> seenRowNumbers = new HashSet<>();
         for (CeSheet656ValidationRequest row : rows) {
-            if (row != null && row.getRowNumber() != null) {
-                results.add(rowValidator.validate(row));
+            Integer rowNumber = row == null ? null : row.getRowNumber();
+            if (rowNumber == null) {
+                results.add(invalidRowNumberResult(rowNumber, "ROW_NUMBER_MISSING",
+                    "rowNumber must be provided for each import row"));
                 continue;
             }
-            CeSheet656ValidationResult malformedResult = new CeSheet656ValidationResult();
-            malformedResult.setRowNumber(row == null ? null : row.getRowNumber());
-            malformedResult.setValid(false);
-            malformedResult.setBlocking(true);
-            malformedResult.setDraftSavable(false);
-            malformedResult.setResolvedDerivedFieldValues(Collections.emptyList());
-            malformedResult.setIssues(List.of(headerIssue("ROW_NUMBER_MISSING", "rowNumber", "rowNumber",
-                "rowNumber must be provided for each import row")));
-            results.add(malformedResult);
+            if (!seenRowNumbers.add(rowNumber)) {
+                results.add(invalidRowNumberResult(rowNumber, "DUPLICATE_ROW_NUMBER",
+                    "rowNumber must be unique within a sheet_656 import request"));
+                continue;
+            }
+            results.add(rowValidator.validate(row));
         }
         return results;
+    }
+
+    private CeSheet656ValidationResult invalidRowNumberResult(Integer rowNumber, String code, String message) {
+        CeSheet656ValidationIssue issue = headerIssue(code, "rowNumber", "rowNumber", message);
+        issue.setRowNumber(rowNumber);
+
+        CeSheet656ValidationResult result = new CeSheet656ValidationResult();
+        result.setRowNumber(rowNumber);
+        result.setValid(false);
+        result.setBlocking(true);
+        result.setDraftSavable(false);
+        result.setResolvedDerivedFieldValues(Collections.emptyList());
+        result.setIssues(List.of(issue));
+        return result;
     }
 
     private List<CeSheet656ValidationResult> resolverUnavailableResults(List<CeSheet656ValidationRequest> rows) {

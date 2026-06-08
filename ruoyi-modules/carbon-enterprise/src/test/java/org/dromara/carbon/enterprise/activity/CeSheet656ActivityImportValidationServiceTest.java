@@ -90,6 +90,31 @@ class CeSheet656ActivityImportValidationServiceTest {
     }
 
     @Test
+    void rejectsDuplicateRowNumbersBeforePersistCanUseThemAsKeys() {
+        CeSheet656ActivityImportValidationServiceImpl service = new CeSheet656ActivityImportValidationServiceImpl(
+            new CeSheet656ValidationServiceImpl(fakeResolver())
+        );
+
+        CeSheet656ImportValidationRequest request = validRequest();
+        request.setRows(List.of(row(values -> {
+        }), row(values -> {
+        })));
+
+        CeSheet656ImportValidationResult result = service.validateImport(request);
+
+        assertTrue(result.isHeaderValid());
+        assertFalse(result.isValid());
+        assertTrue(result.isBlocking());
+        assertEquals(2, result.getRowResults().size());
+        assertTrue(result.getRowResults().get(0).isValid());
+        assertFalse(result.getRowResults().get(1).isValid());
+        CeSheet656ValidationIssue issue = result.getRowResults().get(1).getIssues().get(0);
+        assertEquals("DUPLICATE_ROW_NUMBER", issue.getCode());
+        assertEquals(9, issue.getRowNumber());
+        assertEquals("rowNumber", issue.getSourceColumnCode());
+    }
+
+    @Test
     void headerMismatchBlocksRowsAndDoesNotCallRowValidator() {
         ICeSheet656ValidationService rowValidator = mock(ICeSheet656ValidationService.class);
         when(rowValidator.listFrozenFields()).thenReturn(frozenHeader());

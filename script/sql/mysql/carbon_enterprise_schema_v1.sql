@@ -133,6 +133,119 @@ CREATE TABLE IF NOT EXISTS ce_extension_field (
         FOREIGN KEY (sheet_id) REFERENCES ce_template_sheet (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise allowed extension fields';
 
+CREATE TABLE IF NOT EXISTS ce_emission_source (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    source_code VARCHAR(64) NOT NULL,
+    source_name VARCHAR(255) NOT NULL,
+    source_category_code VARCHAR(64) NOT NULL,
+    source_category_name VARCHAR(255) NOT NULL,
+    facility_name VARCHAR(255) DEFAULT NULL,
+    boundary_scope VARCHAR(64) NOT NULL DEFAULT 'enterprise_local',
+    enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_emission_source_code (source_code),
+    KEY idx_ce_emission_source_category (source_category_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local emission source configuration';
+
+CREATE TABLE IF NOT EXISTS ce_factor_confirmation (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    factor_code VARCHAR(128) NOT NULL,
+    factor_name VARCHAR(255) NOT NULL,
+    factor_version_code VARCHAR(64) NOT NULL,
+    factor_unit VARCHAR(64) NOT NULL,
+    factor_value DECIMAL(28, 10) NOT NULL,
+    confirmation_status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    confirmed_by VARCHAR(64) DEFAULT NULL,
+    confirmed_time DATETIME DEFAULT NULL,
+    license_id VARCHAR(128) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_factor_confirmation (factor_code, factor_version_code),
+    KEY idx_ce_factor_confirmation_status (confirmation_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local emission factor confirmation';
+
+CREATE TABLE IF NOT EXISTS ce_activity_data (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    batch_id BIGINT DEFAULT NULL,
+    emission_source_id BIGINT NOT NULL,
+    activity_period VARCHAR(32) NOT NULL,
+    activity_value DECIMAL(28, 10) NOT NULL,
+    activity_unit VARCHAR(64) NOT NULL,
+    factor_confirmation_id BIGINT DEFAULT NULL,
+    calculated_emission DECIMAL(28, 10) DEFAULT NULL,
+    data_status VARCHAR(32) NOT NULL DEFAULT 'draft',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    KEY idx_ce_activity_data_period (activity_period, data_status),
+    KEY idx_ce_activity_data_source (emission_source_id),
+    CONSTRAINT fk_ce_activity_data_batch
+        FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id),
+    CONSTRAINT fk_ce_activity_data_source
+        FOREIGN KEY (emission_source_id) REFERENCES ce_emission_source (id),
+    CONSTRAINT fk_ce_activity_data_factor
+        FOREIGN KEY (factor_confirmation_id) REFERENCES ce_factor_confirmation (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local activity data';
+
+CREATE TABLE IF NOT EXISTS ce_green_power_certificate (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    certificate_code VARCHAR(128) NOT NULL,
+    certificate_type VARCHAR(64) NOT NULL,
+    energy_period VARCHAR(32) NOT NULL,
+    energy_amount DECIMAL(28, 10) NOT NULL,
+    energy_unit VARCHAR(64) NOT NULL DEFAULT 'MWh',
+    issuing_org VARCHAR(255) DEFAULT NULL,
+    purchase_date DATETIME DEFAULT NULL,
+    expiry_date DATETIME DEFAULT NULL,
+    offset_source_code VARCHAR(64) DEFAULT NULL,
+    proof_status VARCHAR(32) NOT NULL DEFAULT 'draft',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_green_power_certificate (certificate_code),
+    KEY idx_ce_green_power_period (energy_period, proof_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local green electricity and certificate proof';
+
+CREATE TABLE IF NOT EXISTS ce_intensity_metric (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    metric_code VARCHAR(64) NOT NULL,
+    metric_name VARCHAR(255) NOT NULL,
+    metric_period VARCHAR(32) NOT NULL,
+    numerator_emission DECIMAL(28, 10) NOT NULL DEFAULT 0,
+    denominator_value DECIMAL(28, 10) NOT NULL DEFAULT 0,
+    denominator_unit VARCHAR(64) NOT NULL,
+    intensity_value DECIMAL(28, 10) DEFAULT NULL,
+    metric_status VARCHAR(32) NOT NULL DEFAULT 'draft',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_intensity_metric (metric_code, metric_period),
+    KEY idx_ce_intensity_metric_status (metric_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local carbon intensity metric';
+
+CREATE TABLE IF NOT EXISTS ce_report_template_file (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    template_code VARCHAR(64) NOT NULL,
+    template_name VARCHAR(255) NOT NULL,
+    template_type VARCHAR(64) NOT NULL,
+    file_name VARCHAR(255) NOT NULL,
+    file_path VARCHAR(512) NOT NULL,
+    enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_report_template_file (template_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local report template download catalog';
+
 CREATE TABLE IF NOT EXISTS ce_license_state (
     id BIGINT NOT NULL AUTO_INCREMENT,
     license_id VARCHAR(128) NOT NULL,
@@ -160,3 +273,18 @@ CREATE TABLE IF NOT EXISTS ce_factor_cache_version (
     PRIMARY KEY (id),
     UNIQUE KEY uk_ce_factor_cache_version (vendor_version_id, license_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local factor cache version';
+
+INSERT INTO ce_report_template_file (
+    template_code, template_name, template_type, file_name, file_path, enabled_flag, remark
+)
+SELECT
+    'GHG_INVENTORY_V1',
+    'Greenhouse gas inventory report template',
+    'inventory',
+    'greenhouse-gas-inventory-template.xlsx',
+    'enterprise/report-templates/greenhouse-gas-inventory-template.xlsx',
+    1,
+    'Enterprise-side seed template; replace file_path during deployment'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ce_report_template_file WHERE template_code = 'GHG_INVENTORY_V1'
+);

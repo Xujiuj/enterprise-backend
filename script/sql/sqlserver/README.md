@@ -6,7 +6,10 @@ scripts.
 
 Current status:
 - `carbon_enterprise_schema_v1.sql` mirrors the MySQL development foundation
-  and creates the initial `rpt` schema views.
+  and creates the initial `rpt` schema views. It includes the enterprise-local
+  business tables for emission sources, factor confirmation, activity data,
+  green electricity certificates, intensity metrics, and report template
+  download metadata.
 - `carbon_enterprise_permissions_v1.sql` reserves the read-only `pbi_user`
   permission shape for Power BI access.
 - Enterprise business data remains local to this backend. Vendor access is not
