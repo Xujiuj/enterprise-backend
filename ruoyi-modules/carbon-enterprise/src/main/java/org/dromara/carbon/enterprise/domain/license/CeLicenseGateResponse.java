@@ -32,6 +32,7 @@ public class CeLicenseGateResponse {
             case "EXPIRED" -> "license has expired";
             case "CLOCK_ROLLBACK" -> "system time is earlier than the last observed license verification time";
             case "INSTALL_ID_MISMATCH" -> "license installId does not match local installId";
+            case "FEATURE_NOT_ENABLED" -> "license does not include the required feature";
             case "NO_VALID_LICENSE" -> "no valid enterprise license is currently available";
             default -> "enterprise license gate denied access";
         };

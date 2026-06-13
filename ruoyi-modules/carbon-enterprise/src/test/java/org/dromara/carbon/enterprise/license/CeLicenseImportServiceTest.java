@@ -48,6 +48,10 @@ class CeLicenseImportServiceTest {
         assertEquals(EXPECTED_INSTALL_ID, result.getLicenseState().getInstallId());
         assertEquals("VALID", result.getLicenseState().getLicenseStatus());
         assertEquals(VERIFICATION_TIME, result.getLicenseState().getMaxObservedTime());
+        assertEquals("capture,factor-sync,report-gate", result.getLicenseState().getFeatureCodes());
+        assertEquals(64, result.getLicenseState().getPayloadDigest().length());
+        assertTrue(result.getLicenseState().getCurrentSummary().contains("edition=enterprise"));
+        assertTrue(result.getLicenseState().getCurrentSummary().contains("features=capture,factor-sync,report-gate"));
     }
 
     @Test

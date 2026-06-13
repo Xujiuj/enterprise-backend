@@ -10,6 +10,8 @@ import org.dromara.common.core.utils.StringUtils;
  */
 public class BaseController {
 
+    private static final String OPERATION_FAILED_MESSAGE = "操作失败：未更新到任何数据，请确认记录是否存在或当前状态是否允许操作";
+
     /**
      * 响应返回结果
      *
@@ -17,7 +19,7 @@ public class BaseController {
      * @return 操作结果
      */
     protected R<Void> toAjax(int rows) {
-        return rows > 0 ? R.ok() : R.fail();
+        return rows > 0 ? R.ok() : R.fail(OPERATION_FAILED_MESSAGE);
     }
 
     /**
@@ -27,7 +29,7 @@ public class BaseController {
      * @return 操作结果
      */
     protected R<Void> toAjax(boolean result) {
-        return result ? R.ok() : R.fail();
+        return result ? R.ok() : R.fail(OPERATION_FAILED_MESSAGE);
     }
 
     /**

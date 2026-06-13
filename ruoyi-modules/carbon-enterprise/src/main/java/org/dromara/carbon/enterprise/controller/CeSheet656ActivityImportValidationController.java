@@ -14,7 +14,9 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Validate-only import API for the frozen sheet_656 activity shape.
@@ -32,6 +34,12 @@ public class CeSheet656ActivityImportValidationController extends BaseController
     @PostMapping("/validate")
     public R<CeSheet656ImportValidationResult> validate(@RequestBody CeSheet656ImportValidationRequest request) {
         return R.ok(activityImportValidationService.validateImport(request));
+    }
+
+    @SaCheckPermission("enterprise:activityImportValidation:validate")
+    @PostMapping("/parse-file")
+    public R<CeSheet656ImportValidationRequest> parseFile(@RequestPart("file") MultipartFile file) {
+        return R.ok(activityImportValidationService.parseImportFile(file));
     }
 
     @SaCheckPermission("enterprise:activity:save")

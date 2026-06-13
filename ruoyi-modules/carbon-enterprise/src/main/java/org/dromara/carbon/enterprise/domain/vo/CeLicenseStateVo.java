@@ -40,5 +40,11 @@ public class CeLicenseStateVo implements Serializable {
 
     private Date maxObservedTime;
 
+    private String featureCodes;
+
+    private String payloadDigest;
+
+    private String currentSummary;
+
     private String licenseStatus;
 }

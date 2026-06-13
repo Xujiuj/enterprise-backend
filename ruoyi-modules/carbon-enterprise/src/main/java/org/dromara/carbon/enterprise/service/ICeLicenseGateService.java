@@ -9,5 +9,9 @@ import java.util.Date;
  */
 public interface ICeLicenseGateService {
 
-    CeLicenseGateResult evaluateCurrent(String expectedInstallId, Date evaluationTime);
+    default CeLicenseGateResult evaluateCurrent(String expectedInstallId, Date evaluationTime) {
+        return evaluateCurrent(expectedInstallId, evaluationTime, null);
+    }
+
+    CeLicenseGateResult evaluateCurrent(String expectedInstallId, Date evaluationTime, String requiredFeatureCode);
 }

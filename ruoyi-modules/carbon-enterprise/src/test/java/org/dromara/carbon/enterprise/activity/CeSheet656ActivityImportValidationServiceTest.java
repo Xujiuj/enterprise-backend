@@ -1,5 +1,6 @@
 package org.dromara.carbon.enterprise.activity;
 
+import cn.idev.excel.FastExcel;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656FieldDescriptor;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656FieldValue;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ImportValidationRequest;
@@ -11,11 +12,15 @@ import org.dromara.carbon.enterprise.service.ICeSheet656DerivedFieldResolver;
 import org.dromara.carbon.enterprise.service.ICeSheet656ValidationService;
 import org.dromara.carbon.enterprise.service.impl.CeSheet656ActivityImportValidationServiceImpl;
 import org.dromara.carbon.enterprise.service.impl.CeSheet656ValidationServiceImpl;
+import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +29,7 @@ import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -32,6 +38,80 @@ import static org.mockito.Mockito.when;
 
 @Tag("dev")
 class CeSheet656ActivityImportValidationServiceTest {
+
+    @Test
+    void parsesXlsxRowsByHeaderCodeAndSkipsBlankRows() {
+        CeSheet656ActivityImportValidationServiceImpl service = new CeSheet656ActivityImportValidationServiceImpl(
+            new CeSheet656ValidationServiceImpl(fakeResolver())
+        );
+
+        CeSheet656ImportValidationRequest request = service.parseImportFile(xlsxFile(
+            frozenHeader().stream().map(CeSheet656FieldDescriptor::getSourceColumnCode).toList(),
+            List.of(
+                rowValues("SRC-001", "COMP-001", "Company One", "Factory One", "CAT-001", "Scope 1",
+                    "Stationary Combustion", "Natural Gas Boiler", "Natural Gas", "Nm3",
+                    "2026", "6", "2026-06-05", "12.5", "Production", "Meter", "Normal record", "EF-2026-001"),
+                blankRowValues(),
+                rowValues("SRC-001", "COMP-001", "Company One", "Factory One", "CAT-001", "Scope 1",
+                    "Stationary Combustion", "Natural Gas Boiler", "Natural Gas", "Nm3",
+                    "2026", "7", "2026-07-05", "18.5", "Production", "Meter", "Second record", "EF-2026-001")
+            )
+        ));
+
+        assertEquals(18, request.getHeaderFields().size());
+        assertEquals("PK_排放源识别编号", request.getHeaderFields().get(0).getSourceColumnName());
+        assertEquals(2, request.getRows().size());
+        assertEquals(2, request.getRows().get(0).getRowNumber());
+        assertEquals(4, request.getRows().get(1).getRowNumber());
+        assertEquals("12.5", fieldValue(request.getRows().get(0), "f014"));
+        assertEquals("Second record", fieldValue(request.getRows().get(1), "f017"));
+    }
+
+    @Test
+    void rejectsEmptyUploadFile() {
+        CeSheet656ActivityImportValidationServiceImpl service = new CeSheet656ActivityImportValidationServiceImpl(
+            new CeSheet656ValidationServiceImpl(fakeResolver())
+        );
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.parseImportFile(new MockMultipartFile("file", "sheet_656.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[0])));
+
+        assertEquals("请上传非空的 sheet_656 Excel 文件", exception.getMessage());
+    }
+
+    @Test
+    void rejectsNonXlsxUploadFile() {
+        CeSheet656ActivityImportValidationServiceImpl service = new CeSheet656ActivityImportValidationServiceImpl(
+            new CeSheet656ValidationServiceImpl(fakeResolver())
+        );
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.parseImportFile(new MockMultipartFile("file", "sheet_656.csv", "text/csv", "a,b".getBytes())));
+
+        assertEquals("sheet_656 仅支持上传 .xlsx 文件", exception.getMessage());
+    }
+
+    @Test
+    void rejectsMissingRequiredHeaderDuringParse() {
+        CeSheet656ActivityImportValidationServiceImpl service = new CeSheet656ActivityImportValidationServiceImpl(
+            new CeSheet656ValidationServiceImpl(fakeResolver())
+        );
+
+        List<String> headers = frozenHeader().stream()
+            .map(CeSheet656FieldDescriptor::getSourceColumnName)
+            .toList();
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.parseImportFile(xlsxFile(headers.subList(0, headers.size() - 1), List.of(
+                rowValues("SRC-001", "COMP-001", "Company One", "Factory One", "CAT-001", "Scope 1",
+                    "Stationary Combustion", "Natural Gas Boiler", "Natural Gas", "Nm3",
+                    "2026", "6", "2026-06-05", "12.5", "Production", "Meter", "Normal record")
+            ))));
+
+        assertTrue(exception.getMessage().contains("缺少必要表头"));
+        assertTrue(exception.getMessage().contains("FK_排放因子"));
+    }
 
     @Test
     void validatesFrozenHeaderAndRows() {
@@ -261,6 +341,36 @@ class CeSheet656ActivityImportValidationServiceTest {
         fieldValue.setSourceColumnCode(code);
         fieldValue.setValue(value);
         return fieldValue;
+    }
+
+    private String fieldValue(CeSheet656ValidationRequest row, String code) {
+        return row.getFieldValues().stream()
+            .filter(fieldValue -> code.equals(fieldValue.getSourceColumnCode()))
+            .findFirst()
+            .map(CeSheet656FieldValue::getValue)
+            .orElse(null);
+    }
+
+    private MockMultipartFile xlsxFile(List<String> headers, List<List<String>> dataRows) {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(headers);
+        rows.addAll(dataRows);
+        FastExcel.write(outputStream).sheet("sheet_656").doWrite(rows);
+        return new MockMultipartFile(
+            "file",
+            "sheet_656.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            outputStream.toByteArray()
+        );
+    }
+
+    private List<String> rowValues(String... values) {
+        return List.of(values);
+    }
+
+    private List<String> blankRowValues() {
+        return new ArrayList<>(Collections.nCopies(18, ""));
     }
 
     private ICeSheet656DerivedFieldResolver fakeResolver() {

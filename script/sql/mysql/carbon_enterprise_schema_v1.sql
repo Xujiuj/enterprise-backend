@@ -133,6 +133,30 @@ CREATE TABLE IF NOT EXISTS ce_extension_field (
         FOREIGN KEY (sheet_id) REFERENCES ce_template_sheet (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise allowed extension fields';
 
+CREATE TABLE IF NOT EXISTS ce_dimension_record (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    dimension_code VARCHAR(64) NOT NULL,
+    record_code VARCHAR(128) NOT NULL,
+    record_name VARCHAR(255) NOT NULL,
+    parent_code VARCHAR(128) DEFAULT NULL,
+    source_type VARCHAR(32) NOT NULL DEFAULT 'enterprise',
+    field01 VARCHAR(255) DEFAULT NULL,
+    field02 VARCHAR(255) DEFAULT NULL,
+    field03 VARCHAR(255) DEFAULT NULL,
+    field04 VARCHAR(255) DEFAULT NULL,
+    field05 VARCHAR(255) DEFAULT NULL,
+    field06 VARCHAR(255) DEFAULT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    status CHAR(1) NOT NULL DEFAULT '0',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_dimension_record (dimension_code, record_code),
+    KEY idx_ce_dimension_record_name (dimension_code, record_name),
+    KEY idx_ce_dimension_record_status (dimension_code, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise configurable dimension record';
+
 CREATE TABLE IF NOT EXISTS ce_emission_source (
     id BIGINT NOT NULL AUTO_INCREMENT,
     source_code VARCHAR(64) NOT NULL,
@@ -258,10 +282,37 @@ CREATE TABLE IF NOT EXISTS ce_license_state (
     valid_to DATETIME NOT NULL,
     last_verified_time DATETIME DEFAULT NULL,
     max_observed_time DATETIME DEFAULT NULL,
-    license_status VARCHAR(32) NOT NULL DEFAULT 'active',
+    feature_codes TEXT DEFAULT NULL,
+    payload_digest VARCHAR(128) DEFAULT NULL,
+    current_summary VARCHAR(1024) DEFAULT NULL,
+    license_status VARCHAR(32) NOT NULL DEFAULT 'VALID',
     PRIMARY KEY (id),
     UNIQUE KEY uk_ce_license_state_license (license_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local license runtime state';
+
+INSERT INTO ce_dimension_record (
+    dimension_code, record_code, record_name, parent_code, source_type,
+    field01, field02, field03, field04, field05, field06,
+    sort_order, status, remark
+)
+SELECT * FROM (
+    SELECT 'company' AS dimension_code, 'ENT-001' AS record_code, '宁波低碳示范企业' AS record_name, NULL AS parent_code, 'enterprise' AS source_type, '法人主体' AS field01, '330200' AS field02, '91330200MA000001X1' AS field03, NULL AS field04, NULL AS field05, NULL AS field06, 1 AS sort_order, '0' AS status, '企业主体示例' AS remark UNION ALL
+    SELECT 'emission-source', 'ES-001', '总部办公楼外购电', NULL, 'enterprise', 'ENT-001', 'SCOPE2-PURCHASED-ELEC', 'kWh', 'EF-ELEC-ZJ-2025', NULL, NULL, 1, '0', '排放源示例' UNION ALL
+    SELECT 'ef-factor', 'EF-DIESEL-2025', '柴油燃烧排放因子', NULL, 'enterprise', 'tCO2e/t', '生态环境部指南', 'ES-柴油', '2025', NULL, NULL, 1, '0', '排放因子示例' UNION ALL
+    SELECT 'emission-activity-data', 'AD-2026-001', '2026年1月总部外购电', NULL, 'enterprise', 'ES-001', '2026-01', '120000', 'kWh', '行政部', NULL, 1, '0', '活动数据示例' UNION ALL
+    SELECT 'green-electricity-data', 'GP-2026-001', '2026年1月绿证抵扣', NULL, 'enterprise', '绿证', '5000', 'MWh', '2026-01-15', '2027-01-14', NULL, 1, '0', '绿电绿证示例' UNION ALL
+    SELECT 'intensity-denominator', 'DEN-REVENUE', '营业收入', NULL, 'enterprise', '营收', '万元', 'ENT-001', NULL, NULL, NULL, 1, '0', '强度分母示例' UNION ALL
+    SELECT 'intensity-target', 'TARGET-2026-REV', '2026营收强度目标', NULL, 'enterprise', '2026', '单位营收排放强度', '0.85', 'BASE-2025', NULL, NULL, 1, '0', '强度目标示例' UNION ALL
+    SELECT 'denominator-fact', 'FACT-2026-01-REV', '2026年1月营业收入', NULL, 'enterprise', '2026-01', 'DEN-REVENUE', '8600', '财务部', NULL, NULL, 1, '0', '分母事实示例' UNION ALL
+    SELECT 'intensity-tolerance', 'TOL-REV-2026', '营收强度波动容忍率', NULL, 'enterprise', '单位营收排放强度', '10', '2026-01', '2026-12', NULL, NULL, 1, '0', '容忍率示例' UNION ALL
+    SELECT 'data-validation', 'RULE-AD-NOT-NULL', '活动数据必填校验', NULL, 'system', '生产部', '月度', '强错误', 'activity_value != null', NULL, NULL, 1, '0', '验证规则示例'
+) seed
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM ce_dimension_record existing
+    WHERE existing.dimension_code = seed.dimension_code
+      AND existing.record_code = seed.record_code
+);
 
 CREATE TABLE IF NOT EXISTS ce_factor_cache_version (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -273,6 +324,42 @@ CREATE TABLE IF NOT EXISTS ce_factor_cache_version (
     PRIMARY KEY (id),
     UNIQUE KEY uk_ce_factor_cache_version (vendor_version_id, license_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local factor cache version';
+
+CREATE TABLE IF NOT EXISTS ce_factor_cache_record (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    cache_version_id BIGINT NOT NULL,
+    factor_code VARCHAR(128) NOT NULL,
+    factor_name VARCHAR(255) NOT NULL,
+    factor_category VARCHAR(128) NOT NULL,
+    factor_value DECIMAL(28, 10) NOT NULL,
+    factor_unit VARCHAR(64) NOT NULL,
+    source_ref VARCHAR(512) DEFAULT NULL,
+    enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
+    synced_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_factor_cache_record (cache_version_id, factor_code),
+    KEY idx_ce_factor_cache_record_code (factor_code),
+    CONSTRAINT fk_ce_factor_cache_record_version
+        FOREIGN KEY (cache_version_id) REFERENCES ce_factor_cache_version (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local factor cache record';
+
+CREATE TABLE IF NOT EXISTS ce_extension_field_value (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    owner_table_code VARCHAR(128) NOT NULL,
+    owner_record_id BIGINT NOT NULL,
+    extension_field_id BIGINT NOT NULL,
+    text_value TEXT DEFAULT NULL,
+    decimal_value DECIMAL(28, 10) DEFAULT NULL,
+    date_value DATETIME DEFAULT NULL,
+    boolean_value TINYINT(1) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_extension_field_value (owner_table_code, owner_record_id, extension_field_id),
+    KEY idx_ce_extension_field_value_field (extension_field_id),
+    CONSTRAINT fk_ce_extension_field_value_field
+        FOREIGN KEY (extension_field_id) REFERENCES ce_extension_field (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise extension field value for allowed local forms';
 
 INSERT INTO ce_report_template_file (
     template_code, template_name, template_type, file_name, file_path, enabled_flag, remark

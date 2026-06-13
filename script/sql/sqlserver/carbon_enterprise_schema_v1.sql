@@ -126,6 +126,36 @@ CREATE TABLE ce_extension_field (
 );
 GO
 
+CREATE TABLE ce_dimension_record (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    dimension_code NVARCHAR(64) NOT NULL,
+    record_code NVARCHAR(128) NOT NULL,
+    record_name NVARCHAR(255) NOT NULL,
+    parent_code NVARCHAR(128) NULL,
+    source_type NVARCHAR(32) NOT NULL DEFAULT 'enterprise',
+    field01 NVARCHAR(255) NULL,
+    field02 NVARCHAR(255) NULL,
+    field03 NVARCHAR(255) NULL,
+    field04 NVARCHAR(255) NULL,
+    field05 NVARCHAR(255) NULL,
+    field06 NVARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    status NCHAR(1) NOT NULL DEFAULT '0',
+    create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT uk_ce_dimension_record UNIQUE (dimension_code, record_code)
+);
+GO
+
+CREATE INDEX idx_ce_dimension_record_name
+    ON ce_dimension_record (dimension_code, record_name);
+GO
+
+CREATE INDEX idx_ce_dimension_record_status
+    ON ce_dimension_record (dimension_code, status);
+GO
+
 CREATE TABLE ce_emission_source (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     source_code NVARCHAR(64) NOT NULL,
@@ -269,7 +299,10 @@ CREATE TABLE ce_license_state (
     valid_to DATETIME2 NOT NULL,
     last_verified_time DATETIME2 NULL,
     max_observed_time DATETIME2 NULL,
-    license_status NVARCHAR(32) NOT NULL DEFAULT 'active',
+    feature_codes NVARCHAR(MAX) NULL,
+    payload_digest NVARCHAR(128) NULL,
+    current_summary NVARCHAR(1024) NULL,
+    license_status NVARCHAR(32) NOT NULL DEFAULT 'VALID',
     CONSTRAINT uk_ce_license_state_license UNIQUE (license_id)
 );
 GO
@@ -283,6 +316,48 @@ CREATE TABLE ce_factor_cache_version (
     synced_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
     CONSTRAINT uk_ce_factor_cache_version UNIQUE (vendor_version_id, license_id)
 );
+GO
+
+CREATE TABLE ce_factor_cache_record (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    cache_version_id BIGINT NOT NULL,
+    factor_code NVARCHAR(128) NOT NULL,
+    factor_name NVARCHAR(255) NOT NULL,
+    factor_category NVARCHAR(128) NOT NULL,
+    factor_value DECIMAL(28, 10) NOT NULL,
+    factor_unit NVARCHAR(64) NOT NULL,
+    source_ref NVARCHAR(512) NULL,
+    enabled_flag BIT NOT NULL DEFAULT 1,
+    synced_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT uk_ce_factor_cache_record UNIQUE (cache_version_id, factor_code),
+    CONSTRAINT fk_ce_factor_cache_record_version
+        FOREIGN KEY (cache_version_id) REFERENCES ce_factor_cache_version (id)
+);
+GO
+
+CREATE INDEX idx_ce_factor_cache_record_code
+    ON ce_factor_cache_record (factor_code);
+GO
+
+CREATE TABLE ce_extension_field_value (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    owner_table_code NVARCHAR(128) NOT NULL,
+    owner_record_id BIGINT NOT NULL,
+    extension_field_id BIGINT NOT NULL,
+    text_value NVARCHAR(MAX) NULL,
+    decimal_value DECIMAL(28, 10) NULL,
+    date_value DATETIME2 NULL,
+    boolean_value BIT NULL,
+    create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT uk_ce_extension_field_value UNIQUE (owner_table_code, owner_record_id, extension_field_id),
+    CONSTRAINT fk_ce_extension_field_value_field
+        FOREIGN KEY (extension_field_id) REFERENCES ce_extension_field (id)
+);
+GO
+
+CREATE INDEX idx_ce_extension_field_value_field
+    ON ce_extension_field_value (extension_field_id);
 GO
 
 IF NOT EXISTS (SELECT 1 FROM ce_report_template_file WHERE template_code = N'GHG_INVENTORY_V1')
@@ -311,7 +386,7 @@ SELECT
     valid_from,
     valid_to
 FROM ce_license_state
-WHERE license_status = 'active'
+WHERE license_status = 'VALID'
   AND valid_from <= SYSUTCDATETIME()
   AND valid_to >= SYSUTCDATETIME();
 GO
@@ -327,5 +402,62 @@ SELECT
     r.row_status
 FROM ce_capture_batch b
 INNER JOIN ce_capture_row r ON r.batch_id = b.id
+WHERE EXISTS (SELECT 1 FROM rpt.v_LicenseGate);
+GO
+
+CREATE VIEW rpt.v_ActivityDataFact AS
+SELECT
+    a.id AS activity_data_id,
+    a.batch_id,
+    a.activity_period,
+    a.activity_value,
+    a.activity_unit,
+    a.calculated_emission,
+    a.data_status,
+    s.source_code,
+    s.source_name,
+    s.source_category_code,
+    s.source_category_name,
+    s.facility_name,
+    f.factor_code,
+    f.factor_name,
+    f.factor_version_code,
+    f.factor_value,
+    f.factor_unit
+FROM ce_activity_data a
+INNER JOIN ce_emission_source s ON s.id = a.emission_source_id
+LEFT JOIN ce_factor_confirmation f ON f.id = a.factor_confirmation_id
+WHERE EXISTS (SELECT 1 FROM rpt.v_LicenseGate);
+GO
+
+CREATE VIEW rpt.v_GreenElectricityFact AS
+SELECT
+    id AS certificate_id,
+    certificate_code,
+    certificate_type,
+    energy_period,
+    energy_amount,
+    energy_unit,
+    issuing_org,
+    purchase_date,
+    expiry_date,
+    offset_source_code,
+    proof_status
+FROM ce_green_power_certificate
+WHERE EXISTS (SELECT 1 FROM rpt.v_LicenseGate);
+GO
+
+CREATE VIEW rpt.v_IntensityMetricFact AS
+SELECT
+    id AS metric_id,
+    metric_code,
+    metric_name,
+    metric_period,
+    numerator_emission,
+    denominator_value,
+    denominator_unit,
+    intensity_value,
+    metric_status
+FROM ce_intensity_metric
 WHERE EXISTS (SELECT 1 FROM rpt.v_LicenseGate);
 GO

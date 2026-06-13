@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 
@@ -79,7 +81,7 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
                 return CeLicenseImportResult.invalid("CLOCK_ROLLBACK", "system time is earlier than max observed time");
             }
 
-            return CeLicenseImportResult.valid(buildLicenseState(envelope, payload, validFrom, validTo, checkedAt, maxObservedTime));
+            return CeLicenseImportResult.valid(buildLicenseState(envelope, payload, canonicalPayload, validFrom, validTo, checkedAt, maxObservedTime));
         } catch (Exception e) {
             return CeLicenseImportResult.invalid("MALFORMED_LICENSE", e.getMessage());
         }
@@ -151,8 +153,8 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
         }
     }
 
-    private CeLicenseState buildLicenseState(CeLicenseEnvelope envelope, CeLicensePayload payload, Date validFrom,
-                                             Date validTo, Date checkedAt, Date maxObservedTime) {
+    private CeLicenseState buildLicenseState(CeLicenseEnvelope envelope, CeLicensePayload payload, byte[] canonicalPayload,
+                                             Date validFrom, Date validTo, Date checkedAt, Date maxObservedTime) {
         CeLicenseState state = new CeLicenseState();
         state.setLicenseId(payload.getLicenseId());
         state.setCustomerId(payload.getCustomerId());
@@ -164,8 +166,26 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
         state.setValidTo(validTo);
         state.setLastVerifiedTime(checkedAt);
         state.setMaxObservedTime(laterOf(checkedAt, maxObservedTime));
+        state.setFeatureCodes(String.join(",", payload.getFeatures()));
+        state.setPayloadDigest(sha256Hex(canonicalPayload));
+        state.setCurrentSummary(buildCurrentSummary(payload));
         state.setLicenseStatus("VALID");
         return state;
+    }
+
+    private String sha256Hex(byte[] canonicalPayload) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonicalPayload));
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 digest is unavailable", e);
+        }
+    }
+
+    private String buildCurrentSummary(CeLicensePayload payload) {
+        return "customerName=" + payload.getCustomerName()
+            + ";edition=" + payload.getEdition()
+            + ";features=" + String.join(",", payload.getFeatures())
+            + ";templateEntitlements=" + payload.getTemplateEntitlements().size();
     }
 
     private Date laterOf(Date left, Date right) {

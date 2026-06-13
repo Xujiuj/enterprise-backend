@@ -17,6 +17,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Map;
 
 /**
  * Enforces the enterprise license gate for protected enterprise endpoints.
@@ -25,16 +26,23 @@ import java.util.Date;
 @Component
 public class CeLicenseGateInterceptor implements HandlerInterceptor {
 
+    private static final Map<String, String> FEATURE_BY_PATH_PREFIX = Map.of(
+        "/enterprise/factor-sync/", "factor-sync",
+        "/enterprise/report-template-sync/", "report-template-download",
+        "/enterprise/report-template-file/", "report-template-download",
+        "/enterprise/data-validation/", "report-gate"
+    );
+
     private final ICeLicenseGateService licenseGateService;
     private final CeLicenseInstallIdProvider installIdProvider;
     private final ObjectMapper objectMapper;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        CeLicenseGateResult result = licenseGateService.evaluateCurrent(
-            installIdProvider.getExpectedInstallId(),
-            new Date()
-        );
+        String requiredFeatureCode = requiredFeatureCode(request);
+        CeLicenseGateResult result = requiredFeatureCode == null
+            ? licenseGateService.evaluateCurrent(installIdProvider.getExpectedInstallId(), new Date())
+            : licenseGateService.evaluateCurrent(installIdProvider.getExpectedInstallId(), new Date(), requiredFeatureCode);
         if ("ALLOW".equals(result.getDecision())) {
             return true;
         }
@@ -48,6 +56,20 @@ public class CeLicenseGateInterceptor implements HandlerInterceptor {
         response.setCharacterEncoding(StandardCharsets.UTF_8.toString());
         writeJson(response, payload);
         return false;
+    }
+
+    private String requiredFeatureCode(HttpServletRequest request) {
+        String requestPath = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isEmpty() && requestPath.startsWith(contextPath)) {
+            requestPath = requestPath.substring(contextPath.length());
+        }
+        for (Map.Entry<String, String> entry : FEATURE_BY_PATH_PREFIX.entrySet()) {
+            if (requestPath.startsWith(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     private void writeJson(HttpServletResponse response, R<CeLicenseGateBlockedResponse> payload) {

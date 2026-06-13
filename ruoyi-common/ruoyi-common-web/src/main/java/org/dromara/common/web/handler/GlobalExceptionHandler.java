@@ -41,6 +41,8 @@ import java.io.IOException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final String UNEXPECTED_ERROR_MESSAGE = "系统处理失败，请稍后重试或联系管理员";
+
     /**
      * 请求方式不支持
      */
@@ -79,8 +81,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ServletException.class)
     public R<Void> handleServletException(ServletException e, HttpServletRequest request) {
         String requestURI = request.getRequestURI();
-        log.error("请求地址'{}',发生未知异常.", requestURI, e);
-        return R.fail("发生未知异常，请联系管理员");
+        log.error("请求地址'{}',发生未归类Servlet异常.", requestURI, e);
+        return R.fail(UNEXPECTED_ERROR_MESSAGE);
     }
 
     /**
@@ -123,7 +125,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 拦截未知的运行时异常
+     * 拦截未归类的运行时异常
      */
     @ResponseStatus(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
     @ExceptionHandler(IOException.class)
@@ -144,13 +146,13 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 拦截未知的运行时异常
+     * 拦截未归类的运行时异常
      */
     @ExceptionHandler(RuntimeException.class)
     public R<Void> handleRuntimeException(RuntimeException e, HttpServletRequest request) {
         String requestURI = request.getRequestURI();
-        log.error("请求地址'{}',发生未知异常.", requestURI, e);
-        return R.fail("发生未知异常，请联系管理员");
+        log.error("请求地址'{}',发生未归类运行时异常.", requestURI, e);
+        return R.fail(UNEXPECTED_ERROR_MESSAGE);
     }
 
     /**
@@ -160,7 +162,7 @@ public class GlobalExceptionHandler {
     public R<Void> handleException(Exception e, HttpServletRequest request) {
         String requestURI = request.getRequestURI();
         log.error("请求地址'{}',发生系统异常.", requestURI, e);
-        return R.fail("发生系统异常，请联系管理员");
+        return R.fail(UNEXPECTED_ERROR_MESSAGE);
     }
 
     /**
@@ -211,7 +213,7 @@ public class GlobalExceptionHandler {
     public R<Void> handleJsonParseException(JsonParseException e, HttpServletRequest request) {
         String requestURI = request.getRequestURI();
         log.error("请求地址'{}' 发生 JSON 解析异常: {}", requestURI, e.getMessage());
-        return R.fail(HttpStatus.HTTP_BAD_REQUEST, "请求数据格式错误（JSON 解析失败）：" + e.getMessage());
+        return R.fail(HttpStatus.HTTP_BAD_REQUEST, "请求数据格式错误，请检查后重试");
     }
 
     /**
@@ -220,7 +222,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public R<Void> handleHttpMessageNotReadableException(HttpMessageNotReadableException e, HttpServletRequest request) {
         log.error("请求地址'{}', 参数解析失败: {}", request.getRequestURI(), e.getMessage());
-        return R.fail(HttpStatus.HTTP_BAD_REQUEST, "请求参数格式错误：" + e.getMostSpecificCause().getMessage());
+        return R.fail(HttpStatus.HTTP_BAD_REQUEST, "请求参数格式错误，请检查后重试");
     }
 
     /**
@@ -229,7 +231,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ExpressionException.class)
     public R<Void> handleSpelException(ExpressionException e, HttpServletRequest request) {
         log.error("请求地址'{}'，SpEL解析异常: {}", request.getRequestURI(), e.getMessage());
-        return R.fail(HttpStatus.HTTP_INTERNAL_ERROR, "SpEL解析失败：" + e.getMessage());
+        return R.fail(HttpStatus.HTTP_INTERNAL_ERROR, UNEXPECTED_ERROR_MESSAGE);
     }
 
 }

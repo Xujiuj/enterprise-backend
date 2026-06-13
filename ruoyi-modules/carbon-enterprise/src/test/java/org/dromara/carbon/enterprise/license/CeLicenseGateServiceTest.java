@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @Tag("dev")
@@ -34,6 +36,50 @@ class CeLicenseGateServiceTest {
 
         assertEquals("ALLOW", result.getDecision());
         assertEquals("VALID", result.getReason());
+        assertSame(currentState, result.getLicenseState());
+    }
+
+    @Test
+    void cachesCurrentLicenseStateForRepeatedGateChecks() {
+        ICeLicenseStateService stateService = mock(ICeLicenseStateService.class);
+        CeLicenseStateVo currentState = validState();
+        when(stateService.queryCurrent()).thenReturn(currentState);
+
+        CeLicenseGateServiceImpl service = new CeLicenseGateServiceImpl(stateService);
+
+        service.evaluateCurrent(EXPECTED_INSTALL_ID, EVALUATION_TIME);
+        service.evaluateCurrent(EXPECTED_INSTALL_ID, EVALUATION_TIME, "report-gate");
+
+        verify(stateService, times(1)).queryCurrent();
+    }
+
+    @Test
+    void allowsWhenRequiredFeatureIsPresent() {
+        ICeLicenseStateService stateService = mock(ICeLicenseStateService.class);
+        CeLicenseStateVo currentState = validState();
+        when(stateService.queryCurrent()).thenReturn(currentState);
+
+        CeLicenseGateServiceImpl service = new CeLicenseGateServiceImpl(stateService);
+
+        CeLicenseGateResult result = service.evaluateCurrent(EXPECTED_INSTALL_ID, EVALUATION_TIME, "report-gate");
+
+        assertEquals("ALLOW", result.getDecision());
+        assertEquals("VALID", result.getReason());
+        assertSame(currentState, result.getLicenseState());
+    }
+
+    @Test
+    void deniesWhenRequiredFeatureIsMissing() {
+        ICeLicenseStateService stateService = mock(ICeLicenseStateService.class);
+        CeLicenseStateVo currentState = validState();
+        when(stateService.queryCurrent()).thenReturn(currentState);
+
+        CeLicenseGateServiceImpl service = new CeLicenseGateServiceImpl(stateService);
+
+        CeLicenseGateResult result = service.evaluateCurrent(EXPECTED_INSTALL_ID, EVALUATION_TIME, "report-template-download");
+
+        assertEquals("DENY", result.getDecision());
+        assertEquals("FEATURE_NOT_ENABLED", result.getReason());
         assertSame(currentState, result.getLicenseState());
     }
 
@@ -126,6 +172,7 @@ class CeLicenseGateServiceTest {
         state.setValidTo(Date.from(Instant.parse("2026-12-31T00:00:00Z")));
         state.setLastVerifiedTime(Date.from(Instant.parse("2026-06-04T00:00:00Z")));
         state.setMaxObservedTime(Date.from(Instant.parse("2026-06-04T00:00:00Z")));
+        state.setFeatureCodes("capture,factor-sync,report-gate");
         state.setLicenseStatus("VALID");
         return state;
     }

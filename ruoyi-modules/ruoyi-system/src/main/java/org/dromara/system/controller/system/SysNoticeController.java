@@ -61,7 +61,7 @@ public class SysNoticeController extends BaseController {
     public R<Void> add(@Validated @RequestBody SysNoticeBo notice) {
         int rows = noticeService.insertNotice(notice);
         if (rows <= 0) {
-            return R.fail();
+            return R.fail("新增通知公告失败：未写入任何数据，请确认公告内容是否有效");
         }
         String type = dictService.getDictLabel("sys_notice_type", notice.getNoticeType());
         SseMessageUtils.publishAll("[" + type + "] " + notice.getNoticeTitle());
