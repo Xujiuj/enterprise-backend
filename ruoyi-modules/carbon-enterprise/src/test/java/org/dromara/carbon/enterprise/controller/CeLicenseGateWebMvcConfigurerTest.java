@@ -4,13 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dromara.carbon.enterprise.config.CeLicenseGateWebMvcConfigurer;
 import org.dromara.carbon.enterprise.domain.license.CeLicenseGateResult;
 import org.dromara.carbon.enterprise.domain.license.CeLicenseImportResult;
+import org.dromara.carbon.enterprise.domain.vo.CeActivityDataValidationDashboardVo;
 import org.dromara.carbon.enterprise.domain.vo.CeExtensionFieldVo;
-import org.dromara.carbon.enterprise.domain.vo.CeExtensionFieldValueVo;
 import org.dromara.carbon.enterprise.interceptor.CeLicenseGateInterceptor;
 import org.dromara.carbon.enterprise.service.ICeActivityDataService;
 import org.dromara.carbon.enterprise.service.ICeDimensionRecordService;
 import org.dromara.carbon.enterprise.service.ICeEmissionSourceService;
 import org.dromara.carbon.enterprise.service.ICeFactorConfirmationService;
+import org.dromara.carbon.enterprise.service.ICeFactorSyncService;
 import org.dromara.carbon.enterprise.service.CeLicenseInstallIdProvider;
 import org.dromara.carbon.enterprise.service.CeLicensePublicKeyProvider;
 import org.dromara.carbon.enterprise.service.ICeGreenPowerCertificateService;
@@ -20,6 +21,7 @@ import org.dromara.carbon.enterprise.service.ICeIntensityMetricService;
 import org.dromara.carbon.enterprise.service.ICeLicenseGateService;
 import org.dromara.carbon.enterprise.service.ICeLicenseImportService;
 import org.dromara.carbon.enterprise.service.ICeReportTemplateFileService;
+import org.dromara.carbon.enterprise.service.ICeReportTemplateSyncService;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.handler.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +40,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -48,11 +49,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -64,17 +68,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CeLicenseGateWebMvcConfigurerTest {
 
     private static final String EXPECTED_INSTALL_ID = "INSTALL-ENTERPRISE-001";
-    private static final List<String> NEWLY_PROTECTED_ROUTE_LISTS = Arrays.asList(
-        "/enterprise/activity-data/list",
-        "/enterprise/emission-source/list",
-        "/enterprise/extension-field-value/list",
-        "/enterprise/green-power-certificate/list",
-        "/enterprise/factor-confirmation/list",
-        "/enterprise/intensity-metric/list",
-        "/enterprise/report-template-file/list",
-        "/enterprise/dimension-record/list",
-        "/enterprise/data-validation/dashboard"
-    );
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -118,6 +111,12 @@ class CeLicenseGateWebMvcConfigurerTest {
     @Autowired
     private ICeDimensionRecordService dimensionRecordService;
 
+    @Autowired
+    private ICeFactorSyncService factorSyncService;
+
+    @Autowired
+    private ICeReportTemplateSyncService reportTemplateSyncService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -136,15 +135,17 @@ class CeLicenseGateWebMvcConfigurerTest {
             factorConfirmationService,
             intensityMetricService,
             reportTemplateFileService,
-            dimensionRecordService
+            dimensionRecordService,
+            factorSyncService,
+            reportTemplateSyncService
         );
         when(installIdProvider.getExpectedInstallId()).thenReturn(EXPECTED_INSTALL_ID);
     }
 
     @Test
-    void allowsProtectedRouteThroughRegisteredConfigWhenGateIsOpen() throws Exception {
+    void keepsEnterpriseLocalCrudOpenWhenLicenseIsDenied() throws Exception {
         when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class)))
-            .thenReturn(new CeLicenseGateResult("ALLOW", "VALID", null));
+            .thenReturn(new CeLicenseGateResult("DENY", "EXPIRED", null));
         when(extensionFieldService.queryPageList(any(), any()))
             .thenReturn(new TableDataInfo<>(Collections.<CeExtensionFieldVo>emptyList(), 0));
 
@@ -154,79 +155,94 @@ class CeLicenseGateWebMvcConfigurerTest {
             .andExpect(jsonPath("$.rows").isArray())
             .andExpect(jsonPath("$.total", is(0)));
 
-        verify(licenseGateService).evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class));
+        verifyNoInteractions(licenseGateService);
         verify(extensionFieldService).queryPageList(any(), any());
     }
 
     @Test
-    void allowsExtensionFieldValueRouteThroughRegisteredConfigWhenGateIsOpen() throws Exception {
+    void keepsEnterpriseLocalWriteCrudOpenWhenLicenseIsDenied() throws Exception {
         when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class)))
-            .thenReturn(new CeLicenseGateResult("ALLOW", "VALID", null));
-        when(extensionFieldValueService.queryPageList(any(), any()))
-            .thenReturn(new TableDataInfo<>(Collections.<CeExtensionFieldValueVo>emptyList(), 0));
+            .thenReturn(new CeLicenseGateResult("DENY", "EXPIRED", null));
+        when(extensionFieldService.insertByBo(any())).thenReturn(true);
+        when(extensionFieldService.updateByBo(any())).thenReturn(true);
+        when(extensionFieldService.deleteByIds(any())).thenReturn(true);
 
-        mockMvc.perform(get("/enterprise/extension-field-value/list"))
+        mockMvc.perform(post("/enterprise/extension-field")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"templateVersionId":1,"moduleCode":"activity","sheetId":1,"fieldCode":"fuel","fieldName":"Fuel"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code", is(200)));
+
+        mockMvc.perform(put("/enterprise/extension-field")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"id":1,"templateVersionId":1,"moduleCode":"activity","sheetId":1,"fieldCode":"fuel","fieldName":"Fuel"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code", is(200)));
+
+        mockMvc.perform(delete("/enterprise/extension-field/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code", is(200)));
+
+        verifyNoInteractions(licenseGateService);
+        verify(extensionFieldService).insertByBo(any());
+        verify(extensionFieldService).updateByBo(any());
+        verify(extensionFieldService).deleteByIds(any());
+    }
+
+    @Test
+    void keepsEnterpriseLocalValidationRoutesOpenWhenLicenseIsDenied() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class)))
+            .thenReturn(new CeLicenseGateResult("DENY", "EXPIRED", null));
+        when(activityDataService.queryValidationDashboard(any()))
+            .thenReturn(new CeActivityDataValidationDashboardVo());
+
+        for (String route : List.of(
+            "/enterprise/data-validation/dashboard",
+            "/enterprise/data-validation/summary",
+            "/enterprise/data-validation/submissions",
+            "/enterprise/data-validation/issues"
+        )) {
+            mockMvc.perform(get(route))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code", is(200)))
+                .andExpect(jsonPath("$.data.expectedItems", is(0)));
+        }
+
+        verifyNoInteractions(licenseGateService);
+        verify(activityDataService, times(4)).queryValidationDashboard(any());
+    }
+
+    @Test
+    void keepsEnterpriseLocalReportTemplateListOpenWhenLicenseIsDenied() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), any()))
+            .thenReturn(new CeLicenseGateResult("DENY", "FEATURE_NOT_ENABLED", null));
+        when(reportTemplateFileService.queryPageList(any(), any()))
+            .thenReturn(new TableDataInfo<>(Collections.emptyList(), 0));
+
+        mockMvc.perform(get("/enterprise/report-template-file/list"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code", is(200)))
             .andExpect(jsonPath("$.rows").isArray())
             .andExpect(jsonPath("$.total", is(0)));
 
-        verify(licenseGateService).evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class));
-        verify(extensionFieldValueService).queryPageList(any(), any());
+        verifyNoInteractions(licenseGateService);
+        verify(reportTemplateFileService).queryPageList(any(), any());
     }
 
     @Test
-    void deniesProtectedRouteWithRealHttp403AndNoLicenseStateLeak() throws Exception {
-        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class)))
-            .thenReturn(new CeLicenseGateResult("DENY", "EXPIRED", null));
+    void deniesVendorReportTemplateDownloadWhenFeatureIsNotEnabled() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("report-template-download")))
+            .thenReturn(new CeLicenseGateResult("DENY", "FEATURE_NOT_ENABLED", null));
 
-        mockMvc.perform(get("/enterprise/extension-field/list"))
-            .andExpect(status().isForbidden())
+        mockMvc.perform(get("/enterprise/report-template-file/download/7"))
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect(content().encoding("UTF-8"))
             .andExpect(jsonPath("$.code", is(403)))
             .andExpect(jsonPath("$.msg", is("enterprise license gate denied access")))
-            .andExpect(jsonPath("$.data.errorCode", is("ENTERPRISE_LICENSE_GATE_DENIED")))
-            .andExpect(jsonPath("$.data.gate.decision", is("DENY")))
-            .andExpect(jsonPath("$.data.gate.reason", is("EXPIRED")))
-            .andExpect(jsonPath("$.data.gate.message", is("license has expired")))
-            .andExpect(jsonPath("$.data.gate.licenseState").doesNotExist());
-    }
-
-    @Test
-    void deniesNewlyProtectedCrudRoutesWhenLicenseHasExpired() throws Exception {
-        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class)))
-            .thenReturn(new CeLicenseGateResult("DENY", "EXPIRED", null));
-        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), any()))
-            .thenReturn(new CeLicenseGateResult("DENY", "EXPIRED", null));
-
-        for (String route : NEWLY_PROTECTED_ROUTE_LISTS) {
-            mockMvc.perform(get(route))
-                .andExpect(status().isForbidden())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.code", is(403)))
-                .andExpect(jsonPath("$.data.errorCode", is("ENTERPRISE_LICENSE_GATE_DENIED")))
-                .andExpect(jsonPath("$.data.gate.reason", is("EXPIRED")));
-        }
-
-        verifyNoInteractions(
-            activityDataService,
-            emissionSourceService,
-            extensionFieldValueService,
-            greenPowerCertificateService,
-            factorConfirmationService,
-            intensityMetricService,
-            reportTemplateFileService,
-            dimensionRecordService
-        );
-    }
-
-    @Test
-    void passesReportTemplateRoutesThroughFeatureGate() throws Exception {
-        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("report-template-download")))
-            .thenReturn(new CeLicenseGateResult("DENY", "FEATURE_NOT_ENABLED", null));
-
-        mockMvc.perform(get("/enterprise/report-template-file/list"))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.data.gate.reason", is("FEATURE_NOT_ENABLED")))
             .andExpect(jsonPath("$.data.gate.message", is("license does not include the required feature")));
@@ -236,16 +252,29 @@ class CeLicenseGateWebMvcConfigurerTest {
     }
 
     @Test
-    void passesReportGateRoutesThroughFeatureGate() throws Exception {
-        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("report-gate")))
+    void deniesVendorFactorSyncWhenFeatureIsNotEnabled() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("factor-sync")))
             .thenReturn(new CeLicenseGateResult("DENY", "FEATURE_NOT_ENABLED", null));
 
-        mockMvc.perform(get("/enterprise/data-validation/dashboard"))
+        mockMvc.perform(post("/enterprise/factor-sync/run"))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.data.gate.reason", is("FEATURE_NOT_ENABLED")));
 
-        verify(licenseGateService).evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("report-gate"));
-        verifyNoInteractions(activityDataService);
+        verify(licenseGateService).evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("factor-sync"));
+        verifyNoInteractions(factorSyncService);
+    }
+
+    @Test
+    void deniesVendorReportTemplateSyncWhenFeatureIsNotEnabled() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("report-template-download")))
+            .thenReturn(new CeLicenseGateResult("DENY", "FEATURE_NOT_ENABLED", null));
+
+        mockMvc.perform(post("/enterprise/report-template-sync/run"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.data.gate.reason", is("FEATURE_NOT_ENABLED")));
+
+        verify(licenseGateService).evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("report-template-download"));
+        verifyNoInteractions(reportTemplateSyncService);
     }
 
     @Test
@@ -333,6 +362,16 @@ class CeLicenseGateWebMvcConfigurerTest {
         }
 
         @Bean
+        ICeFactorSyncService factorSyncService() {
+            return mock(ICeFactorSyncService.class);
+        }
+
+        @Bean
+        ICeReportTemplateSyncService reportTemplateSyncService() {
+            return mock(ICeReportTemplateSyncService.class);
+        }
+
+        @Bean
         ICeLicenseImportService licenseImportService() {
             return mock(ICeLicenseImportService.class);
         }
@@ -408,6 +447,16 @@ class CeLicenseGateWebMvcConfigurerTest {
         @Bean
         CeDimensionRecordController ceDimensionRecordController(ICeDimensionRecordService dimensionRecordService) {
             return new CeDimensionRecordController(dimensionRecordService);
+        }
+
+        @Bean
+        CeFactorSyncController ceFactorSyncController(ICeFactorSyncService factorSyncService) {
+            return new CeFactorSyncController(factorSyncService);
+        }
+
+        @Bean
+        CeReportTemplateSyncController ceReportTemplateSyncController(ICeReportTemplateSyncService reportTemplateSyncService) {
+            return new CeReportTemplateSyncController(reportTemplateSyncService);
         }
 
         @Bean
