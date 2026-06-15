@@ -10,7 +10,7 @@ services:
       - fx
 
   vendor-backend:
-    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-Xujiuj}/vendor-backend:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-xujiuj}/vendor-backend:${IMAGE_TAG:-latest}
     container_name: fx-vendor-backend
     restart: unless-stopped
     depends_on:
@@ -37,7 +37,7 @@ services:
       - fx
 
   enterprise-backend:
-    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-Xujiuj}/enterprise-backend:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-xujiuj}/enterprise-backend:${IMAGE_TAG:-latest}
     container_name: fx-enterprise-backend
     restart: unless-stopped
     depends_on:
@@ -66,7 +66,7 @@ services:
       - fx
 
   vendor-ui:
-    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-Xujiuj}/vendor-ui:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-xujiuj}/vendor-ui:${IMAGE_TAG:-latest}
     container_name: fx-vendor-ui
     restart: unless-stopped
     depends_on:
@@ -77,7 +77,7 @@ services:
       - fx
 
   enterprise-ui:
-    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-Xujiuj}/enterprise-ui:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-xujiuj}/enterprise-ui:${IMAGE_TAG:-latest}
     container_name: fx-enterprise-ui
     restart: unless-stopped
     depends_on:
