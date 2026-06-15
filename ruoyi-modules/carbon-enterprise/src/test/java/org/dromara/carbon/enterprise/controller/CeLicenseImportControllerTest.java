@@ -108,7 +108,7 @@ class CeLicenseImportControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code", is(400)))
-            .andExpect(jsonPath("$.msg", is("\u8bf7\u6c42\u53c2\u6570\u683c\u5f0f\u9519\u8bef\uff1aunsupported license import request field: publicKeyPem")));
+            .andExpect(jsonPath("$.msg", is("\u8bf7\u6c42\u53c2\u6570\u683c\u5f0f\u9519\u8bef\uff0c\u8bf7\u68c0\u67e5\u540e\u91cd\u8bd5")));
 
         verify(licenseImportService, never()).importLicense(any(), any(), any(), any());
     }

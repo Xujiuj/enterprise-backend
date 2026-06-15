@@ -2,6 +2,7 @@ package org.dromara.carbon.enterprise.sync;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dromara.carbon.enterprise.domain.sync.CeVendorAnnouncementListResponse;
+import org.dromara.carbon.enterprise.domain.sync.CeVendorDimensionListResponse;
 import org.dromara.carbon.enterprise.domain.sync.CeVendorFactorSyncResponse;
 import org.dromara.carbon.enterprise.domain.sync.CeVendorReportTemplateDownloadResponse;
 import org.dromara.carbon.enterprise.domain.sync.CeVendorReportTemplateListResponse;
@@ -100,5 +101,33 @@ class CeVendorOpenResponseDateFormatTest {
 
         assertEquals(1, response.getAnnouncements().size());
         assertNotNull(response.getAnnouncements().get(0).getCreateTime());
+    }
+
+    @Test
+    void parsesVendorOpenDimensionRecordTimeFormat() throws Exception {
+        CeVendorDimensionListResponse response = objectMapper.readValue(
+            """
+                {
+                  "licenseId": "LIC-001",
+                  "dimensionCode": "report-template-download",
+                  "total": 1,
+                  "records": [
+                    {
+                      "id": 1,
+                      "dimensionCode": "report-template-download",
+                      "recordCode": "carbon-report-standard",
+                      "recordName": "碳排放报告模板",
+                      "createTime": "2026-06-13 17:22:17",
+                      "updateTime": "2026-06-13 17:22:17"
+                    }
+                  ]
+                }
+                """,
+            CeVendorDimensionListResponse.class
+        );
+
+        assertEquals(1, response.getRecords().size());
+        assertNotNull(response.getRecords().get(0).getCreateTime());
+        assertNotNull(response.getRecords().get(0).getUpdateTime());
     }
 }

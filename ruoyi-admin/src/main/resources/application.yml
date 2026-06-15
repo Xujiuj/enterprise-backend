@@ -192,9 +192,9 @@ springdoc:
     version: '版本号: ${project.version}'
     # 作者信息
     contact:
-      name: Lion Li
-      email: crazylionli@163.com
-      url: https://gitee.com/dromara/RuoYi-Vue-Plus
+      name: Enterprise Carbon Data Team
+      email: ""
+      url: ""
   #这里定义了两个分组，可定义多个，也可以不定义
   group-configs:
     - group: 1.通用模块
