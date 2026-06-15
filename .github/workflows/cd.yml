@@ -14,16 +14,18 @@ permissions:
 
 concurrency:
   group: cd-enterprise-backend
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: xujiuj/enterprise-backend
   DEPLOY_SERVICE: enterprise-backend
+  APP_PORT: 18001
+  SNAIL_PORT: 28081
+  DB_NAME: enterprise
+  DB_PREFIX: ENTERPRISE
 
 jobs:
-  build-and-deploy:
-    name: Build image and deploy
+  deploy:
+    name: Build and deploy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,42 +44,10 @@ jobs:
       - name: Package
         run: mvn -B -Pprod clean package -DskipTests
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image
-        shell: bash
-        run: |
-          docker build \
-            -t "${REGISTRY}/${IMAGE_NAME}:${GITHUB_SHA}" \
-            -t "${REGISTRY}/${IMAGE_NAME}:latest" \
-            ruoyi-admin
-
-      - name: Check deploy configuration
-        id: deploy-config
+      - name: Deploy over SSH
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_USERNAME: ${{ secrets.DB_USERNAME }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-        shell: bash
-        run: |
-          if [ -n "$DEPLOY_HOST" ] && [ -n "$DEPLOY_USER" ] && { [ -n "$DEPLOY_SSH_KEY" ] || [ -n "$DEPLOY_PASSWORD" ]; } && [ -n "$DB_HOST" ] && [ -n "$DB_USERNAME" ] && [ -n "$DB_PASSWORD" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "Deployment skipped because deploy or database secrets are incomplete."
-          fi
-
-      - name: Upload deployment files
-        if: steps.deploy-config.outputs.enabled == 'true'
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fx' }}
@@ -88,72 +58,53 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          docker pull redis:7.4-alpine
-          docker save "${REGISTRY}/${IMAGE_NAME}:latest" redis:7.4-alpine | gzip > "${DEPLOY_SERVICE}.tar.gz"
-          cat > .env.deploy <<EOF
-          REGISTRY=ghcr.io
-          GHCR_OWNER=xujiuj
-          IMAGE_TAG=latest
-          DB_HOST=$DB_HOST
-          DB_PORT=$DB_PORT
-          DB_USERNAME=$DB_USERNAME
-          DB_PASSWORD=$DB_PASSWORD
-          REDIS_PASSWORD=ruoyi123
-          VENDOR_UI_PORT=17000
-          VENDOR_BACKEND_PORT=18000
-          VENDOR_SNAIL_PORT=28080
-          ENTERPRISE_UI_PORT=17001
-          ENTERPRISE_BACKEND_PORT=18001
-          ENTERPRISE_SNAIL_PORT=28081
-          VENDOR_BACKEND_JAVA_OPTS=
-          ENTERPRISE_BACKEND_JAVA_OPTS=
-          EOF
-          sed -i 's/^          //' .env.deploy
-          install -m 700 -d ~/.ssh
-          if [ -n "$DEPLOY_SSH_KEY" ]; then
-            printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-            chmod 600 ~/.ssh/deploy_key
-            ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
-            scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new deploy/docker-compose.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/docker-compose.yml"
-            scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new .env.deploy "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.env"
-            scp -i ~/.ssh/deploy_key -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "${DEPLOY_SERVICE}.tar.gz" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/${DEPLOY_SERVICE}.tar.gz"
-          else
-            sudo apt-get update
-            sudo apt-get install -y sshpass
-            sshpass -p "$DEPLOY_PASSWORD" ssh -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
-            sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new deploy/docker-compose.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/docker-compose.yml"
-            sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new .env.deploy "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/.env"
-            sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "${DEPLOY_SERVICE}.tar.gz" "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/${DEPLOY_SERVICE}.tar.gz"
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_PASSWORD" ] || [ -z "$DB_HOST" ] || [ -z "$DB_USERNAME" ] || [ -z "$DB_PASSWORD" ]; then
+            echo "Deployment skipped because deploy or database secrets are incomplete."
+            exit 0
           fi
+          sudo apt-get update
+          sudo apt-get install -y sshpass
+          cat > deploy-backend.sh <<'EOF'
+          set -euo pipefail
+          echo "$SUDO_PASSWORD" | sudo -S apt-get update
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jre-headless redis-server
+          echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE"
+          mv "$DEPLOY_PATH/$DEPLOY_SERVICE.jar" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
+          echo "$SUDO_PASSWORD" | sudo -S systemctl enable --now redis-server
+          cat > "/tmp/$DEPLOY_SERVICE.service" <<SERVICE
+          [Unit]
+          Description=$DEPLOY_SERVICE
+          After=network.target redis-server.service
+          Wants=redis-server.service
 
-      - name: Deploy service
-        if: steps.deploy-config.outputs.enabled == 'true'
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/fx' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > deploy-remote.sh <<'EOF'
-          set -euo pipefail
-          cd "$DEPLOY_PATH"
-          docker load -i "${DEPLOY_SERVICE}.tar.gz"
-          docker compose up -d --remove-orphans redis
-          docker compose up -d --no-deps "$DEPLOY_SERVICE"
-          rm -f "${DEPLOY_SERVICE}.tar.gz"
-          docker image prune -f
+          [Service]
+          WorkingDirectory=$DEPLOY_PATH/apps/$DEPLOY_SERVICE
+          Environment=TZ=Asia/Shanghai
+          Environment=SERVER_PORT=$APP_PORT
+          Environment=SNAIL_PORT=$SNAIL_PORT
+          Environment=SPRING_DATA_REDIS_HOST=127.0.0.1
+          Environment=SPRING_DATA_REDIS_PORT=6379
+          Environment=SPRING_DATA_REDIS_PASSWORD=
+          Environment=${DB_PREFIX}_DB_HOST=$DB_HOST
+          Environment=${DB_PREFIX}_DB_PORT=$DB_PORT
+          Environment=${DB_PREFIX}_DB_NAME=$DB_NAME
+          Environment=${DB_PREFIX}_DB_USERNAME=$DB_USERNAME
+          Environment=${DB_PREFIX}_DB_PASSWORD=$DB_PASSWORD
+          Environment=ENTERPRISE_VENDOR_OPEN_BASE_URL=http://127.0.0.1:18000
+          ExecStart=/usr/bin/java -Dserver.port=$APP_PORT -Dsnail-job.port=$SNAIL_PORT -jar app.jar
+          Restart=always
+          RestartSec=10
+          User=$USER
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+          echo "$SUDO_PASSWORD" | sudo -S mv "/tmp/$DEPLOY_SERVICE.service" "/etc/systemd/system/$DEPLOY_SERVICE.service"
+          echo "$SUDO_PASSWORD" | sudo -S systemctl daemon-reload
+          echo "$SUDO_PASSWORD" | sudo -S systemctl enable "$DEPLOY_SERVICE"
+          echo "$SUDO_PASSWORD" | sudo -S systemctl restart "$DEPLOY_SERVICE"
           EOF
-          sed -i 's/^          //' deploy-remote.sh
-          if [ -n "$DEPLOY_SSH_KEY" ]; then
-            printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
-            chmod 600 ~/.ssh/deploy_key
-            ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' bash -s" < deploy-remote.sh
-          else
-            sudo apt-get update
-            sudo apt-get install -y sshpass
-            sshpass -p "$DEPLOY_PASSWORD" ssh -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' bash -s" < deploy-remote.sh
-          fi
+          sshpass -p "$DEPLOY_PASSWORD" ssh -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
+          sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new ruoyi-admin/target/ruoyi-admin.jar "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/$DEPLOY_SERVICE.jar"
+          sshpass -p "$DEPLOY_PASSWORD" ssh -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' SUDO_PASSWORD='$DEPLOY_PASSWORD' bash -s" < deploy-backend.sh
