@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+  push:
+    branches:
+      - main
+      - master
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Test and package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Test
+        run: mvn -B -Pdev test -DskipTests=false
+
+      - name: Package
+        run: mvn -B -Pprod clean package -DskipTests
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: enterprise-backend-ruoyi-admin
+          path: ruoyi-admin/target/ruoyi-admin.jar
+          if-no-files-found: error

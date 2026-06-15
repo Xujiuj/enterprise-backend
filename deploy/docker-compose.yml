@@ -1,0 +1,95 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: fx-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-ruoyi123}"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - fx
+
+  vendor-backend:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-Xujiuj}/vendor-backend:${IMAGE_TAG:-latest}
+    container_name: fx-vendor-backend
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      TZ: Asia/Shanghai
+      SERVER_PORT: 8080
+      SNAIL_PORT: 28080
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-ruoyi123}
+      VENDOR_DB_HOST: ${DB_HOST}
+      VENDOR_DB_PORT: ${DB_PORT:-3306}
+      VENDOR_DB_NAME: vendor
+      VENDOR_DB_USERNAME: ${DB_USERNAME}
+      VENDOR_DB_PASSWORD: ${DB_PASSWORD}
+      JAVA_OPTS: ${VENDOR_BACKEND_JAVA_OPTS:-}
+    ports:
+      - "${VENDOR_BACKEND_PORT:-18000}:8080"
+      - "${VENDOR_SNAIL_PORT:-28080}:28080"
+    volumes:
+      - ./logs/vendor-backend:/ruoyi/server/logs
+    networks:
+      - fx
+
+  enterprise-backend:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-Xujiuj}/enterprise-backend:${IMAGE_TAG:-latest}
+    container_name: fx-enterprise-backend
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - vendor-backend
+    environment:
+      TZ: Asia/Shanghai
+      SERVER_PORT: 8080
+      SNAIL_PORT: 28080
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-ruoyi123}
+      ENTERPRISE_DB_HOST: ${DB_HOST}
+      ENTERPRISE_DB_PORT: ${DB_PORT:-3306}
+      ENTERPRISE_DB_NAME: enterprise
+      ENTERPRISE_DB_USERNAME: ${DB_USERNAME}
+      ENTERPRISE_DB_PASSWORD: ${DB_PASSWORD}
+      ENTERPRISE_VENDOR_OPEN_BASE_URL: http://vendor-backend:8080
+      JAVA_OPTS: ${ENTERPRISE_BACKEND_JAVA_OPTS:-}
+    ports:
+      - "${ENTERPRISE_BACKEND_PORT:-18001}:8080"
+      - "${ENTERPRISE_SNAIL_PORT:-28081}:28080"
+    volumes:
+      - ./logs/enterprise-backend:/ruoyi/server/logs
+    networks:
+      - fx
+
+  vendor-ui:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-Xujiuj}/vendor-ui:${IMAGE_TAG:-latest}
+    container_name: fx-vendor-ui
+    restart: unless-stopped
+    depends_on:
+      - vendor-backend
+    ports:
+      - "${VENDOR_UI_PORT:-17000}:80"
+    networks:
+      - fx
+
+  enterprise-ui:
+    image: ${REGISTRY:-ghcr.io}/${GHCR_OWNER:-Xujiuj}/enterprise-ui:${IMAGE_TAG:-latest}
+    container_name: fx-enterprise-ui
+    restart: unless-stopped
+    depends_on:
+      - enterprise-backend
+    ports:
+      - "${ENTERPRISE_UI_PORT:-17001}:80"
+    networks:
+      - fx
+
+networks:
+  fx:
+    driver: bridge
+
+volumes:
+  redis-data:
