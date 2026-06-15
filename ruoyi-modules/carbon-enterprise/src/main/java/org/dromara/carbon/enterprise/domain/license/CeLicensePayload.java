@@ -16,6 +16,10 @@ public class CeLicensePayload {
 
     private String customerName;
 
+    private Long packageId;
+
+    private String packageName;
+
     private String edition;
 
     private List<String> features;

@@ -20,6 +20,7 @@ public class CeLicenseGateWebMvcConfigurer implements WebMvcConfigurer {
         registry.addInterceptor(licenseGateInterceptor)
             .addPathPatterns(
                 "/enterprise/factor-sync/**",
+                "/enterprise/data-validation/**",
                 "/enterprise/report-template-sync/**",
                 "/enterprise/report-template-file/download/**"
             )

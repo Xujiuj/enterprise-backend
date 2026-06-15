@@ -13,11 +13,6 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900106, '数据管理', 0, 2, 'data-management', 'Layout', '', 1, 0, 'M', '0', '0', '', 'database', 103, 1, sysdate(), '企业端通过厂商开放接口读取的数据目录');
-
-insert into sys_menu
-(menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
-values
 (900102, '授权管理', 900100, 1, 'license-import', 'enterprise/licenseImport/index', '', 1, 0, 'C', '0', '0', 'enterprise:licenseImport:import', 'lock', 103, 1, sysdate(), '企业端导入和验签授权');
 
 insert into sys_menu
@@ -35,7 +30,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900111, '行政区划', 900106, 1, 'admin-division', 'enterprise/dimension/index', '{"code":"admin-division"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'tree', 103, 1, sysdate(), '行政区划维度');
+(900111, '行政区划', 900110, 1, 'admin-division', 'enterprise/dimension/index', '{"code":"admin-division"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'tree', 103, 1, sysdate(), '行政区划维度');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -45,7 +40,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900113, '排放源分类', 900106, 2, 'emission-source-category', 'enterprise/dimension/index', '{"code":"emission-source-category"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'tree', 103, 1, sysdate(), '排放源分类维度');
+(900113, '排放源分类', 900110, 3, 'emission-source-category', 'enterprise/dimension/index', '{"code":"emission-source-category"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'tree', 103, 1, sysdate(), '排放源分类维度');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -55,7 +50,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900115, '基准年维度表', 900106, 3, 'base-year', 'enterprise/dimension/index', '{"code":"base-year"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'date-range', 103, 1, sysdate(), '基准年维度');
+(900115, '基准年维度表', 900110, 5, 'base-year', 'enterprise/dimension/index', '{"code":"base-year"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'date-range', 103, 1, sysdate(), '基准年维度');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -70,22 +65,22 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900122, 'EF电力因子维度表', 900106, 4, 'ef-electricity-factor', 'enterprise/dimension/index', '{"code":"ef-electricity-factor"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), 'EF电力因子维度');
+(900122, 'EF电力因子维度表', 900120, 2, 'ef-electricity-factor', 'enterprise/dimension/index', '{"code":"ef-electricity-factor"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), 'EF电力因子维度');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900123, 'EF电力因子版本对应', 900106, 5, 'ef-electricity-version', 'enterprise/dimension/index', '{"code":"ef-electricity-version"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'validCode', 103, 1, sysdate(), 'EF电力因子版本对应');
+(900123, 'EF电力因子版本对应', 900120, 3, 'ef-electricity-version', 'enterprise/dimension/index', '{"code":"ef-electricity-version"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'validCode', 103, 1, sysdate(), 'EF电力因子版本对应');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900124, 'EF电力因子口径维度', 900106, 6, 'ef-electricity-scope', 'enterprise/dimension/index', '{"code":"ef-electricity-scope"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'validCode', 103, 1, sysdate(), 'EF电力因子口径维度');
+(900124, 'EF电力因子口径维度', 900120, 4, 'ef-electricity-scope', 'enterprise/dimension/index', '{"code":"ef-electricity-scope"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'validCode', 103, 1, sysdate(), 'EF电力因子口径维度');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900125, '温室气体维度', 900106, 7, 'greenhouse-gas', 'enterprise/dimension/index', '{"code":"greenhouse-gas"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), '温室气体维度');
+(900125, '温室气体维度', 900120, 5, 'greenhouse-gas', 'enterprise/dimension/index', '{"code":"greenhouse-gas"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), '温室气体维度');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -95,7 +90,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900127, '因子缓存记录', 900106, 8, 'factor-cache-record', 'enterprise/factorCacheRecord/index', '', 1, 0, 'C', '0', '0', 'enterprise:factorCacheRecord:list', 'table', 103, 1, sysdate(), '企业本地厂商因子缓存记录');
+(900127, '因子缓存记录', 900120, 7, 'factor-cache-record', 'enterprise/factorCacheRecord/index', '', 1, 0, 'C', '0', '0', 'enterprise:factorCacheRecord:list', 'table', 103, 1, sysdate(), '企业本地厂商因子缓存记录');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -165,7 +160,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900163, '报表模板下载', 900106, 9, 'report-template-download', 'enterprise/reportTemplateFile/index', '', 1, 0, 'C', '0', '0', 'enterprise:reportTemplateFile:list', 'download', 103, 1, sysdate(), '企业端报表模板文件维护');
+(900163, '报表模板下载', 900160, 3, 'report-template-download', 'enterprise/reportTemplateFile/index', '', 1, 0, 'C', '0', '0', 'enterprise:reportTemplateFile:list', 'download', 103, 1, sysdate(), '企业端报表模板文件维护');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -208,16 +203,16 @@ values
 (900202, '强度指标新增', 900150, 7, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:intensityMetric:add', '#', 103, 1, sysdate(), '企业本地强度指标新增权限'),
 (900203, '强度指标修改', 900150, 8, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:intensityMetric:edit', '#', 103, 1, sysdate(), '企业本地强度指标修改权限'),
 (900204, '强度指标删除', 900150, 9, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:intensityMetric:remove', '#', 103, 1, sysdate(), '企业本地强度指标删除权限'),
-(900205, '报表模板列表查询', 900106, 10, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:list', '#', 103, 1, sysdate(), '企业本地报表模板列表接口权限'),
-(900206, '报表模板详情查询', 900106, 11, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:query', '#', 103, 1, sysdate(), '企业本地报表模板详情接口权限'),
-(900207, '报表模板新增', 900106, 12, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:add', '#', 103, 1, sysdate(), '企业本地报表模板新增权限'),
-(900208, '报表模板修改', 900106, 13, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:edit', '#', 103, 1, sysdate(), '企业本地报表模板修改权限'),
-(900209, '报表模板删除', 900106, 14, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:remove', '#', 103, 1, sysdate(), '企业本地报表模板删除权限'),
-(900210, '报表模板下载', 900106, 15, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:download', '#', 103, 1, sysdate(), '企业本地报表模板下载权限'),
-(900211, '厂商因子同步', 900106, 16, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:factorSync:run', '#', 103, 1, sysdate(), '企业触发厂商因子同步权限'),
-(900212, '厂商模板同步', 900106, 17, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateSync:run', '#', 103, 1, sysdate(), '企业触发厂商报表模板同步权限'),
-(900213, '因子缓存列表查询', 900106, 18, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:factorCacheRecord:list', '#', 103, 1, sysdate(), '企业本地因子缓存记录列表权限'),
-(900214, '因子缓存详情查询', 900106, 19, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:factorCacheRecord:query', '#', 103, 1, sysdate(), '企业本地因子缓存记录详情权限'),
+(900205, '报表模板列表查询', 900160, 10, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:list', '#', 103, 1, sysdate(), '企业本地报表模板列表接口权限'),
+(900206, '报表模板详情查询', 900160, 11, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:query', '#', 103, 1, sysdate(), '企业本地报表模板详情接口权限'),
+(900207, '报表模板新增', 900160, 12, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:add', '#', 103, 1, sysdate(), '企业本地报表模板新增权限'),
+(900208, '报表模板修改', 900160, 13, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:edit', '#', 103, 1, sysdate(), '企业本地报表模板修改权限'),
+(900209, '报表模板删除', 900160, 14, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:remove', '#', 103, 1, sysdate(), '企业本地报表模板删除权限'),
+(900210, '报表模板下载', 900160, 15, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateFile:download', '#', 103, 1, sysdate(), '企业本地报表模板下载权限'),
+(900211, '厂商因子同步', 900120, 16, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:factorSync:run', '#', 103, 1, sysdate(), '企业触发厂商因子同步权限'),
+(900212, '厂商模板同步', 900160, 17, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:reportTemplateSync:run', '#', 103, 1, sysdate(), '企业触发厂商报表模板同步权限'),
+(900213, '因子缓存列表查询', 900120, 18, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:factorCacheRecord:list', '#', 103, 1, sysdate(), '企业本地因子缓存记录列表权限'),
+(900214, '因子缓存详情查询', 900120, 19, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:factorCacheRecord:query', '#', 103, 1, sysdate(), '企业本地因子缓存记录详情权限'),
 (900215, '扩展字段元数据查询', 900130, 11, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:extensionField:list', '#', 103, 1, sysdate(), '企业自定义表单字段元数据查询权限'),
 (900216, '扩展字段值列表查询', 900130, 12, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:extensionFieldValue:list', '#', 103, 1, sysdate(), '企业自定义表单字段值列表权限'),
 (900217, '扩展字段值新增', 900130, 13, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:extensionFieldValue:add', '#', 103, 1, sysdate(), '企业自定义表单字段值新增权限'),

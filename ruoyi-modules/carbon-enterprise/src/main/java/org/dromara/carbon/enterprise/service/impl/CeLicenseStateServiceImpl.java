@@ -1,6 +1,7 @@
 package org.dromara.carbon.enterprise.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +17,9 @@ import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Enterprise local license runtime state service implementation.
@@ -55,6 +58,16 @@ public class CeLicenseStateServiceImpl implements ICeLicenseStateService {
             .orderByDesc(CeLicenseState::getLastVerifiedTime)
             .orderByDesc(CeLicenseState::getId));
         return page.getRecords().stream().findFirst().orElse(null);
+    }
+
+    @Override
+    public int expireValidLicenses(Date evaluationTime) {
+        Objects.requireNonNull(evaluationTime, "evaluationTime cannot be null");
+        CeLicenseState updateEntity = new CeLicenseState();
+        updateEntity.setLicenseStatus("EXPIRED");
+        return licenseStateMapper.update(updateEntity, new LambdaUpdateWrapper<CeLicenseState>()
+            .eq(CeLicenseState::getLicenseStatus, "VALID")
+            .lt(CeLicenseState::getValidTo, evaluationTime));
     }
 
     @Override

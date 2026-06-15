@@ -17,6 +17,20 @@ public class CeLicenseGateResponse {
 
     private final CeLicenseStateVo licenseState;
 
+    /**
+     * Compatibility alias for clients that consume a boolean gate decision.
+     */
+    public boolean isAllowed() {
+        return "ALLOW".equals(decision);
+    }
+
+    /**
+     * Compatibility alias for clients that consume the effective gate status.
+     */
+    public String getStatus() {
+        return reason;
+    }
+
     public static CeLicenseGateResponse from(CeLicenseGateResult result) {
         return new CeLicenseGateResponse(
             result.getDecision(),

@@ -175,13 +175,13 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
                 "/license-manage/license-import", "查看"),
             todoItem("报表模板", StringUtils.isBlank(latestTemplateName) ? "暂无可下载模板记录" : latestTemplateName,
                 StringUtils.isBlank(latestTemplateName) ? "待同步" : "可下载", StringUtils.isBlank(latestTemplateName) ? "warn" : "info",
-                "/data-management/report-template-download", StringUtils.isBlank(latestTemplateName) ? "查看" : "下载"),
+                "/report-management/report-template-download", StringUtils.isBlank(latestTemplateName) ? "查看" : "下载"),
             todoItem("数据录入", defaultInt(dashboard.getMissingItems()) > 0 ? dashboard.getMissingItems() + " 项未填报" : "本期暂无缺失项",
                 defaultInt(dashboard.getMissingItems()) > 0 ? "未完成" : "正常", defaultInt(dashboard.getMissingItems()) > 0 ? "warn" : "ok",
                 "/activity-data/emission-activity-entry", "去录入"),
             todoItem("因子库", StringUtils.isBlank(latestFactorVersion) ? "暂无因子同步记录" : latestFactorVersion + " 已同步",
                 StringUtils.isBlank(latestFactorVersion) ? "待同步" : "已同步", StringUtils.isBlank(latestFactorVersion) ? "warn" : "info",
-                "/data-management/factor-cache-record", "查看")
+                "/factor-confirm/factor-cache-record", "查看")
         );
     }
 

@@ -24,6 +24,10 @@ public class CeLicenseStateVo implements Serializable {
 
     private String customerId;
 
+    private Long packageId;
+
+    private String packageName;
+
     private String installId;
 
     private String keyId;

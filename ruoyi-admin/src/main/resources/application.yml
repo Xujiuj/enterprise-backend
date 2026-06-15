@@ -245,6 +245,13 @@ websocket:
   # 设置访问源地址
   allowedOrigins: '*'
 
+--- # enterprise license expiry write-back scheduling
+carbon:
+  license:
+    expiry-write-back:
+      enabled: true
+      cron: 0 0/5 * * * ?
+
 --- # warm-flow工作流配置
 warm-flow:
   # 是否开启工作流，默认true

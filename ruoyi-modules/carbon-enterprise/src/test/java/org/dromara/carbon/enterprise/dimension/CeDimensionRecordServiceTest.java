@@ -63,7 +63,6 @@ class CeDimensionRecordServiceTest {
 
         assertEquals(1, page.getTotal());
         assertEquals("330000", page.getRows().get(0).getRecordCode());
-        assertEquals("vendor", page.getRows().get(0).getSourceType());
         verify(dimensionRecordMapper, never()).selectVoPage(any(), any());
     }
 
@@ -96,7 +95,6 @@ class CeDimensionRecordServiceTest {
         record.setDimensionCode("admin-division");
         record.setRecordCode("330000");
         record.setRecordName("浙江省");
-        record.setSourceType("vendor");
         record.setStatus("0");
 
         CeVendorDimensionListResponse response = new CeVendorDimensionListResponse();

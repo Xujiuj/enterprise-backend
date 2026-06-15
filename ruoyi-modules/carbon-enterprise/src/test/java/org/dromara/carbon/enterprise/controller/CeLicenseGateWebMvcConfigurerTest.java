@@ -4,8 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dromara.carbon.enterprise.config.CeLicenseGateWebMvcConfigurer;
 import org.dromara.carbon.enterprise.domain.license.CeLicenseGateResult;
 import org.dromara.carbon.enterprise.domain.license.CeLicenseImportResult;
-import org.dromara.carbon.enterprise.domain.vo.CeActivityDataValidationDashboardVo;
+import org.dromara.carbon.enterprise.domain.vo.CeActivityDataVo;
 import org.dromara.carbon.enterprise.domain.vo.CeExtensionFieldVo;
+import org.dromara.carbon.enterprise.domain.vo.CeLicenseStateVo;
 import org.dromara.carbon.enterprise.interceptor.CeLicenseGateInterceptor;
 import org.dromara.carbon.enterprise.service.ICeActivityDataService;
 import org.dromara.carbon.enterprise.service.ICeDimensionRecordService;
@@ -20,6 +21,7 @@ import org.dromara.carbon.enterprise.service.ICeExtensionFieldValueService;
 import org.dromara.carbon.enterprise.service.ICeIntensityMetricService;
 import org.dromara.carbon.enterprise.service.ICeLicenseGateService;
 import org.dromara.carbon.enterprise.service.ICeLicenseImportService;
+import org.dromara.carbon.enterprise.service.ICeLicenseStateService;
 import org.dromara.carbon.enterprise.service.ICeReportTemplateFileService;
 import org.dromara.carbon.enterprise.service.ICeReportTemplateSyncService;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
@@ -52,6 +54,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -74,6 +77,9 @@ class CeLicenseGateWebMvcConfigurerTest {
 
     @Autowired
     private ICeLicenseGateService licenseGateService;
+
+    @Autowired
+    private ICeLicenseStateService licenseStateService;
 
     @Autowired
     private CeLicenseInstallIdProvider installIdProvider;
@@ -124,6 +130,7 @@ class CeLicenseGateWebMvcConfigurerTest {
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
         reset(
             licenseGateService,
+            licenseStateService,
             installIdProvider,
             extensionFieldService,
             extensionFieldValueService,
@@ -140,6 +147,63 @@ class CeLicenseGateWebMvcConfigurerTest {
             reportTemplateSyncService
         );
         when(installIdProvider.getExpectedInstallId()).thenReturn(EXPECTED_INSTALL_ID);
+    }
+
+    @Test
+    void keepsEnterpriseLicenseStatusOpenWhenLicenseIsDenied() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class)))
+            .thenReturn(new CeLicenseGateResult("DENY", "EXPIRED", null));
+        CeLicenseStateVo current = new CeLicenseStateVo();
+        current.setLicenseId("LIC-001");
+        current.setLicenseStatus("EXPIRED");
+        when(licenseStateService.queryCurrent()).thenReturn(current);
+
+        mockMvc.perform(get("/enterprise/license-state/current"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code", is(200)))
+            .andExpect(jsonPath("$.data.licenseId", is("LIC-001")))
+            .andExpect(jsonPath("$.data.licenseStatus", is("EXPIRED")));
+
+        verifyNoInteractions(licenseGateService);
+        verify(licenseStateService).queryCurrent();
+    }
+
+    @Test
+    void keepsEnterpriseLicenseGateStatusOpenWithoutInterceptorGateCheck() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq("REQUEST-INSTALL-001"), any(Date.class)))
+            .thenReturn(new CeLicenseGateResult("ALLOW", "VALID", null));
+
+        mockMvc.perform(get("/enterprise/license-gate/current")
+                .param("expectedInstallId", "REQUEST-INSTALL-001"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code", is(200)))
+            .andExpect(jsonPath("$.data.allowed", is(true)))
+            .andExpect(jsonPath("$.data.status", is("VALID")));
+
+        verify(licenseGateService).evaluateCurrent(eq("REQUEST-INSTALL-001"), any(Date.class));
+        verifyNoMoreInteractions(licenseGateService);
+        verifyNoInteractions(installIdProvider);
+    }
+
+    @Test
+    void keepsEnterpriseActivityDataEntryListOpenWhenLicenseIsDenied() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class)))
+            .thenReturn(new CeLicenseGateResult("DENY", "EXPIRED", null));
+        CeActivityDataVo row = new CeActivityDataVo();
+        row.setId(656L);
+        row.setDataStatus("DRAFT");
+        when(activityDataService.queryPageList(any(), any()))
+            .thenReturn(new TableDataInfo<>(List.of(row), 1));
+
+        mockMvc.perform(get("/enterprise/activity-data/list"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code", is(200)))
+            .andExpect(jsonPath("$.rows[0].id", is(656)))
+            .andExpect(jsonPath("$.rows[0].dataStatus", is("DRAFT")))
+            .andExpect(jsonPath("$.total", is(1)));
+
+        verifyNoInteractions(licenseGateService);
+        verify(activityDataService).queryPageList(any(), any());
     }
 
     @Test
@@ -194,11 +258,9 @@ class CeLicenseGateWebMvcConfigurerTest {
     }
 
     @Test
-    void keepsEnterpriseLocalValidationRoutesOpenWhenLicenseIsDenied() throws Exception {
-        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class)))
+    void deniesEnterpriseDataValidationRoutesWhenLicenseIsDenied() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("report-gate")))
             .thenReturn(new CeLicenseGateResult("DENY", "EXPIRED", null));
-        when(activityDataService.queryValidationDashboard(any()))
-            .thenReturn(new CeActivityDataValidationDashboardVo());
 
         for (String route : List.of(
             "/enterprise/data-validation/dashboard",
@@ -207,13 +269,15 @@ class CeLicenseGateWebMvcConfigurerTest {
             "/enterprise/data-validation/issues"
         )) {
             mockMvc.perform(get(route))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code", is(200)))
-                .andExpect(jsonPath("$.data.expectedItems", is(0)));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is(403)))
+                .andExpect(jsonPath("$.msg", is("enterprise license gate denied access")))
+                .andExpect(jsonPath("$.data.gate.reason", is("EXPIRED")));
         }
 
-        verifyNoInteractions(licenseGateService);
-        verify(activityDataService, times(4)).queryValidationDashboard(any());
+        verify(licenseGateService, times(4))
+            .evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("report-gate"));
+        verifyNoInteractions(activityDataService);
     }
 
     @Test
@@ -309,6 +373,11 @@ class CeLicenseGateWebMvcConfigurerTest {
         @Bean
         ICeLicenseGateService licenseGateService() {
             return mock(ICeLicenseGateService.class);
+        }
+
+        @Bean
+        ICeLicenseStateService licenseStateService() {
+            return mock(ICeLicenseStateService.class);
         }
 
         @Bean
@@ -463,6 +532,16 @@ class CeLicenseGateWebMvcConfigurerTest {
         CeLicenseImportController ceLicenseImportController(ICeLicenseImportService licenseImportService,
                                                             CeLicensePublicKeyProvider publicKeyProvider) {
             return new CeLicenseImportController(licenseImportService, publicKeyProvider);
+        }
+
+        @Bean
+        CeLicenseStateController ceLicenseStateController(ICeLicenseStateService licenseStateService) {
+            return new CeLicenseStateController(licenseStateService);
+        }
+
+        @Bean
+        CeLicenseGateController ceLicenseGateController(ICeLicenseGateService licenseGateService) {
+            return new CeLicenseGateController(licenseGateService);
         }
 
         @Bean

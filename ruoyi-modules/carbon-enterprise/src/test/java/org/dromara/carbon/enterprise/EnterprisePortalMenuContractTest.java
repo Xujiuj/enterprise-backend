@@ -22,7 +22,7 @@ class EnterprisePortalMenuContractTest {
         assertThat(sql).contains("delete from sys_menu where menu_id between 900100 and 900230");
         assertThat(sql).contains("delete from sys_role_menu where menu_id between 900100 and 900230");
         assertThat(extractMenuIds(sql)).containsExactlyInAnyOrder(
-            900100, 900102, 900103, 900104, 900105, 900106,
+            900100, 900102, 900103, 900104, 900105,
             900110, 900111, 900112, 900113, 900114, 900115,
             900120, 900121, 900122, 900123, 900124, 900125, 900126, 900127,
             900130, 900131, 900132,
@@ -42,7 +42,6 @@ class EnterprisePortalMenuContractTest {
         assertThat(sql).contains(
             "系统授权",
             "授权管理",
-            "数据管理",
             "配置排放源",
             "行政区划",
             "公司表",
@@ -139,18 +138,22 @@ class EnterprisePortalMenuContractTest {
             "m.menu_id <> 900131"
         );
         assertThat(sql).contains(
-            "(900106, '数据管理', 0, 2, 'data-management', 'Layout'",
-            "(900111, '行政区划', 900106",
-            "(900113, '排放源分类', 900106",
-            "(900115, '基准年维度表', 900106",
-            "(900122, 'EF电力因子维度表', 900106",
-            "(900123, 'EF电力因子版本对应', 900106",
-            "(900124, 'EF电力因子口径维度', 900106",
-            "(900125, '温室气体维度', 900106",
-            "(900127, '因子缓存记录', 900106",
-            "(900163, '报表模板下载', 900106",
-            "(900211, '厂商因子同步', 900106",
-            "(900212, '厂商模板同步', 900106"
+            "(900111, '行政区划', 900110",
+            "(900113, '排放源分类', 900110",
+            "(900115, '基准年维度表', 900110",
+            "(900122, 'EF电力因子维度表', 900120",
+            "(900123, 'EF电力因子版本对应', 900120",
+            "(900124, 'EF电力因子口径维度', 900120",
+            "(900125, '温室气体维度', 900120",
+            "(900127, '因子缓存记录', 900120",
+            "(900163, '报表模板下载', 900160",
+            "(900211, '厂商因子同步', 900120",
+            "(900212, '厂商模板同步', 900160"
+        );
+        assertThat(sql).doesNotContain(
+            "(900106,",
+            "'data-management'",
+            "'数据管理'"
         );
         assertThat(sql).doesNotContain(
             "enterprise:activityDataRaw:add",
@@ -233,6 +236,22 @@ class EnterprisePortalMenuContractTest {
             "'report-template-download'",
             "'vendor' AS source_type",
             ", 'vendor',"
+        );
+    }
+
+    @Test
+    void enterpriseWorkbenchLinksUseCurrentPortalRoutes() throws Exception {
+        String source = Files.readString(resolveFromWorkspace(
+            "ruoyi-modules/carbon-enterprise/src/main/java/org/dromara/carbon/enterprise/service/impl/CeWorkbenchServiceImpl.java"
+        ));
+
+        assertThat(source).contains(
+            "/report-management/report-template-download",
+            "/factor-confirm/factor-cache-record"
+        );
+        assertThat(source).doesNotContain(
+            "/data-management/report-template-download",
+            "/data-management/factor-cache-record"
         );
     }
 

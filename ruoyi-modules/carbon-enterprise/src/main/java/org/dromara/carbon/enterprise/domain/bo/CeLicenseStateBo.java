@@ -31,6 +31,10 @@ public class CeLicenseStateBo implements Serializable {
     @NotBlank(message = "customerId cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String customerId;
 
+    private Long packageId;
+
+    private String packageName;
+
     @NotBlank(message = "installId cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String installId;
 

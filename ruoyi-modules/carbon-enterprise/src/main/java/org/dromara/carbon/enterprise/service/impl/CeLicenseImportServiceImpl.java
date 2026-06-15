@@ -158,6 +158,8 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
         CeLicenseState state = new CeLicenseState();
         state.setLicenseId(payload.getLicenseId());
         state.setCustomerId(payload.getCustomerId());
+        state.setPackageId(payload.getPackageId());
+        state.setPackageName(payload.getPackageName());
         state.setInstallId(payload.getInstallId());
         state.setKeyId(envelope.getKeyId());
         state.setAlgorithm(envelope.getAlgorithm());
@@ -183,6 +185,8 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
 
     private String buildCurrentSummary(CeLicensePayload payload) {
         return "customerName=" + payload.getCustomerName()
+            + ";packageId=" + (payload.getPackageId() == null ? "" : payload.getPackageId())
+            + ";packageName=" + StringUtils.blankToDefault(payload.getPackageName(), "")
             + ";edition=" + payload.getEdition()
             + ";features=" + String.join(",", payload.getFeatures())
             + ";templateEntitlements=" + payload.getTemplateEntitlements().size();

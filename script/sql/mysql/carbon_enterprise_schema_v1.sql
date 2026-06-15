@@ -139,7 +139,6 @@ CREATE TABLE IF NOT EXISTS ce_dimension_record (
     record_code VARCHAR(128) NOT NULL,
     record_name VARCHAR(255) NOT NULL,
     parent_code VARCHAR(128) DEFAULT NULL,
-    source_type VARCHAR(32) NOT NULL DEFAULT 'enterprise',
     field01 VARCHAR(255) DEFAULT NULL,
     field02 VARCHAR(255) DEFAULT NULL,
     field03 VARCHAR(255) DEFAULT NULL,
@@ -274,6 +273,8 @@ CREATE TABLE IF NOT EXISTS ce_license_state (
     id BIGINT NOT NULL AUTO_INCREMENT,
     license_id VARCHAR(128) NOT NULL,
     customer_id VARCHAR(128) NOT NULL,
+    package_id BIGINT DEFAULT NULL,
+    package_name VARCHAR(64) DEFAULT NULL,
     install_id VARCHAR(128) NOT NULL,
     key_id VARCHAR(64) NOT NULL,
     algorithm VARCHAR(64) NOT NULL,
@@ -291,21 +292,21 @@ CREATE TABLE IF NOT EXISTS ce_license_state (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local license runtime state';
 
 INSERT INTO ce_dimension_record (
-    dimension_code, record_code, record_name, parent_code, source_type,
+    dimension_code, record_code, record_name, parent_code,
     field01, field02, field03, field04, field05, field06,
     sort_order, status, remark
 )
 SELECT * FROM (
-    SELECT 'company' AS dimension_code, 'ENT-001' AS record_code, '宁波低碳示范企业' AS record_name, NULL AS parent_code, 'enterprise' AS source_type, '法人主体' AS field01, '330200' AS field02, '91330200MA000001X1' AS field03, NULL AS field04, NULL AS field05, NULL AS field06, 1 AS sort_order, '0' AS status, '企业主体示例' AS remark UNION ALL
-    SELECT 'emission-source', 'ES-001', '总部办公楼外购电', NULL, 'enterprise', 'ENT-001', 'SCOPE2-PURCHASED-ELEC', 'kWh', 'EF-ELEC-ZJ-2025', NULL, NULL, 1, '0', '排放源示例' UNION ALL
-    SELECT 'ef-factor', 'EF-DIESEL-2025', '柴油燃烧排放因子', NULL, 'enterprise', 'tCO2e/t', '生态环境部指南', 'ES-柴油', '2025', NULL, NULL, 1, '0', '排放因子示例' UNION ALL
-    SELECT 'emission-activity-data', 'AD-2026-001', '2026年1月总部外购电', NULL, 'enterprise', 'ES-001', '2026-01', '120000', 'kWh', '行政部', NULL, 1, '0', '活动数据示例' UNION ALL
-    SELECT 'green-electricity-data', 'GP-2026-001', '2026年1月绿证抵扣', NULL, 'enterprise', '绿证', '5000', 'MWh', '2026-01-15', '2027-01-14', NULL, 1, '0', '绿电绿证示例' UNION ALL
-    SELECT 'intensity-denominator', 'DEN-REVENUE', '营业收入', NULL, 'enterprise', '营收', '万元', 'ENT-001', NULL, NULL, NULL, 1, '0', '强度分母示例' UNION ALL
-    SELECT 'intensity-target', 'TARGET-2026-REV', '2026营收强度目标', NULL, 'enterprise', '2026', '单位营收排放强度', '0.85', 'BASE-2025', NULL, NULL, 1, '0', '强度目标示例' UNION ALL
-    SELECT 'denominator-fact', 'FACT-2026-01-REV', '2026年1月营业收入', NULL, 'enterprise', '2026-01', 'DEN-REVENUE', '8600', '财务部', NULL, NULL, 1, '0', '分母事实示例' UNION ALL
-    SELECT 'intensity-tolerance', 'TOL-REV-2026', '营收强度波动容忍率', NULL, 'enterprise', '单位营收排放强度', '10', '2026-01', '2026-12', NULL, NULL, 1, '0', '容忍率示例' UNION ALL
-    SELECT 'data-validation', 'RULE-AD-NOT-NULL', '活动数据必填校验', NULL, 'system', '生产部', '月度', '强错误', 'activity_value != null', NULL, NULL, 1, '0', '验证规则示例'
+    SELECT 'company' AS dimension_code, 'ENT-001' AS record_code, '宁波低碳示范企业' AS record_name, NULL AS parent_code, '法人主体' AS field01, '330200' AS field02, '91330200MA000001X1' AS field03, NULL AS field04, NULL AS field05, NULL AS field06, 1 AS sort_order, '0' AS status, '企业主体示例' AS remark UNION ALL
+    SELECT 'emission-source', 'ES-001', '总部办公楼外购电', NULL, 'ENT-001', 'SCOPE2-PURCHASED-ELEC', 'kWh', 'EF-ELEC-ZJ-2025', NULL, NULL, 1, '0', '排放源示例' UNION ALL
+    SELECT 'ef-factor', 'EF-DIESEL-2025', '柴油燃烧排放因子', NULL, 'tCO2e/t', '生态环境部指南', 'ES-柴油', '2025', NULL, NULL, 1, '0', '排放因子示例' UNION ALL
+    SELECT 'emission-activity-data', 'AD-2026-001', '2026年1月总部外购电', NULL, 'ES-001', '2026-01', '120000', 'kWh', '行政部', NULL, 1, '0', '活动数据示例' UNION ALL
+    SELECT 'green-electricity-data', 'GP-2026-001', '2026年1月绿证抵扣', NULL, '绿证', '5000', 'MWh', '2026-01-15', '2027-01-14', NULL, 1, '0', '绿电绿证示例' UNION ALL
+    SELECT 'intensity-denominator', 'DEN-REVENUE', '营业收入', NULL, '营收', '万元', 'ENT-001', NULL, NULL, NULL, 1, '0', '强度分母示例' UNION ALL
+    SELECT 'intensity-target', 'TARGET-2026-REV', '2026营收强度目标', NULL, '2026', '单位营收排放强度', '0.85', 'BASE-2025', NULL, NULL, 1, '0', '强度目标示例' UNION ALL
+    SELECT 'denominator-fact', 'FACT-2026-01-REV', '2026年1月营业收入', NULL, '2026-01', 'DEN-REVENUE', '8600', '财务部', NULL, NULL, 1, '0', '分母事实示例' UNION ALL
+    SELECT 'intensity-tolerance', 'TOL-REV-2026', '营收强度波动容忍率', NULL, '单位营收排放强度', '10', '2026-01', '2026-12', NULL, NULL, 1, '0', '容忍率示例' UNION ALL
+    SELECT 'data-validation', 'RULE-AD-NOT-NULL', '活动数据必填校验', NULL, '生产部', '月度', '强错误', 'activity_value != null', NULL, NULL, 1, '0', '验证规则示例'
 ) seed
 WHERE NOT EXISTS (
     SELECT 1

@@ -141,7 +141,6 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
             .like(StringUtils.isNotBlank(bo.getRecordCode()), CeDimensionRecord::getRecordCode, bo.getRecordCode())
             .like(StringUtils.isNotBlank(bo.getRecordName()), CeDimensionRecord::getRecordName, bo.getRecordName())
             .eq(StringUtils.isNotBlank(bo.getParentCode()), CeDimensionRecord::getParentCode, bo.getParentCode())
-            .eq(StringUtils.isNotBlank(bo.getSourceType()), CeDimensionRecord::getSourceType, bo.getSourceType())
             .eq(StringUtils.isNotBlank(bo.getStatus()), CeDimensionRecord::getStatus, bo.getStatus());
     }
 
@@ -179,7 +178,6 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         target.setRecordCode(source.getRecordCode());
         target.setRecordName(source.getRecordName());
         target.setParentCode(source.getParentCode());
-        target.setSourceType("vendor");
         target.setField01(source.getField01());
         target.setField02(source.getField02());
         target.setField03(source.getField03());

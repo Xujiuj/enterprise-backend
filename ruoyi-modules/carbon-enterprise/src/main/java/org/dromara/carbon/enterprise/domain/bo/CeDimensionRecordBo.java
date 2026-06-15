@@ -35,8 +35,6 @@ public class CeDimensionRecordBo implements Serializable {
 
     private String parentCode;
 
-    private String sourceType;
-
     private String field01;
 
     private String field02;
