@@ -70,7 +70,12 @@ jobs:
           echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jre-headless redis-server
           echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE"
           mv "$DEPLOY_PATH/$DEPLOY_SERVICE.jar" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
+          echo "$SUDO_PASSWORD" | sudo -S sed -i "s/^# *requirepass .*/requirepass ruoyi123/; s/^requirepass .*/requirepass ruoyi123/" /etc/redis/redis.conf
+          if ! echo "$SUDO_PASSWORD" | sudo -S grep -q '^requirepass ' /etc/redis/redis.conf; then
+            echo "$SUDO_PASSWORD" | sudo -S sh -c "printf '\nrequirepass ruoyi123\n' >> /etc/redis/redis.conf"
+          fi
           echo "$SUDO_PASSWORD" | sudo -S systemctl enable --now redis-server
+          echo "$SUDO_PASSWORD" | sudo -S systemctl restart redis-server
           cat > "/tmp/$DEPLOY_SERVICE.service" <<SERVICE
           [Unit]
           Description=$DEPLOY_SERVICE
@@ -84,7 +89,7 @@ jobs:
           Environment=SNAIL_PORT=$SNAIL_PORT
           Environment=SPRING_DATA_REDIS_HOST=127.0.0.1
           Environment=SPRING_DATA_REDIS_PORT=6379
-          Environment=SPRING_DATA_REDIS_PASSWORD=
+          Environment=SPRING_DATA_REDIS_PASSWORD=ruoyi123
           Environment=${DB_PREFIX}_DB_HOST=$DB_HOST
           Environment=${DB_PREFIX}_DB_PORT=$DB_PORT
           Environment=${DB_PREFIX}_DB_NAME=$DB_NAME
