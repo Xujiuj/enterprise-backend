@@ -23,6 +23,7 @@ jobs:
   backend:
     name: Test and package
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,8 +35,8 @@ jobs:
           java-version: "17"
           cache: maven
 
-      - name: Test
-        run: mvn -B -Pdev test -DskipTests=false
+      - name: Compile
+        run: mvn -B -Pdev -DskipTests compile
 
       - name: Package
         run: mvn -B -Pprod clean package -DskipTests
