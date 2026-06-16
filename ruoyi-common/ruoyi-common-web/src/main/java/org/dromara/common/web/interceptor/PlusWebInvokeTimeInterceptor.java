@@ -4,6 +4,7 @@ import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.ObjectUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -45,10 +46,7 @@ public class PlusWebInvokeTimeInterceptor implements HandlerInterceptor {
             if (request instanceof RepeatedlyRequestWrapper) {
                 jsonParam = IoUtil.read(request.getReader());
                 if (StringUtils.isNotBlank(jsonParam)) {
-                    ObjectMapper objectMapper = JsonUtils.getObjectMapper();
-                    JsonNode rootNode = objectMapper.readTree(jsonParam);
-                    removeSensitiveFields(rootNode, SystemConstants.EXCLUDE_PROPERTIES);
-                    jsonParam = rootNode.toString();
+                    jsonParam = sanitizeJsonParam(jsonParam);
                 }
             }
             log.info("[PLUS]开始请求 => URL[{}],参数类型[json],参数:[{}]", url, jsonParam);
@@ -69,6 +67,18 @@ public class PlusWebInvokeTimeInterceptor implements HandlerInterceptor {
         stopWatch.start();
 
         return true;
+    }
+
+    private String sanitizeJsonParam(String jsonParam) {
+        try {
+            ObjectMapper objectMapper = JsonUtils.getObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(jsonParam);
+            removeSensitiveFields(rootNode, SystemConstants.EXCLUDE_PROPERTIES);
+            return rootNode.toString();
+        } catch (JsonProcessingException e) {
+            log.warn("[PLUS]request json log parse failed, fallback to raw body length={}", jsonParam.length(), e);
+            return jsonParam;
+        }
     }
 
     private void removeSensitiveFields(JsonNode node, String[] excludeProperties) {

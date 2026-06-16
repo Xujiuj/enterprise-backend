@@ -25,7 +25,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900110, '配置排放源', 0, 3, 'emission-source-config', 'Layout', '', 1, 0, 'M', '0', '0', '', 'tree', 103, 1, sysdate(), '配置排放源目录');
+(900110, '01 配置排放源', 0, 2, 'emission-source-config', 'Layout', '', 1, 0, 'M', '0', '0', '', 'tree', 103, 1, sysdate(), '配置排放源目录');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -55,7 +55,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900120, '确认排放因子', 0, 4, 'factor-confirm', 'Layout', '', 1, 0, 'M', '0', '0', '', 'validCode', 103, 1, sysdate(), '确认排放因子目录');
+(900120, '02 确认排放因子', 0, 3, 'factor-confirm', 'Layout', '', 1, 0, 'M', '0', '0', '', 'validCode', 103, 1, sysdate(), '确认排放因子目录');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -85,17 +85,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900126, '因子确认记录', 900120, 6, 'factor-confirmation', 'enterprise/factorConfirmation/index', '', 1, 0, 'C', '0', '0', 'enterprise:factorConfirmation:list', 'validCode', 103, 1, sysdate(), '企业端排放因子确认记录');
-
-insert into sys_menu
-(menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
-values
-(900127, '因子缓存记录', 900120, 7, 'factor-cache-record', 'enterprise/factorCacheRecord/index', '', 1, 0, 'C', '0', '0', 'enterprise:factorCacheRecord:list', 'table', 103, 1, sysdate(), '企业本地厂商因子缓存记录');
-
-insert into sys_menu
-(menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
-values
-(900130, '活动数据', 0, 5, 'activity-data', 'Layout', '', 1, 0, 'M', '0', '0', '', 'form', 103, 1, sysdate(), '活动数据目录');
+(900130, '03 活动数据', 0, 4, 'activity-data', 'Layout', '', 1, 0, 'M', '0', '0', '', 'form', 103, 1, sysdate(), '活动数据目录');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -105,12 +95,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900132, '活动数据录入', 900130, 2, 'emission-activity-entry', 'enterprise/activityEntry/index', '', 1, 0, 'C', '0', '0', 'enterprise:activityImportValidation:validate', 'edit', 103, 1, sysdate(), '企业端活动数据服务端校验录入');
-
-insert into sys_menu
-(menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
-values
-(900140, '绿电绿证', 0, 6, 'green-electricity', 'Layout', '', 1, 0, 'M', '0', '0', '', 'international', 103, 1, sysdate(), '绿电绿证目录');
+(900140, '04 绿电绿证', 0, 5, 'green-electricity', 'Layout', '', 1, 0, 'M', '0', '0', '', 'international', 103, 1, sysdate(), '绿电绿证目录');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -120,7 +105,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900150, '强度管理', 0, 7, 'intensity', 'Layout', '', 1, 0, 'M', '0', '0', '', 'chart', 103, 1, sysdate(), '强度管理目录');
+(900150, '05 强度管理', 0, 6, 'intensity', 'Layout', '', 1, 0, 'M', '0', '0', '', 'chart', 103, 1, sysdate(), '强度管理目录');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -145,7 +130,7 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900160, '报表管理', 0, 8, 'report-management', 'Layout', '', 1, 0, 'M', '0', '0', '', 'chart', 103, 1, sysdate(), '报表管理目录');
+(900160, '报表管理', 0, 7, 'report-management', 'Layout', '', 1, 0, 'M', '0', '0', '', 'chart', 103, 1, sysdate(), '报表管理目录');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
@@ -218,6 +203,62 @@ values
 (900217, '扩展字段值新增', 900130, 13, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:extensionFieldValue:add', '#', 103, 1, sysdate(), '企业自定义表单字段值新增权限'),
 (900218, '扩展字段值修改', 900130, 14, '#', '', '', 1, 0, 'F', '0', '0', 'enterprise:extensionFieldValue:edit', '#', 103, 1, sysdate(), '企业自定义表单字段值修改权限');
 
+-- Production portal menu policy:
+-- RuoYi uses visible='0' for shown routes and visible='1' for hidden routes.
+-- Hide development/admin configuration utilities from final navigation.
+update sys_menu
+set visible = '1',
+    status = '1',
+    update_time = sysdate()
+where menu_id in (
+  103, 104, 105, 106, 115, 116, 132,
+  1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024, 1025,
+  1026, 1027, 1028, 1029, 1030,
+  1031, 1032, 1033, 1034, 1035,
+  1055, 1056, 1057, 1058, 1059, 1060
+);
+
+-- Enterprise final portal follows 意见反馈20260602.md: user, role, and menu management only.
+update sys_menu
+set visible = '0',
+    status = '0',
+    update_time = sysdate()
+where menu_id in (102, 1013, 1014, 1015, 1016);
+
+update sys_menu
+set menu_name = '日志',
+    parent_id = 0,
+    order_num = 9,
+    component = 'Layout',
+    visible = '0',
+    status = '0',
+    update_time = sysdate()
+where menu_id = 108;
+
+update sys_menu
+set visible = '0',
+    status = '0',
+    update_time = sysdate()
+where menu_id in (500, 501);
+
+delete from sys_role_menu
+where menu_id in (
+  103, 104, 105, 106, 115, 116, 132,
+  1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024, 1025,
+  1026, 1027, 1028, 1029, 1030,
+  1031, 1032, 1033, 1034, 1035,
+  1055, 1056, 1057, 1058, 1059, 1060
+)
+and role_id <> 1;
+
+insert ignore into sys_role_menu (role_id, menu_id)
+select r.role_id, m.menu_id
+from sys_role r
+cross join sys_menu m
+where r.status = '0'
+  and r.role_id <> 1
+  and m.menu_id in (102, 1013, 1014, 1015, 1016);
+
 -- Non-super-admin users only receive menus through sys_role_menu.
 -- Keep the seeded RuoYi test roles aligned with this enterprise portal menu set.
 insert ignore into sys_role_menu (role_id, menu_id)
@@ -225,8 +266,7 @@ select r.role_id, m.menu_id
 from sys_role r
 cross join sys_menu m
 where r.role_key in ('test1', 'test2')
-  and m.menu_id between 900100 and 900230
-  and m.menu_id <> 900131;
+  and m.menu_id between 900100 and 900230;
 
 -- Keep the built-in superadmin role fully assigned for role/menu
 -- management screens and seeded database consistency.

@@ -172,16 +172,16 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
         return List.of(
             todoItem("授权", isLicenseValid(licenseState) ? licenseNote(licenseState) : "暂无有效授权状态",
                 isLicenseValid(licenseState) ? "正常" : "待处理", isLicenseValid(licenseState) ? "ok" : "warn",
-                "/license-manage/license-import", "查看"),
+                "/system-auth/license-import", "查看"),
             todoItem("报表模板", StringUtils.isBlank(latestTemplateName) ? "暂无可下载模板记录" : latestTemplateName,
                 StringUtils.isBlank(latestTemplateName) ? "待同步" : "可下载", StringUtils.isBlank(latestTemplateName) ? "warn" : "info",
                 "/report-management/report-template-download", StringUtils.isBlank(latestTemplateName) ? "查看" : "下载"),
             todoItem("数据录入", defaultInt(dashboard.getMissingItems()) > 0 ? dashboard.getMissingItems() + " 项未填报" : "本期暂无缺失项",
                 defaultInt(dashboard.getMissingItems()) > 0 ? "未完成" : "正常", defaultInt(dashboard.getMissingItems()) > 0 ? "warn" : "ok",
-                "/activity-data/emission-activity-entry", "去录入"),
+                "/activity-data/emission-activity-data", "去录入"),
             todoItem("因子库", StringUtils.isBlank(latestFactorVersion) ? "暂无因子同步记录" : latestFactorVersion + " 已同步",
                 StringUtils.isBlank(latestFactorVersion) ? "待同步" : "已同步", StringUtils.isBlank(latestFactorVersion) ? "warn" : "info",
-                "/factor-confirm/factor-cache-record", "查看")
+                "/factor-confirm/ef-factor", "查看")
         );
     }
 

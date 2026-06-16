@@ -24,8 +24,8 @@ class EnterprisePortalMenuContractTest {
         assertThat(extractMenuIds(sql)).containsExactlyInAnyOrder(
             900100, 900102, 900103, 900104, 900105,
             900110, 900111, 900112, 900113, 900114, 900115,
-            900120, 900121, 900122, 900123, 900124, 900125, 900126, 900127,
-            900130, 900131, 900132,
+            900120, 900121, 900122, 900123, 900124, 900125,
+            900130, 900131,
             900140, 900141,
             900150, 900151, 900152, 900153, 900154,
             900160, 900161, 900162, 900163,
@@ -42,23 +42,23 @@ class EnterprisePortalMenuContractTest {
         assertThat(sql).contains(
             "系统授权",
             "授权管理",
-            "配置排放源",
+            "01 配置排放源",
             "行政区划",
             "公司表",
             "排放源分类",
             "排放源识别",
             "基准年维度表",
-            "确认排放因子",
+            "02 确认排放因子",
             "EF排放因子维度表",
             "EF电力因子维度表",
             "EF电力因子版本对应",
             "EF电力因子口径维度",
             "温室气体维度",
-            "活动数据",
+            "03 活动数据",
             "排放活动数据",
-            "绿电绿证",
+            "04 绿电绿证",
             "绿电绿证数据",
-            "强度管理",
+            "05 强度管理",
             "碳排放强度分母维度表",
             "强度目标表",
             "分母事实表",
@@ -72,10 +72,7 @@ class EnterprisePortalMenuContractTest {
             "enterprise/licenseImport/index",
             "enterprise/dimension/index",
             "enterprise/emissionSource/index",
-            "enterprise/factorConfirmation/index",
-            "enterprise/factorCacheRecord/index",
             "enterprise/activityData/index",
-            "enterprise/activityEntry/index",
             "enterprise/greenPowerCertificate/index",
             "enterprise/intensityMetric/index",
             "enterprise/reportTemplateFile/index",
@@ -134,10 +131,17 @@ class EnterprisePortalMenuContractTest {
         assertThat(sql).contains(
             "insert ignore into sys_role_menu (role_id, menu_id)",
             "r.role_key in ('test1', 'test2')",
-            "m.menu_id between 900100 and 900230",
-            "m.menu_id <> 900131"
+            "m.menu_id between 900100 and 900230"
         );
+        assertThat(sql).doesNotContain("m.menu_id <> 900131");
         assertThat(sql).contains(
+            "(900100, '系统授权', 0, 1, 'system-auth'",
+            "(900110, '01 配置排放源', 0, 2, 'emission-source-config'",
+            "(900120, '02 确认排放因子', 0, 3, 'factor-confirm'",
+            "(900130, '03 活动数据', 0, 4, 'activity-data'",
+            "(900140, '04 绿电绿证', 0, 5, 'green-electricity'",
+            "(900150, '05 强度管理', 0, 6, 'intensity'",
+            "(900160, '报表管理', 0, 7, 'report-management'",
             "(900111, '行政区划', 900110",
             "(900113, '排放源分类', 900110",
             "(900115, '基准年维度表', 900110",
@@ -145,10 +149,17 @@ class EnterprisePortalMenuContractTest {
             "(900123, 'EF电力因子版本对应', 900120",
             "(900124, 'EF电力因子口径维度', 900120",
             "(900125, '温室气体维度', 900120",
-            "(900127, '因子缓存记录', 900120",
             "(900163, '报表模板下载', 900160",
             "(900211, '厂商因子同步', 900120",
-            "(900212, '厂商模板同步', 900160"
+            "(900212, '厂商模板同步', 900160",
+            "where menu_id in (102, 1013, 1014, 1015, 1016)",
+            "set menu_name = '日志'",
+            "where menu_id = 108"
+        );
+        assertThat(sql).contains(
+            "103, 104, 105, 106, 115, 116, 132",
+            "1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024, 1025",
+            "status = '1'"
         );
         assertThat(sql).doesNotContain(
             "(900106,",
@@ -162,6 +173,12 @@ class EnterprisePortalMenuContractTest {
             "enterprise:activityData:add",
             "enterprise:activityData:edit",
             "enterprise:activityData:remove",
+            "(900126,",
+            "(900127,",
+            "(900132,",
+            "'factor-confirmation'",
+            "'factor-cache-record'",
+            "'emission-activity-entry'",
             "system/emissionSource/index",
             "system/factorConfirm/index",
             "system/factorLibrary/index",
@@ -178,6 +195,65 @@ class EnterprisePortalMenuContractTest {
             "续费订单",
             "vendor:"
         );
+        assertThat(sql).doesNotContain("where menu_id in (103, 104, 1017");
+    }
+
+    @Test
+    void enterpriseAcceptanceRepairKeepsExistingDatabasesInDocumentOrder() throws Exception {
+        String sql = Files.readString(resolveFromWorkspace("script/sql/portal/enterprise_acceptance_menu_repair.sql"));
+
+        assertThat(sql).contains(
+            "when 900100 then 1",
+            "when 900110 then 2",
+            "when 900120 then 3",
+            "when 900130 then 4",
+            "when 900140 then 5",
+            "when 900150 then 6",
+            "when 900160 then 7",
+            "when 1 then 8",
+            "when 108 then 9",
+            "where menu_id in (900100, 900110, 900120, 900130, 900140, 900150, 900160, 1, 108)"
+        );
+        assertThat(sql).contains(
+            "when 900114 then 4",
+            "when 900115 then 5",
+            "when 900122 then 2",
+            "when 900124 then 4",
+            "when 900125 then 5",
+            "when 900163 then 3"
+        );
+        assertThat(sql).contains(
+            "where menu_id in (102, 108, 500, 501, 1013, 1014, 1015, 1016)",
+            "set menu_name = '日志'",
+            "where menu_id = 108"
+        );
+        assertThat(sql).contains(
+            "107, 109, 113, 117, 118, 120, 121, 122, 123",
+            "2, 3, 4, 5, 6, 900106",
+            "1500, 1506, 11616, 11618, 11619, 11620, 11621, 11622",
+            "11629, 11630, 11631, 11632, 11633, 11638, 11801",
+            "status = '1'"
+        );
+        assertThat(sql).contains(
+            "where menu_type in ('M', 'C')",
+            "and menu_id not in (",
+            "900100, 900102",
+            "900110, 900111, 900112, 900113, 900114, 900115",
+            "900120, 900121, 900122, 900123, 900124, 900125",
+            "900130, 900131",
+            "900140, 900141",
+            "900150, 900151, 900152, 900153, 900154",
+            "900160, 900161, 900162, 900163",
+            "1, 100, 101, 102",
+            "108, 500, 501"
+        );
+        assertThat(sql).contains(
+            "delete from sys_role_menu",
+            "where menu_id in (900126, 900127, 900132)",
+            "delete from sys_menu"
+        );
+        assertThat(sql).doesNotContain("path = 'factor-cache-record'");
+        assertThat(sql).doesNotContain("where menu_id in (103, 104, 1017");
     }
 
     @Test
@@ -246,12 +322,17 @@ class EnterprisePortalMenuContractTest {
         ));
 
         assertThat(source).contains(
+            "/system-auth/license-import",
             "/report-management/report-template-download",
-            "/factor-confirm/factor-cache-record"
+            "/activity-data/emission-activity-data",
+            "/factor-confirm/ef-factor"
         );
         assertThat(source).doesNotContain(
+            "/license-manage/license-import",
             "/data-management/report-template-download",
-            "/data-management/factor-cache-record"
+            "/data-management/factor-cache-record",
+            "/activity-data/emission-activity-entry",
+            "/factor-confirm/factor-cache-record"
         );
     }
 
