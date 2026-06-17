@@ -218,6 +218,25 @@ where menu_id in (
   1055, 1056, 1057, 1058, 1059, 1060
 );
 
+-- Treat the document menu as an allowlist for visible route nodes.
+-- Button permission nodes stay assigned below but must not become sidebar entries.
+update sys_menu
+set visible = '1',
+    status = '1',
+    update_time = sysdate()
+where menu_type in ('M', 'C')
+  and menu_id not in (
+    900100, 900102,
+    900110, 900111, 900112, 900113, 900114, 900115,
+    900120, 900121, 900122, 900123, 900124, 900125,
+    900130, 900131,
+    900140, 900141,
+    900150, 900151, 900152, 900153, 900154,
+    900160, 900161, 900162, 900163,
+    1, 100, 101, 102,
+    108, 500, 501
+  );
+
 -- Enterprise final portal follows 意见反馈20260602.md: user, role, and menu management only.
 update sys_menu
 set visible = '0',

@@ -161,6 +161,40 @@ class EnterprisePortalMenuContractTest {
             "1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024, 1025",
             "status = '1'"
         );
+        assertThat(sql).contains(
+            "where menu_type in ('M', 'C')",
+            "and menu_id not in (",
+            "900100, 900102",
+            "900110, 900111, 900112, 900113, 900114, 900115",
+            "900120, 900121, 900122, 900123, 900124, 900125",
+            "900130, 900131",
+            "900140, 900141",
+            "900150, 900151, 900152, 900153, 900154",
+            "900160, 900161, 900162, 900163",
+            "1, 100, 101, 102",
+            "108, 500, 501"
+        );
+        assertThat(sql).contains(
+            "900110, 1, 'admin-division'",
+            "900110, 2, 'company'",
+            "900110, 3, 'emission-source-category'",
+            "900110, 4, 'emission-source'",
+            "900110, 5, 'base-year'",
+            "900120, 1, 'ef-factor'",
+            "900120, 2, 'ef-electricity-factor'",
+            "900120, 3, 'ef-electricity-version'",
+            "900120, 4, 'ef-electricity-scope'",
+            "900120, 5, 'greenhouse-gas'",
+            "900130, 1, 'emission-activity-data'",
+            "900140, 1, 'green-electricity-data'",
+            "900150, 1, 'intensity-denominator'",
+            "900150, 2, 'intensity-target'",
+            "900150, 3, 'denominator-fact'",
+            "900150, 4, 'intensity-tolerance'",
+            "900160, 1, 'content'",
+            "900160, 2, 'data-validation'",
+            "900160, 3, 'report-template-download'"
+        );
         assertThat(sql).doesNotContain(
             "(900106,",
             "'data-management'",
