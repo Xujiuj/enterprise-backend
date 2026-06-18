@@ -103,8 +103,9 @@ jobs:
             echo "Deployment skipped because deploy or database secrets are incomplete."
             exit 0
           fi
-          SOURCE_ARCHIVE="$DEPLOY_SERVICE-${GITHUB_RUN_ID}-source.tar.gz"
-          REMOTE_SOURCE_ARCHIVE="$DEPLOY_PATH/$SOURCE_ARCHIVE"
+          SOURCE_ARCHIVE_NAME="$DEPLOY_SERVICE-${GITHUB_RUN_ID}-source.tar.gz"
+          SOURCE_ARCHIVE="$RUNNER_TEMP/$SOURCE_ARCHIVE_NAME"
+          REMOTE_SOURCE_ARCHIVE="$DEPLOY_PATH/$SOURCE_ARCHIVE_NAME"
           REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           sudo apt-get update
           sudo apt-get install -y sshpass
