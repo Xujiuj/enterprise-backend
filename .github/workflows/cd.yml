@@ -103,12 +103,12 @@ jobs:
             echo "Deployment skipped because deploy or database secrets are incomplete."
             exit 0
           fi
-          JAR_ARCHIVE="$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar.gz"
-          REMOTE_JAR_ARCHIVE="$DEPLOY_PATH/$JAR_ARCHIVE"
+          SOURCE_ARCHIVE="$DEPLOY_SERVICE-${GITHUB_RUN_ID}-source.tar.gz"
+          REMOTE_SOURCE_ARCHIVE="$DEPLOY_PATH/$SOURCE_ARCHIVE"
           REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           sudo apt-get update
-          sudo apt-get install -y sshpass gzip
-          gzip -9 -c ruoyi-admin/target/ruoyi-admin.jar > "$JAR_ARCHIVE"
+          sudo apt-get install -y sshpass
+          tar --exclude='.git' --exclude='**/target' --exclude='.idea' --exclude='.vscode' -czf "$SOURCE_ARCHIVE" .
           SSH_OPTS=(
             -p "$DEPLOY_PORT"
             -o StrictHostKeyChecking=accept-new
@@ -128,10 +128,15 @@ jobs:
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
-          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jre-headless redis-server gzip
-          echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE"
-          gzip -dc "$REMOTE_JAR_ARCHIVE" > "$REMOTE_JAR"
-          rm -f "$REMOTE_JAR_ARCHIVE"
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jdk-headless maven redis-server
+          BUILD_DIR="$DEPLOY_PATH/build/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
+          echo "$SUDO_PASSWORD" | sudo -S rm -rf "$BUILD_DIR"
+          echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$BUILD_DIR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE"
+          tar -xzf "$REMOTE_SOURCE_ARCHIVE" -C "$BUILD_DIR"
+          rm -f "$REMOTE_SOURCE_ARCHIVE"
+          (cd "$BUILD_DIR" && mvn -B -Pprod package -DskipTests)
+          cp "$BUILD_DIR/ruoyi-admin/target/ruoyi-admin.jar" "$REMOTE_JAR"
+          echo "$SUDO_PASSWORD" | sudo -S rm -rf "$BUILD_DIR"
           mv "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
           echo "$SUDO_PASSWORD" | sudo -S sed -i "s/^# *requirepass .*/requirepass ruoyi123/; s/^requirepass .*/requirepass ruoyi123/" /etc/redis/redis.conf
           if ! echo "$SUDO_PASSWORD" | sudo -S grep -q '^requirepass ' /etc/redis/redis.conf; then
@@ -193,6 +198,6 @@ jobs:
             timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
           fi
-          timeout 600 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$JAR_ARCHIVE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR_ARCHIVE"
-          timeout 720 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 600 bash -s" < deploy-backend.sh
+          timeout 180 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$SOURCE_ARCHIVE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SOURCE_ARCHIVE"
+          timeout 1800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "GITHUB_RUN_ID='$GITHUB_RUN_ID' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' REMOTE_SOURCE_ARCHIVE='$REMOTE_SOURCE_ARCHIVE' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh
