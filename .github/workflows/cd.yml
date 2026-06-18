@@ -203,16 +203,25 @@ jobs:
             timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
           fi
+          upload_archive_with_ssh_stream() {
+            for attempt in 1 2 3 4; do
+              echo "Uploading backend archive via SSH stream (attempt $attempt/4)"
+              if timeout 2400 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cat > '$REMOTE_JAR_ARCHIVE'" < "$JAR_ARCHIVE"; then
+                return 0
+              fi
+              sleep $((attempt * 10))
+            done
+            return 1
+          }
           upload_archive_with_rsync() {
-            for attempt in 1 2 3 4 5 6 7 8 9 10; do
-              echo "Uploading backend archive via rsync (attempt $attempt/10)"
-              if timeout 900 sshpass -p "$DEPLOY_PASSWORD" rsync \
+            for attempt in 1 2 3 4; do
+              echo "Uploading backend archive via rsync (attempt $attempt/4)"
+              if timeout 1200 sshpass -p "$DEPLOY_PASSWORD" rsync \
                 --archive \
                 --partial \
                 --append-verify \
-                --timeout=60 \
+                --timeout=180 \
                 --contimeout=20 \
-                --bwlimit=128 \
                 -e "$RSYNC_RSH" \
                 "$JAR_ARCHIVE" \
                 "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR_ARCHIVE_PART"; then
@@ -245,6 +254,6 @@ jobs:
               fi
             done
           }
-          upload_archive_with_rsync || upload_archive_with_chunks
+          upload_archive_with_ssh_stream || upload_archive_with_rsync || upload_archive_with_chunks
           timeout 1800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
             "REMOTE_UPLOAD_DIR='$REMOTE_UPLOAD_DIR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' JAR_ARCHIVE_SHA256='$(cat "$JAR_ARCHIVE_SHA256")' GITHUB_RUN_ID='$GITHUB_RUN_ID' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh
