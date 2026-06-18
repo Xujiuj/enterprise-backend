@@ -104,14 +104,16 @@ jobs:
             exit 0
           fi
           JAR_ARCHIVE="$RUNNER_TEMP/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar.gz"
+          JAR_ARCHIVE_SHA256="$RUNNER_TEMP/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar.gz.sha256"
           CHUNK_PREFIX="$RUNNER_TEMP/part-"
-          REMOTE_CHUNK_DIR="$DEPLOY_PATH/chunks/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
-          REMOTE_JAR_ARCHIVE="$REMOTE_CHUNK_DIR/app.jar.gz"
+          REMOTE_UPLOAD_DIR="$DEPLOY_PATH/uploads/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
+          REMOTE_JAR_ARCHIVE="$REMOTE_UPLOAD_DIR/app.jar.gz"
+          REMOTE_JAR_ARCHIVE_PART="$REMOTE_UPLOAD_DIR/app.jar.gz.part"
           REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           sudo apt-get update
-          sudo apt-get install -y sshpass gzip coreutils
+          sudo apt-get install -y sshpass gzip coreutils rsync
           gzip -9 -c ruoyi-admin/target/ruoyi-admin.jar > "$JAR_ARCHIVE"
-          split -b 1m -d -a 4 "$JAR_ARCHIVE" "$CHUNK_PREFIX"
+          sha256sum "$JAR_ARCHIVE" | awk '{print $1}' > "$JAR_ARCHIVE_SHA256"
           SSH_OPTS=(
             -p "$DEPLOY_PORT"
             -o StrictHostKeyChecking=accept-new
@@ -126,15 +128,20 @@ jobs:
             -o ServerAliveInterval=15
             -o ServerAliveCountMax=4
           )
+          RSYNC_RSH="ssh -p $DEPLOY_PORT -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
           SQL_FILE="ruoyi-modules/ruoyi-system/src/main/resources/sql/enterprise_portal_menu_sync.sql"
           REMOTE_SQL="$DEPLOY_PATH/enterprise_portal_menu_sync-${GITHUB_RUN_ID}.sql"
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
           echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jre-headless redis-server gzip
-          cat "$REMOTE_CHUNK_DIR"/part-* > "$REMOTE_JAR_ARCHIVE"
+          if [ ! -f "$REMOTE_JAR_ARCHIVE" ]; then
+            cat "$REMOTE_UPLOAD_DIR"/part-* > "$REMOTE_JAR_ARCHIVE"
+          fi
+          printf '%s  %s\n' "$JAR_ARCHIVE_SHA256" "$REMOTE_JAR_ARCHIVE" | sha256sum -c -
+          gzip -t "$REMOTE_JAR_ARCHIVE"
           gzip -dc "$REMOTE_JAR_ARCHIVE" > "$REMOTE_JAR"
-          rm -rf "$REMOTE_CHUNK_DIR"
+          rm -rf "$REMOTE_UPLOAD_DIR"
           mv "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
           echo "$SUDO_PASSWORD" | sudo -S sed -i "s/^# *requirepass .*/requirepass ruoyi123/; s/^requirepass .*/requirepass ruoyi123/" /etc/redis/redis.conf
           if ! echo "$SUDO_PASSWORD" | sudo -S grep -q '^requirepass ' /etc/redis/redis.conf; then
@@ -190,15 +197,54 @@ jobs:
             < "$REMOTE_SQL"
           rm -f "$REMOTE_SQL"
           EOF
-          timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$REMOTE_CHUNK_DIR' && mkdir -p '$DEPLOY_PATH' '$REMOTE_CHUNK_DIR' '$DEPLOY_PATH/apps/$DEPLOY_SERVICE' '$DEPLOY_PATH/logs/$DEPLOY_SERVICE'"
+          timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$REMOTE_UPLOAD_DIR' && mkdir -p '$DEPLOY_PATH' '$REMOTE_UPLOAD_DIR' '$DEPLOY_PATH/apps/$DEPLOY_SERVICE' '$DEPLOY_PATH/logs/$DEPLOY_SERVICE'"
           if [ "${{ steps.sync_menu_runner.outputs.status }}" != "success" ]; then
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$SQL_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SQL"
             timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
           fi
-          for chunk in "$RUNNER_TEMP"/part-*; do
-            echo "Uploading $(basename "$chunk")"
-            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$chunk" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_CHUNK_DIR/$(basename "$chunk")"
-          done
+          upload_archive_with_rsync() {
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              echo "Uploading backend archive via rsync (attempt $attempt/10)"
+              if timeout 900 sshpass -p "$DEPLOY_PASSWORD" rsync \
+                --archive \
+                --partial \
+                --append-verify \
+                --timeout=60 \
+                --contimeout=20 \
+                --bwlimit=128 \
+                -e "$RSYNC_RSH" \
+                "$JAR_ARCHIVE" \
+                "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR_ARCHIVE_PART"; then
+                timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "mv '$REMOTE_JAR_ARCHIVE_PART' '$REMOTE_JAR_ARCHIVE'"
+                return 0
+              fi
+              sleep $((attempt * 5))
+            done
+            return 1
+          }
+          upload_archive_with_chunks() {
+            echo "Rsync upload failed; falling back to 256KB chunked upload."
+            rm -f "$RUNNER_TEMP"/part-*
+            split -b 256k -d -a 5 "$JAR_ARCHIVE" "$CHUNK_PREFIX"
+            timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -f '$REMOTE_JAR_ARCHIVE_PART' '$REMOTE_JAR_ARCHIVE' '$REMOTE_UPLOAD_DIR'/part-*"
+            for chunk in "$RUNNER_TEMP"/part-*; do
+              chunk_name="$(basename "$chunk")"
+              uploaded=0
+              for attempt in 1 2 3 4 5 6 7 8; do
+                echo "Uploading $chunk_name (attempt $attempt/8)"
+                if timeout 180 sshpass -p "$DEPLOY_PASSWORD" scp -l 512 "${SCP_OPTS[@]}" "$chunk" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPLOAD_DIR/$chunk_name"; then
+                  uploaded=1
+                  break
+                fi
+                sleep $((attempt * 5))
+              done
+              if [ "$uploaded" -ne 1 ]; then
+                echo "Failed to upload $chunk_name after retries."
+                return 1
+              fi
+            done
+          }
+          upload_archive_with_rsync || upload_archive_with_chunks
           timeout 1800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "REMOTE_CHUNK_DIR='$REMOTE_CHUNK_DIR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' GITHUB_RUN_ID='$GITHUB_RUN_ID' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh
+            "REMOTE_UPLOAD_DIR='$REMOTE_UPLOAD_DIR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' JAR_ARCHIVE_SHA256='$(cat "$JAR_ARCHIVE_SHA256")' GITHUB_RUN_ID='$GITHUB_RUN_ID' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh
