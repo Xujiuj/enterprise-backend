@@ -42,6 +42,33 @@ jobs:
       - name: Package
         run: mvn -B -Pprod clean package -DskipTests
 
+      - name: Sync enterprise menu database from runner
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || 3306 }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$DB_HOST" ] || [ -z "$DB_USERNAME" ] || [ -z "$DB_PASSWORD" ]; then
+            echo "Menu database sync skipped because database secrets are incomplete."
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+          if ! timeout 60 mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            "$DB_NAME" \
+            < ruoyi-modules/ruoyi-system/src/main/resources/sql/enterprise_portal_menu_sync.sql; then
+            echo "Runner database sync did not complete; deploy step will retry from the target host."
+          fi
+
       - name: Deploy over SSH
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -63,6 +90,22 @@ jobs:
           REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           sudo apt-get update
           sudo apt-get install -y sshpass
+          SSH_OPTS=(
+            -p "$DEPLOY_PORT"
+            -o StrictHostKeyChecking=accept-new
+            -o ConnectTimeout=20
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+          )
+          SCP_OPTS=(
+            -P "$DEPLOY_PORT"
+            -o StrictHostKeyChecking=accept-new
+            -o ConnectTimeout=20
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+          )
+          SQL_FILE="ruoyi-modules/ruoyi-system/src/main/resources/sql/enterprise_portal_menu_sync.sql"
+          REMOTE_SQL="$DEPLOY_PATH/enterprise_portal_menu_sync-${GITHUB_RUN_ID}.sql"
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
@@ -108,7 +151,25 @@ jobs:
           echo "$SUDO_PASSWORD" | sudo -S systemctl enable "$DEPLOY_SERVICE"
           echo "$SUDO_PASSWORD" | sudo -S systemctl restart "$DEPLOY_SERVICE"
           EOF
-          sshpass -p "$DEPLOY_PASSWORD" ssh -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
-          sshpass -p "$DEPLOY_PASSWORD" scp -P "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new ruoyi-admin/target/ruoyi-admin.jar "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR"
-          sshpass -p "$DEPLOY_PASSWORD" ssh -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' bash -s" < deploy-backend.sh
+          cat > sync-menu-db.sh <<'EOF'
+          set -euo pipefail
+          echo "$SUDO_PASSWORD" | sudo -S apt-get update
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y default-mysql-client
+          mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            "$DB_NAME" \
+            < "$REMOTE_SQL"
+          rm -f "$REMOTE_SQL"
+          EOF
+          sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
+          sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$SQL_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SQL"
+          sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
+          sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" ruoyi-admin/target/ruoyi-admin.jar "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR"
+          sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 600 bash -s" < deploy-backend.sh
