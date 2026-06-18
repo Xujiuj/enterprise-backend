@@ -68,6 +68,17 @@ jobs:
             --default-character-set=utf8mb4 \
             "$DB_NAME" \
             < ruoyi-modules/ruoyi-system/src/main/resources/sql/enterprise_portal_menu_sync.sql; then
+            mysql \
+              --connect-timeout=20 \
+              --host="$DB_HOST" \
+              --port="$DB_PORT" \
+              --user="$DB_USERNAME" \
+              --password="$DB_PASSWORD" \
+              --default-character-set=utf8mb4 \
+              --batch \
+              --skip-column-names \
+              "$DB_NAME" \
+              -e "select concat(repeat('  ', level - 1), menu_name) from (select p.menu_id, p.menu_name, p.order_num as parent_order, p.order_num, p.menu_id as parent_id, 1 as level from sys_menu p where p.parent_id = 0 and p.menu_type in ('M','C') and p.visible = '0' and p.status = '0' union all select c.menu_id, c.menu_name, p.order_num as parent_order, c.order_num, p.menu_id as parent_id, 2 as level from sys_menu p join sys_menu c on c.parent_id = p.menu_id where p.parent_id = 0 and p.menu_type in ('M','C') and p.visible = '0' and p.status = '0' and c.menu_type in ('M','C') and c.visible = '0' and c.status = '0') menu_snapshot order by parent_order, parent_id, level, order_num, menu_id;"
             echo "status=success" >> "$GITHUB_OUTPUT"
           else
             echo "Runner database sync did not complete; deploy step will retry from the target host."
@@ -92,9 +103,12 @@ jobs:
             echo "Deployment skipped because deploy or database secrets are incomplete."
             exit 0
           fi
+          JAR_ARCHIVE="$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar.gz"
+          REMOTE_JAR_ARCHIVE="$DEPLOY_PATH/$JAR_ARCHIVE"
           REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           sudo apt-get update
-          sudo apt-get install -y sshpass
+          sudo apt-get install -y sshpass gzip
+          gzip -9 -c ruoyi-admin/target/ruoyi-admin.jar > "$JAR_ARCHIVE"
           SSH_OPTS=(
             -p "$DEPLOY_PORT"
             -o StrictHostKeyChecking=accept-new
@@ -114,8 +128,10 @@ jobs:
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
-          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jre-headless redis-server
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jre-headless redis-server gzip
           echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE"
+          gzip -dc "$REMOTE_JAR_ARCHIVE" > "$REMOTE_JAR"
+          rm -f "$REMOTE_JAR_ARCHIVE"
           mv "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
           echo "$SUDO_PASSWORD" | sudo -S sed -i "s/^# *requirepass .*/requirepass ruoyi123/; s/^requirepass .*/requirepass ruoyi123/" /etc/redis/redis.conf
           if ! echo "$SUDO_PASSWORD" | sudo -S grep -q '^requirepass ' /etc/redis/redis.conf; then
@@ -177,6 +193,6 @@ jobs:
             timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
           fi
-          timeout 300 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" ruoyi-admin/target/ruoyi-admin.jar "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR"
+          timeout 600 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$JAR_ARCHIVE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR_ARCHIVE"
           timeout 720 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 600 bash -s" < deploy-backend.sh
+            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 600 bash -s" < deploy-backend.sh
