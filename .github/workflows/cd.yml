@@ -103,11 +103,15 @@ jobs:
             echo "Deployment skipped because deploy or database secrets are incomplete."
             exit 0
           fi
+          JAR_ARCHIVE="$RUNNER_TEMP/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar.gz"
+          CHUNK_PREFIX="$RUNNER_TEMP/part-"
+          REMOTE_CHUNK_DIR="$DEPLOY_PATH/chunks/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
+          REMOTE_JAR_ARCHIVE="$REMOTE_CHUNK_DIR/app.jar.gz"
           REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
           sudo apt-get update
-          sudo apt-get install -y sshpass
-          DEPLOY_REF="${GITHUB_SHA:-$(git rev-parse HEAD)}"
-          REPOSITORY_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          sudo apt-get install -y sshpass gzip coreutils
+          gzip -9 -c ruoyi-admin/target/ruoyi-admin.jar > "$JAR_ARCHIVE"
+          split -b 8m -d -a 4 "$JAR_ARCHIVE" "$CHUNK_PREFIX"
           SSH_OPTS=(
             -p "$DEPLOY_PORT"
             -o StrictHostKeyChecking=accept-new
@@ -127,15 +131,10 @@ jobs:
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
-          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y git openjdk-17-jdk-headless maven redis-server
-          BUILD_DIR="$DEPLOY_PATH/build/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
-          echo "$SUDO_PASSWORD" | sudo -S rm -rf "$BUILD_DIR"
-          echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$BUILD_DIR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE"
-          git clone --depth 1 "$REPOSITORY_URL" "$BUILD_DIR"
-          (cd "$BUILD_DIR" && git fetch --depth 1 origin "$DEPLOY_REF" && git checkout --detach "$DEPLOY_REF")
-          (cd "$BUILD_DIR" && mvn -B -Pprod package -DskipTests)
-          cp "$BUILD_DIR/ruoyi-admin/target/ruoyi-admin.jar" "$REMOTE_JAR"
-          echo "$SUDO_PASSWORD" | sudo -S rm -rf "$BUILD_DIR"
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jre-headless redis-server gzip
+          cat "$REMOTE_CHUNK_DIR"/part-* > "$REMOTE_JAR_ARCHIVE"
+          gzip -dc "$REMOTE_JAR_ARCHIVE" > "$REMOTE_JAR"
+          rm -rf "$REMOTE_CHUNK_DIR"
           mv "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
           echo "$SUDO_PASSWORD" | sudo -S sed -i "s/^# *requirepass .*/requirepass ruoyi123/; s/^requirepass .*/requirepass ruoyi123/" /etc/redis/redis.conf
           if ! echo "$SUDO_PASSWORD" | sudo -S grep -q '^requirepass ' /etc/redis/redis.conf; then
@@ -191,11 +190,14 @@ jobs:
             < "$REMOTE_SQL"
           rm -f "$REMOTE_SQL"
           EOF
-          timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
+          timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$REMOTE_CHUNK_DIR' && mkdir -p '$DEPLOY_PATH' '$REMOTE_CHUNK_DIR' '$DEPLOY_PATH/apps/$DEPLOY_SERVICE' '$DEPLOY_PATH/logs/$DEPLOY_SERVICE'"
           if [ "${{ steps.sync_menu_runner.outputs.status }}" != "success" ]; then
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$SQL_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SQL"
             timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
           fi
+          for chunk in "$RUNNER_TEMP"/part-*; do
+            timeout 90 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$chunk" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_CHUNK_DIR/$(basename "$chunk")"
+          done
           timeout 1800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "GITHUB_RUN_ID='$GITHUB_RUN_ID' REPOSITORY_URL='$REPOSITORY_URL' DEPLOY_REF='$DEPLOY_REF' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh
+            "REMOTE_CHUNK_DIR='$REMOTE_CHUNK_DIR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' GITHUB_RUN_ID='$GITHUB_RUN_ID' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh
