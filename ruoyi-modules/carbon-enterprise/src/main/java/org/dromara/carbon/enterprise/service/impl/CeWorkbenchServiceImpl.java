@@ -28,6 +28,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -46,6 +48,7 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
     private static final String LICENSE_VALID = "VALID";
     private static final String UNIT_TCO2E = "tCO2e";
     private static final int ANNOUNCEMENT_LIMIT = 5;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private final ICeActivityDataService activityDataService;
     private final ICeLicenseStateService licenseStateService;
@@ -356,7 +359,7 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
         if (licenseState == null || licenseState.getValidTo() == null) {
             return "暂无授权到期信息";
         }
-        return licenseState.getValidTo() + " 到期";
+        return DATE_FORMATTER.format(licenseState.getValidTo().toInstant().atZone(ZoneId.systemDefault()).toLocalDate()) + " 到期";
     }
 
     private String rate(BigDecimal value) {
