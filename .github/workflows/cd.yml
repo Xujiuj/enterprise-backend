@@ -32,16 +32,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: maven
-
-      - name: Package
-        run: mvn -B -Pprod clean package -DskipTests
-
       - name: Sync enterprise menu database from runner
         id: sync_menu_runner
         env:
@@ -103,17 +93,18 @@ jobs:
             echo "Deployment skipped because deploy or database secrets are incomplete."
             exit 0
           fi
-          JAR_ARCHIVE="$RUNNER_TEMP/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar.gz"
-          JAR_ARCHIVE_SHA256="$RUNNER_TEMP/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar.gz.sha256"
-          CHUNK_PREFIX="$RUNNER_TEMP/part-"
+          SOURCE_ARCHIVE="$RUNNER_TEMP/$DEPLOY_SERVICE-${GITHUB_RUN_ID}-source.tar.gz"
           REMOTE_UPLOAD_DIR="$DEPLOY_PATH/uploads/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
-          REMOTE_JAR_ARCHIVE="$REMOTE_UPLOAD_DIR/app.jar.gz"
-          REMOTE_JAR_ARCHIVE_PART="$REMOTE_UPLOAD_DIR/app.jar.gz.part"
-          REMOTE_JAR="$DEPLOY_PATH/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
+          REMOTE_SOURCE_ARCHIVE="$REMOTE_UPLOAD_DIR/source.tar.gz"
+          REMOTE_BUILD_DIR="$DEPLOY_PATH/builds/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
           sudo apt-get update
-          sudo apt-get install -y sshpass gzip coreutils rsync
-          gzip -9 -c ruoyi-admin/target/ruoyi-admin.jar > "$JAR_ARCHIVE"
-          sha256sum "$JAR_ARCHIVE" | awk '{print $1}' > "$JAR_ARCHIVE_SHA256"
+          sudo apt-get install -y sshpass gzip tar coreutils
+          tar \
+            --exclude='.git' \
+            --exclude='**/target' \
+            --exclude='**/node_modules' \
+            --exclude='**/.mvn/wrapper/maven-wrapper.jar' \
+            -czf "$SOURCE_ARCHIVE" .
           SSH_OPTS=(
             -p "$DEPLOY_PORT"
             -o StrictHostKeyChecking=accept-new
@@ -128,21 +119,19 @@ jobs:
             -o ServerAliveInterval=15
             -o ServerAliveCountMax=4
           )
-          RSYNC_RSH="ssh -p $DEPLOY_PORT -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
           SQL_FILE="ruoyi-modules/ruoyi-system/src/main/resources/sql/enterprise_portal_menu_sync.sql"
           REMOTE_SQL="$DEPLOY_PATH/enterprise_portal_menu_sync-${GITHUB_RUN_ID}.sql"
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
-          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jre-headless redis-server gzip
-          if [ ! -f "$REMOTE_JAR_ARCHIVE" ]; then
-            cat "$REMOTE_UPLOAD_DIR"/part-* > "$REMOTE_JAR_ARCHIVE"
-          fi
-          printf '%s  %s\n' "$JAR_ARCHIVE_SHA256" "$REMOTE_JAR_ARCHIVE" | sha256sum -c -
-          gzip -t "$REMOTE_JAR_ARCHIVE"
-          gzip -dc "$REMOTE_JAR_ARCHIVE" > "$REMOTE_JAR"
-          rm -rf "$REMOTE_UPLOAD_DIR"
-          mv "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jdk-headless maven redis-server gzip tar
+          rm -rf "$REMOTE_BUILD_DIR"
+          mkdir -p "$REMOTE_BUILD_DIR"
+          tar -xzf "$REMOTE_SOURCE_ARCHIVE" -C "$REMOTE_BUILD_DIR"
+          cd "$REMOTE_BUILD_DIR"
+          mvn -B -Pprod clean package -DskipTests
+          install -m 0644 ruoyi-admin/target/ruoyi-admin.jar "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
+          rm -rf "$REMOTE_UPLOAD_DIR" "$REMOTE_BUILD_DIR"
           echo "$SUDO_PASSWORD" | sudo -S sed -i "s/^# *requirepass .*/requirepass ruoyi123/; s/^requirepass .*/requirepass ruoyi123/" /etc/redis/redis.conf
           if ! echo "$SUDO_PASSWORD" | sudo -S grep -q '^requirepass ' /etc/redis/redis.conf; then
             echo "$SUDO_PASSWORD" | sudo -S sh -c "printf '\nrequirepass ruoyi123\n' >> /etc/redis/redis.conf"
@@ -203,57 +192,6 @@ jobs:
             timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
           fi
-          upload_archive_with_ssh_stream() {
-            for attempt in 1; do
-              echo "Uploading backend archive via SSH stream (attempt $attempt/1)"
-              if timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cat > '$REMOTE_JAR_ARCHIVE'" < "$JAR_ARCHIVE"; then
-                return 0
-              fi
-              sleep $((attempt * 10))
-            done
-            return 1
-          }
-          upload_archive_with_rsync() {
-            for attempt in 1 2; do
-              echo "Uploading backend archive via rsync (attempt $attempt/2)"
-              if timeout 300 sshpass -p "$DEPLOY_PASSWORD" rsync \
-                --archive \
-                --partial \
-                --append-verify \
-                --timeout=60 \
-                --contimeout=20 \
-                -e "$RSYNC_RSH" \
-                "$JAR_ARCHIVE" \
-                "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR_ARCHIVE_PART"; then
-                timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "mv '$REMOTE_JAR_ARCHIVE_PART' '$REMOTE_JAR_ARCHIVE'"
-                return 0
-              fi
-              sleep $((attempt * 5))
-            done
-            return 1
-          }
-          upload_archive_with_chunks() {
-            echo "Rsync upload failed; falling back to 4MB chunked upload."
-            rm -f "$RUNNER_TEMP"/part-*
-            split -b 4m -d -a 5 "$JAR_ARCHIVE" "$CHUNK_PREFIX"
-            timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -f '$REMOTE_JAR_ARCHIVE_PART' '$REMOTE_JAR_ARCHIVE' '$REMOTE_UPLOAD_DIR'/part-*"
-            for chunk in "$RUNNER_TEMP"/part-*; do
-              chunk_name="$(basename "$chunk")"
-              uploaded=0
-              for attempt in 1 2 3; do
-                echo "Uploading $chunk_name (attempt $attempt/3)"
-                if timeout 120 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$chunk" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPLOAD_DIR/$chunk_name"; then
-                  uploaded=1
-                  break
-                fi
-                sleep $((attempt * 5))
-              done
-              if [ "$uploaded" -ne 1 ]; then
-                echo "Failed to upload $chunk_name after retries."
-                return 1
-              fi
-            done
-          }
-          upload_archive_with_rsync || upload_archive_with_ssh_stream || upload_archive_with_chunks
-          timeout 600 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "REMOTE_UPLOAD_DIR='$REMOTE_UPLOAD_DIR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' JAR_ARCHIVE_SHA256='$(cat "$JAR_ARCHIVE_SHA256")' GITHUB_RUN_ID='$GITHUB_RUN_ID' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 540 bash -s" < deploy-backend.sh
+          timeout 180 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$SOURCE_ARCHIVE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SOURCE_ARCHIVE"
+          timeout 1800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "REMOTE_UPLOAD_DIR='$REMOTE_UPLOAD_DIR' REMOTE_SOURCE_ARCHIVE='$REMOTE_SOURCE_ARCHIVE' REMOTE_BUILD_DIR='$REMOTE_BUILD_DIR' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh
