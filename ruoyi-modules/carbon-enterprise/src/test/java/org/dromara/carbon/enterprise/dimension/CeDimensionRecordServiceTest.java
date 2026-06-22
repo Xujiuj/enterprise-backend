@@ -1,13 +1,12 @@
 package org.dromara.carbon.enterprise.dimension;
 
 import org.dromara.carbon.enterprise.client.CeVendorDimensionOpenClient;
-import org.dromara.carbon.enterprise.domain.CeDimensionRecord;
 import org.dromara.carbon.enterprise.domain.CeLicenseState;
 import org.dromara.carbon.enterprise.domain.bo.CeDimensionRecordBo;
 import org.dromara.carbon.enterprise.domain.sync.CeVendorDimensionListResponse;
 import org.dromara.carbon.enterprise.domain.sync.CeVendorDimensionRecord;
 import org.dromara.carbon.enterprise.domain.vo.CeDimensionRecordVo;
-import org.dromara.carbon.enterprise.mapper.CeDimensionRecordMapper;
+import org.dromara.carbon.enterprise.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.service.impl.CeDimensionRecordServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
@@ -33,28 +32,41 @@ import static org.mockito.Mockito.when;
 @Tag("dev")
 class CeDimensionRecordServiceTest {
 
-    private CeDimensionRecordMapper dimensionRecordMapper;
+    private CeDimensionProjectionMapper dimensionProjectionMapper;
     private CeLicenseStateMapper licenseStateMapper;
     private CeVendorDimensionOpenClient vendorDimensionOpenClient;
     private CeDimensionRecordServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        dimensionRecordMapper = mock(CeDimensionRecordMapper.class);
+        dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
         licenseStateMapper = mock(CeLicenseStateMapper.class);
         vendorDimensionOpenClient = mock(CeVendorDimensionOpenClient.class);
         service = new CeDimensionRecordServiceImpl(
-            dimensionRecordMapper,
+            dimensionProjectionMapper,
             licenseStateMapper,
             vendorDimensionOpenClient
         );
     }
 
     @Test
-    void vendorOwnedDimensionsAreReadFromVendorOpenApi() {
+    void concreteEnterpriseDimensionsAreReadFromLocalProjection() {
         CeDimensionRecordBo query = new CeDimensionRecordBo();
-        query.setDimensionCode("admin-division");
-        query.setRecordName("浙江");
+        query.setDimensionCode("company");
+        query.setRecordName("Demo");
+        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(localCompany()));
+
+        TableDataInfo<CeDimensionRecordVo> page = service.queryPageList(query, new PageQuery(10, 1));
+
+        assertEquals(1, page.getTotal());
+        assertEquals("COMP-001", page.getRows().get(0).getRecordCode());
+        verify(vendorDimensionOpenClient, never()).listDimensions(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void reportTemplatesAreReadFromVendorOpenApi() {
+        CeDimensionRecordBo query = new CeDimensionRecordBo();
+        query.setDimensionCode("report-template-download");
         when(licenseStateMapper.selectList(any())).thenReturn(List.of(validLicense()));
         when(vendorDimensionOpenClient.listDimensions(eq("LIC-001"), eq("INSTALL-001"), eq(query), eq(1), eq(10)))
             .thenReturn(vendorResponse());
@@ -62,12 +74,12 @@ class CeDimensionRecordServiceTest {
         TableDataInfo<CeDimensionRecordVo> page = service.queryPageList(query, new PageQuery(10, 1));
 
         assertEquals(1, page.getTotal());
-        assertEquals("330000", page.getRows().get(0).getRecordCode());
-        verify(dimensionRecordMapper, never()).selectVoPage(any(), any());
+        assertEquals("TPL-001", page.getRows().get(0).getRecordCode());
+        verify(dimensionProjectionMapper, never()).selectByDimensionCode("report-template-download");
     }
 
     @Test
-    void rejectsLocalWritesForVendorOwnedDimensions() {
+    void rejectsLocalWritesForReadOnlyDimensions() {
         CeDimensionRecordBo bo = new CeDimensionRecordBo();
         bo.setDimensionCode("greenhouse-gas");
         bo.setRecordCode("CO2");
@@ -75,8 +87,18 @@ class CeDimensionRecordServiceTest {
 
         ServiceException exception = assertThrows(ServiceException.class, () -> service.insertByBo(bo));
 
-        assertEquals("Vendor-owned dimension data must be maintained in vendor backend", exception.getMessage());
-        verify(dimensionRecordMapper, never()).insert(any(CeDimensionRecord.class));
+        assertEquals("Dimension is read-only for enterprise users: greenhouse-gas", exception.getMessage());
+        verify(dimensionProjectionMapper, never()).insertByDimensionCode(any());
+    }
+
+    private CeDimensionRecordVo localCompany() {
+        CeDimensionRecordVo record = new CeDimensionRecordVo();
+        record.setId(1L);
+        record.setDimensionCode("company");
+        record.setRecordCode("COMP-001");
+        record.setRecordName("Demo Company");
+        record.setStatus("0");
+        return record;
     }
 
     private CeLicenseState validLicense() {
@@ -92,14 +114,14 @@ class CeDimensionRecordServiceTest {
     private CeVendorDimensionListResponse vendorResponse() {
         CeVendorDimensionRecord record = new CeVendorDimensionRecord();
         record.setId(100L);
-        record.setDimensionCode("admin-division");
-        record.setRecordCode("330000");
-        record.setRecordName("浙江省");
+        record.setDimensionCode("report-template-download");
+        record.setRecordCode("TPL-001");
+        record.setRecordName("Report template");
         record.setStatus("0");
 
         CeVendorDimensionListResponse response = new CeVendorDimensionListResponse();
         response.setLicenseId("LIC-001");
-        response.setDimensionCode("admin-division");
+        response.setDimensionCode("report-template-download");
         response.setTotal(1);
         response.setRecords(List.of(record));
         return response;

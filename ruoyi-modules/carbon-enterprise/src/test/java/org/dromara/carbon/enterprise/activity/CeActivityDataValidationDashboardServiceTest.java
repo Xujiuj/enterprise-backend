@@ -1,18 +1,18 @@
 package org.dromara.carbon.enterprise.activity;
 
 import org.dromara.carbon.enterprise.domain.CeActivityData;
-import org.dromara.carbon.enterprise.domain.CeDimensionRecord;
 import org.dromara.carbon.enterprise.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.domain.CeGreenPowerCertificate;
+import org.dromara.carbon.enterprise.domain.CeIntensityDenominatorFact;
 import org.dromara.carbon.enterprise.domain.bo.CeActivityDataBo;
 import org.dromara.carbon.enterprise.domain.vo.CeActivityDataValidationDashboardVo;
 import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureCellMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureRowMapper;
-import org.dromara.carbon.enterprise.mapper.CeDimensionRecordMapper;
 import org.dromara.carbon.enterprise.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.mapper.CeGreenPowerCertificateMapper;
+import org.dromara.carbon.enterprise.mapper.CeIntensityDenominatorFactMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateFieldMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateSheetMapper;
 import org.dromara.carbon.enterprise.service.impl.CeActivityDataServiceImpl;
@@ -34,7 +34,7 @@ class CeActivityDataValidationDashboardServiceTest {
     private CeActivityDataMapper activityDataMapper;
     private CeEmissionSourceMapper emissionSourceMapper;
     private CeGreenPowerCertificateMapper greenPowerCertificateMapper;
-    private CeDimensionRecordMapper dimensionRecordMapper;
+    private CeIntensityDenominatorFactMapper denominatorFactMapper;
     private CeTemplateSheetMapper templateSheetMapper;
     private CeTemplateFieldMapper templateFieldMapper;
     private CeActivityDataServiceImpl service;
@@ -44,7 +44,7 @@ class CeActivityDataValidationDashboardServiceTest {
         activityDataMapper = mock(CeActivityDataMapper.class);
         emissionSourceMapper = mock(CeEmissionSourceMapper.class);
         greenPowerCertificateMapper = mock(CeGreenPowerCertificateMapper.class);
-        dimensionRecordMapper = mock(CeDimensionRecordMapper.class);
+        denominatorFactMapper = mock(CeIntensityDenominatorFactMapper.class);
         templateSheetMapper = mock(CeTemplateSheetMapper.class);
         templateFieldMapper = mock(CeTemplateFieldMapper.class);
         CeCaptureRowMapper captureRowMapper = mock(CeCaptureRowMapper.class);
@@ -55,7 +55,7 @@ class CeActivityDataValidationDashboardServiceTest {
             activityDataMapper,
             emissionSourceMapper,
             greenPowerCertificateMapper,
-            dimensionRecordMapper,
+            denominatorFactMapper,
             templateSheetMapper,
             templateFieldMapper,
             captureRowMapper,
@@ -67,24 +67,26 @@ class CeActivityDataValidationDashboardServiceTest {
     @Test
     void buildsValidationDashboardFromEnterpriseActivityData() {
         when(emissionSourceMapper.selectList(any())).thenReturn(List.of(
-            emissionSource(1L, "ES-001", "总部外购电"),
-            emissionSource(2L, "ES-002", "生产天然气")
+            emissionSource(1L, "ES-001", "Purchased electricity"),
+            emissionSource(2L, "ES-002", "Natural gas")
         ));
         when(activityDataMapper.selectList(any())).thenReturn(List.of(
-            activity(1L, "submitted", BigDecimal.TEN, "kWh", 100L),
-            activity(2L, "draft", BigDecimal.ONE, "m3", null)
+            activity("ES-001", "submitted", BigDecimal.TEN, "kWh", "EF-001"),
+            activity("ES-002", "draft", BigDecimal.ONE, "m3", null)
         ));
         when(greenPowerCertificateMapper.selectList(any())).thenReturn(List.of(invalidVoidedGreenCertificate()));
-        when(dimensionRecordMapper.selectList(any())).thenReturn(List.of(invalidDenominatorFact()));
+        when(denominatorFactMapper.selectList(any())).thenReturn(List.of(invalidDenominatorFact()));
         when(templateSheetMapper.selectList(any())).thenReturn(List.of());
         when(templateFieldMapper.selectList(any())).thenReturn(List.of());
 
         CeActivityDataBo query = new CeActivityDataBo();
-        query.setActivityPeriod("2026-01");
+        query.setActivityYear(2026);
+        query.setActivityMonth(1);
 
         CeActivityDataValidationDashboardVo dashboard = service.queryValidationDashboard(query);
 
-        assertEquals("2026-01", dashboard.getActivityPeriod());
+        assertEquals(2026, dashboard.getActivityYear());
+        assertEquals(1, dashboard.getActivityMonth());
         assertEquals("2026-02-05", dashboard.getDueDate());
         assertEquals(2, dashboard.getExpectedItems());
         assertEquals(4, dashboard.getValidatedRecordCount());
@@ -107,20 +109,22 @@ class CeActivityDataValidationDashboardServiceTest {
     private CeEmissionSource emissionSource(Long id, String code, String name) {
         CeEmissionSource source = new CeEmissionSource();
         source.setId(id);
-        source.setSourceCode(code);
-        source.setSourceName(name);
-        source.setFacilityName("一厂");
+        source.setSourceIdentificationCode(code);
+        source.setSourceIdentificationName(name);
+        source.setEmissionSourceName(name);
+        source.setFactoryName("Factory A");
         source.setEnabledFlag(true);
         return source;
     }
 
-    private CeActivityData activity(Long sourceId, String status, BigDecimal value, String unit, Long factorId) {
+    private CeActivityData activity(String sourceCode, String status, BigDecimal value, String unit, String factorKey) {
         CeActivityData activity = new CeActivityData();
-        activity.setEmissionSourceId(sourceId);
-        activity.setActivityPeriod("2026-01");
+        activity.setSourceIdentificationCode(sourceCode);
+        activity.setActivityYear(2026);
+        activity.setActivityMonth(1);
         activity.setActivityValue(value);
         activity.setActivityUnit(unit);
-        activity.setFactorConfirmationId(factorId);
+        activity.setFactorKey(factorKey);
         activity.setDataStatus(status);
         return activity;
     }
@@ -128,21 +132,22 @@ class CeActivityDataValidationDashboardServiceTest {
     private CeGreenPowerCertificate invalidVoidedGreenCertificate() {
         CeGreenPowerCertificate certificate = new CeGreenPowerCertificate();
         certificate.setCertificateCode("GEC-001");
-        certificate.setCertificateType("GEC");
-        certificate.setEnergyPeriod("2026-01");
-        certificate.setEnergyAmount(BigDecimal.ZERO);
+        certificate.setElectricityType("GEC");
+        certificate.setActivityYear(2026);
+        certificate.setActivityMonth(1);
+        certificate.setQuantityKwh(BigDecimal.ZERO);
         certificate.setProofStatus("voided");
         return certificate;
     }
 
-    private CeDimensionRecord invalidDenominatorFact() {
-        CeDimensionRecord fact = new CeDimensionRecord();
-        fact.setDimensionCode("denominator-fact");
-        fact.setRecordCode("DEN-001");
-        fact.setRecordName("产量");
-        fact.setField01("2026-01");
-        fact.setField02("");
-        fact.setField03("0");
+    private CeIntensityDenominatorFact invalidDenominatorFact() {
+        CeIntensityDenominatorFact fact = new CeIntensityDenominatorFact();
+        fact.setFactoryCode("FAC-001");
+        fact.setDenominatorMetricName("Output");
+        fact.setFactYear(2026);
+        fact.setFactMonth(1);
+        fact.setDenominatorType("");
+        fact.setDenominatorValue(BigDecimal.ZERO);
         return fact;
     }
 }

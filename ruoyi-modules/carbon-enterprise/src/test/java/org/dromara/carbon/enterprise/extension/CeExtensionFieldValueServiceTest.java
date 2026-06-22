@@ -3,11 +3,12 @@ package org.dromara.carbon.enterprise.extension;
 import org.dromara.carbon.enterprise.domain.CeExtensionField;
 import org.dromara.carbon.enterprise.domain.CeExtensionFieldValue;
 import org.dromara.carbon.enterprise.domain.bo.CeExtensionFieldValueBo;
+import org.dromara.carbon.enterprise.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
+import org.dromara.carbon.enterprise.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.mapper.CeExtensionFieldMapper;
 import org.dromara.carbon.enterprise.mapper.CeExtensionFieldValueMapper;
 import org.dromara.carbon.enterprise.mapper.CeGreenPowerCertificateMapper;
-import org.dromara.carbon.enterprise.mapper.CeIntensityMetricMapper;
 import org.dromara.carbon.enterprise.service.impl.CeExtensionFieldValueServiceImpl;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,7 +34,7 @@ class CeExtensionFieldValueServiceTest {
     private CeExtensionFieldMapper extensionFieldMapper;
     private CeActivityDataMapper activityDataMapper;
     private CeGreenPowerCertificateMapper greenPowerCertificateMapper;
-    private CeIntensityMetricMapper intensityMetricMapper;
+    private CeDimensionProjectionMapper dimensionProjectionMapper;
     private CeExtensionFieldValueServiceImpl service;
 
     @BeforeEach
@@ -42,13 +43,13 @@ class CeExtensionFieldValueServiceTest {
         extensionFieldMapper = mock(CeExtensionFieldMapper.class);
         activityDataMapper = mock(CeActivityDataMapper.class);
         greenPowerCertificateMapper = mock(CeGreenPowerCertificateMapper.class);
-        intensityMetricMapper = mock(CeIntensityMetricMapper.class);
+        dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
         service = new CeExtensionFieldValueServiceImpl(
             extensionFieldValueMapper,
             extensionFieldMapper,
             activityDataMapper,
             greenPowerCertificateMapper,
-            intensityMetricMapper
+            dimensionProjectionMapper
         ) {
             @Override
             protected CeExtensionFieldValue toEntity(CeExtensionFieldValueBo bo) {
@@ -87,6 +88,17 @@ class CeExtensionFieldValueServiceTest {
 
         assertEquals("extension field owner table does not match module code", exception.getMessage());
         verify(extensionFieldValueMapper, never()).insert(any(CeExtensionFieldValue.class));
+    }
+
+    @Test
+    void savesValueForIntensityDenominatorFactProjectionOwner() {
+        when(extensionFieldMapper.selectById(501L)).thenReturn(field("intensity_denominator", true));
+        when(dimensionProjectionMapper.selectByDimensionCodeAndId("denominator-fact", 9001L))
+            .thenReturn(new CeDimensionRecordVo());
+
+        service.insertByBo(validBo("ce_intensity_denominator_fact"));
+
+        verify(extensionFieldValueMapper).insert(any(CeExtensionFieldValue.class));
     }
 
     @Test
