@@ -8,10 +8,10 @@ import org.dromara.carbon.enterprise.domain.CeExtensionFieldValue;
 import org.dromara.carbon.enterprise.domain.bo.CeExtensionFieldValueBo;
 import org.dromara.carbon.enterprise.domain.vo.CeExtensionFieldValueVo;
 import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
+import org.dromara.carbon.enterprise.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.mapper.CeExtensionFieldMapper;
 import org.dromara.carbon.enterprise.mapper.CeExtensionFieldValueMapper;
 import org.dromara.carbon.enterprise.mapper.CeGreenPowerCertificateMapper;
-import org.dromara.carbon.enterprise.mapper.CeIntensityMetricMapper;
 import org.dromara.carbon.enterprise.service.ICeExtensionFieldValueService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
@@ -35,14 +35,14 @@ public class CeExtensionFieldValueServiceImpl implements ICeExtensionFieldValueS
     private static final Map<String, String> MODULE_OWNER_TABLES = Map.of(
         "activity_data", "ce_activity_data",
         "green_electricity", "ce_green_power_certificate",
-        "intensity_denominator", "ce_intensity_metric"
+        "intensity_denominator", "ce_intensity_denominator_fact"
     );
 
     private final CeExtensionFieldValueMapper extensionFieldValueMapper;
     private final CeExtensionFieldMapper extensionFieldMapper;
     private final CeActivityDataMapper activityDataMapper;
     private final CeGreenPowerCertificateMapper greenPowerCertificateMapper;
-    private final CeIntensityMetricMapper intensityMetricMapper;
+    private final CeDimensionProjectionMapper dimensionProjectionMapper;
 
     @Override
     public TableDataInfo<CeExtensionFieldValueVo> queryPageList(CeExtensionFieldValueBo bo, PageQuery pageQuery) {
@@ -165,7 +165,7 @@ public class CeExtensionFieldValueServiceImpl implements ICeExtensionFieldValueS
         Object owner = switch (ownerTableCode) {
             case "ce_activity_data" -> activityDataMapper.selectById(ownerRecordId);
             case "ce_green_power_certificate" -> greenPowerCertificateMapper.selectById(ownerRecordId);
-            case "ce_intensity_metric" -> intensityMetricMapper.selectById(ownerRecordId);
+            case "ce_intensity_denominator_fact" -> dimensionProjectionMapper.selectByDimensionCodeAndId("denominator-fact", ownerRecordId);
             default -> throw new ServiceException("Unsupported enterprise extension owner table: " + ownerTableCode);
         };
         if (owner == null) {

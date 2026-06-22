@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -50,8 +51,11 @@ public class CeDimensionRecordController extends BaseController {
      */
     @SaCheckPermission("enterprise:dimension:query")
     @GetMapping("/{id}")
-    public R<CeDimensionRecordVo> getInfo(@NotNull(message = "id cannot be null") @PathVariable Long id) {
-        return R.ok(dimensionRecordService.queryById(id));
+    public R<CeDimensionRecordVo> getInfo(
+        @NotNull(message = "id cannot be null") @PathVariable Long id,
+        @RequestParam String dimensionCode
+    ) {
+        return R.ok(dimensionRecordService.queryById(dimensionCode, id));
     }
 
     /**
@@ -77,7 +81,10 @@ public class CeDimensionRecordController extends BaseController {
      */
     @SaCheckPermission("enterprise:dimension:remove")
     @DeleteMapping("/{ids}")
-    public R<Void> remove(@NotEmpty(message = "ids cannot be empty") @PathVariable Long[] ids) {
-        return toAjax(dimensionRecordService.deleteByIds(List.of(ids)));
+    public R<Void> remove(
+        @NotEmpty(message = "ids cannot be empty") @PathVariable Long[] ids,
+        @RequestParam String dimensionCode
+    ) {
+        return toAjax(dimensionRecordService.deleteByIds(dimensionCode, List.of(ids)));
     }
 }

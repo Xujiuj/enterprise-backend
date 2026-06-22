@@ -26,19 +26,31 @@ public class CeGreenPowerCertificateBo implements Serializable {
     @NotNull(message = "id cannot be null", groups = { EditGroup.class })
     private Long id;
 
-    @NotBlank(message = "certificateCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    private Integer rowNo;
+
+    @NotBlank(message = "factoryCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    private String factoryCode;
+
+    private String factoryName;
+
+    private Integer activityYear;
+
+    private Integer activityMonth;
+
+    private String sourceCategoryKey;
+
+    private String scopeName;
+
+    private String scopeSubcategory;
+
+    private String electricityType;
+
+    private String electricityTypeDesc;
+
+    @NotNull(message = "quantityKwh cannot be null", groups = { AddGroup.class, EditGroup.class })
+    private BigDecimal quantityKwh;
+
     private String certificateCode;
-
-    @NotBlank(message = "certificateType cannot be blank", groups = { AddGroup.class, EditGroup.class })
-    private String certificateType;
-
-    @NotBlank(message = "energyPeriod cannot be blank", groups = { AddGroup.class, EditGroup.class })
-    private String energyPeriod;
-
-    @NotNull(message = "energyAmount cannot be null", groups = { AddGroup.class, EditGroup.class })
-    private BigDecimal energyAmount;
-
-    private String energyUnit;
 
     private String issuingOrg;
 
@@ -46,7 +58,17 @@ public class CeGreenPowerCertificateBo implements Serializable {
 
     private Date expiryDate;
 
-    private String offsetSourceCode;
+    private String powerGridRegion;
+
+    private String offsetPowerSource;
+
+    private String dataSource;
+
+    private String sourceRemark;
+
+    private String emissionSourceName;
+
+    private String factorKey;
 
     private String proofStatus;
 

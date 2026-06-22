@@ -133,126 +133,379 @@ CREATE TABLE IF NOT EXISTS ce_extension_field (
         FOREIGN KEY (sheet_id) REFERENCES ce_template_sheet (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise allowed extension fields';
 
-CREATE TABLE IF NOT EXISTS ce_dimension_record (
+CREATE TABLE IF NOT EXISTS ce_admin_division (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    dimension_code VARCHAR(64) NOT NULL,
-    record_code VARCHAR(128) NOT NULL,
-    record_name VARCHAR(255) NOT NULL,
-    parent_code VARCHAR(128) DEFAULT NULL,
-    field01 VARCHAR(255) DEFAULT NULL,
-    field02 VARCHAR(255) DEFAULT NULL,
-    field03 VARCHAR(255) DEFAULT NULL,
-    field04 VARCHAR(255) DEFAULT NULL,
-    field05 VARCHAR(255) DEFAULT NULL,
-    field06 VARCHAR(255) DEFAULT NULL,
-    sort_order INT NOT NULL DEFAULT 0,
-    status CHAR(1) NOT NULL DEFAULT '0',
+    division_code VARCHAR(64) NOT NULL,
+    division_name VARCHAR(255) NOT NULL,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_ce_dimension_record (dimension_code, record_code),
-    KEY idx_ce_dimension_record_name (dimension_code, record_name),
-    KEY idx_ce_dimension_record_status (dimension_code, status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise configurable dimension record';
+    UNIQUE KEY uk_ce_admin_division_code (division_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='101 administrative division';
 
-CREATE TABLE IF NOT EXISTS ce_emission_source (
+CREATE TABLE IF NOT EXISTS ce_company_factory (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    source_code VARCHAR(64) NOT NULL,
-    source_name VARCHAR(255) NOT NULL,
-    source_category_code VARCHAR(64) NOT NULL,
-    source_category_name VARCHAR(255) NOT NULL,
-    facility_name VARCHAR(255) DEFAULT NULL,
-    boundary_scope VARCHAR(64) NOT NULL DEFAULT 'enterprise_local',
+    company_sk VARCHAR(64) NOT NULL,
+    company_code VARCHAR(64) NOT NULL,
+    factory_code VARCHAR(64) NOT NULL,
+    company_name VARCHAR(255) NOT NULL,
+    factory_name VARCHAR(255) NOT NULL,
+    province_code VARCHAR(64) DEFAULT NULL,
+    province_name VARCHAR(255) DEFAULT NULL,
+    factory_type VARCHAR(128) DEFAULT NULL,
+    industry_section_code VARCHAR(64) DEFAULT NULL,
+    industry_section_name VARCHAR(255) DEFAULT NULL,
+    industry_division_code VARCHAR(64) DEFAULT NULL,
+    industry_division_name VARCHAR(255) DEFAULT NULL,
+    industry_group_code VARCHAR(64) DEFAULT NULL,
+    industry_group_name VARCHAR(255) DEFAULT NULL,
+    industry_class_code VARCHAR(64) DEFAULT NULL,
+    industry_class_name VARCHAR(255) DEFAULT NULL,
+    effective_date DATE DEFAULT NULL,
+    expiry_date DATE DEFAULT NULL,
+    is_active CHAR(1) NOT NULL DEFAULT 'Y',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_company_factory (company_code, factory_code),
+    KEY idx_ce_company_factory_type (factory_type),
+    KEY idx_ce_company_factory_province (province_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='102 company and factory';
+
+CREATE TABLE IF NOT EXISTS ce_emission_source_category (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    category_sk VARCHAR(64) NOT NULL,
+    business_key VARCHAR(64) NOT NULL,
+    ghg_scope VARCHAR(128) DEFAULT NULL,
+    ghg_scope_category_sort INT DEFAULT NULL,
+    ghg_scope_category VARCHAR(255) DEFAULT NULL,
+    ghg_scope_en VARCHAR(128) DEFAULT NULL,
+    ghg_scope_category_en VARCHAR(255) DEFAULT NULL,
+    iso_category VARCHAR(128) DEFAULT NULL,
+    iso_category_en VARCHAR(128) DEFAULT NULL,
+    iso_category_description VARCHAR(500) DEFAULT NULL,
+    iso_category_description_en VARCHAR(500) DEFAULT NULL,
+    iso_custom_subcategory VARCHAR(255) DEFAULT NULL,
+    gb_scope_category VARCHAR(255) DEFAULT NULL,
+    gb_subcategory VARCHAR(255) DEFAULT NULL,
+    effective_date DATE DEFAULT NULL,
+    expiry_date DATE DEFAULT NULL,
+    is_current CHAR(1) NOT NULL DEFAULT 'Y',
+    version_no VARCHAR(64) DEFAULT NULL,
+    unified_standard_category VARCHAR(255) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_emission_source_category (business_key, version_no),
+    KEY idx_ce_emission_source_category_scope (ghg_scope, ghg_scope_category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='103 emission source category';
+
+CREATE TABLE IF NOT EXISTS ce_base_year (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    factory_code VARCHAR(64) NOT NULL,
+    factory_name VARCHAR(255) DEFAULT NULL,
+    base_year INT NOT NULL,
     enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_ce_emission_source_code (source_code),
-    KEY idx_ce_emission_source_category (source_category_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local emission source configuration';
+    UNIQUE KEY uk_ce_base_year_factory (factory_code, base_year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='106 base year dimension';
 
-CREATE TABLE IF NOT EXISTS ce_factor_confirmation (
+CREATE TABLE IF NOT EXISTS ce_ef_factor (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    factor_code VARCHAR(128) NOT NULL,
-    factor_name VARCHAR(255) NOT NULL,
-    factor_version_code VARCHAR(64) NOT NULL,
-    factor_unit VARCHAR(64) NOT NULL,
-    factor_value DECIMAL(28, 10) NOT NULL,
-    confirmation_status VARCHAR(32) NOT NULL DEFAULT 'pending',
-    confirmed_by VARCHAR(64) DEFAULT NULL,
-    confirmed_time DATETIME DEFAULT NULL,
-    license_id VARCHAR(128) DEFAULT NULL,
+    factor_sk VARCHAR(64) NOT NULL,
+    emission_source_name VARCHAR(255) DEFAULT NULL,
+    emission_source_name_en VARCHAR(255) DEFAULT NULL,
+    fuel_material_category VARCHAR(255) DEFAULT NULL,
+    source_unit VARCHAR(64) DEFAULT NULL,
+    co2 DECIMAL(28, 10) DEFAULT NULL,
+    ch4 DECIMAL(28, 10) DEFAULT NULL,
+    n2o DECIMAL(28, 10) DEFAULT NULL,
+    hfcs DECIMAL(28, 10) DEFAULT NULL,
+    pfcs DECIMAL(28, 10) DEFAULT NULL,
+    sf6 DECIMAL(28, 10) DEFAULT NULL,
+    nf3 DECIMAL(28, 10) DEFAULT NULL,
+    applicable_scope VARCHAR(255) DEFAULT NULL,
+    factor_source VARCHAR(255) DEFAULT NULL,
+    gwp_ch4 DECIMAL(28, 10) DEFAULT NULL,
+    gwp_n2o DECIMAL(28, 10) DEFAULT NULL,
+    gwp_hfcs DECIMAL(28, 10) DEFAULT NULL,
+    gwp_pfcs DECIMAL(28, 10) DEFAULT NULL,
+    gwp_sf6 DECIMAL(28, 10) DEFAULT NULL,
+    gwp_nf3 DECIMAL(28, 10) DEFAULT NULL,
+    factor_gwp DECIMAL(28, 10) DEFAULT NULL,
+    factor_unit VARCHAR(128) DEFAULT NULL,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_ce_factor_confirmation (factor_code, factor_version_code),
-    KEY idx_ce_factor_confirmation_status (confirmation_status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local emission factor confirmation';
+    UNIQUE KEY uk_ce_ef_factor_sk (factor_sk),
+    KEY idx_ce_ef_factor_source (emission_source_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='201 emission factor dimension';
+
+CREATE TABLE IF NOT EXISTS ce_electricity_factor (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    version_province_code VARCHAR(64) NOT NULL,
+    factor_version VARCHAR(64) NOT NULL,
+    division_code VARCHAR(64) DEFAULT NULL,
+    division_name VARCHAR(255) DEFAULT NULL,
+    region_name VARCHAR(255) DEFAULT NULL,
+    province_factor DECIMAL(28, 10) DEFAULT NULL,
+    region_factor DECIMAL(28, 10) DEFAULT NULL,
+    national_factor DECIMAL(28, 10) DEFAULT NULL,
+    non_fossil_excluded_factor DECIMAL(28, 10) DEFAULT NULL,
+    national_fossil_power_factor DECIMAL(28, 10) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_electricity_factor (version_province_code),
+    KEY idx_ce_electricity_factor_version (factor_version, division_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='202 electricity factor dimension';
+
+CREATE TABLE IF NOT EXISTS ce_electricity_factor_version_map (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    factor_version VARCHAR(64) NOT NULL,
+    effective_year INT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_electricity_factor_version_map (factor_version, effective_year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='203 electricity factor version map';
+
+CREATE TABLE IF NOT EXISTS ce_fuel_factor_calc (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    calc_key VARCHAR(64) NOT NULL,
+    fuel_material_category VARCHAR(255) DEFAULT NULL,
+    lower_heat_value DECIMAL(28, 10) DEFAULT NULL,
+    lower_heat_value_unit VARCHAR(64) DEFAULT NULL,
+    carbon_content DECIMAL(28, 10) DEFAULT NULL,
+    carbon_content_unit VARCHAR(64) DEFAULT NULL,
+    oxidation_rate DECIMAL(18, 10) DEFAULT NULL,
+    co2_factor DECIMAL(28, 10) DEFAULT NULL,
+    factor_unit VARCHAR(128) DEFAULT NULL,
+    factor_source VARCHAR(255) DEFAULT NULL,
+    effective_date DATE DEFAULT NULL,
+    expiry_date DATE DEFAULT NULL,
+    enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_fuel_factor_calc (calc_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='204 fuel factor calculation';
+
+CREATE TABLE IF NOT EXISTS ce_electricity_factor_scope (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    scope_key VARCHAR(64) NOT NULL,
+    scope_name VARCHAR(255) NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_electricity_factor_scope (scope_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='205 electricity factor scope';
+
+CREATE TABLE IF NOT EXISTS ce_greenhouse_gas (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    gas_code VARCHAR(64) NOT NULL,
+    gas_name VARCHAR(128) NOT NULL,
+    gas_name_en VARCHAR(128) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_greenhouse_gas_code (gas_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='206 greenhouse gas dimension';
+
+CREATE TABLE IF NOT EXISTS ce_emission_source (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    row_no INT DEFAULT NULL,
+    company_code VARCHAR(64) NOT NULL,
+    company_name VARCHAR(255) DEFAULT NULL,
+    factory_name VARCHAR(255) DEFAULT NULL,
+    source_category_key VARCHAR(64) NOT NULL,
+    scope_name VARCHAR(128) DEFAULT NULL,
+    scope_subcategory VARCHAR(255) DEFAULT NULL,
+    source_identification_code VARCHAR(64) NOT NULL,
+    source_identification_name VARCHAR(255) DEFAULT NULL,
+    emission_source_name VARCHAR(255) DEFAULT NULL,
+    responsible_dept VARCHAR(255) DEFAULT NULL,
+    data_source VARCHAR(255) DEFAULT NULL,
+    factor_key VARCHAR(64) DEFAULT NULL,
+    enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_emission_source_code (source_identification_code),
+    KEY idx_ce_emission_source_company (company_code),
+    KEY idx_ce_emission_source_category (source_category_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='104 emission source identification';
 
 CREATE TABLE IF NOT EXISTS ce_activity_data (
     id BIGINT NOT NULL AUTO_INCREMENT,
     batch_id BIGINT DEFAULT NULL,
-    emission_source_id BIGINT NOT NULL,
-    activity_period VARCHAR(32) NOT NULL,
-    activity_value DECIMAL(28, 10) NOT NULL,
-    activity_unit VARCHAR(64) NOT NULL,
-    factor_confirmation_id BIGINT DEFAULT NULL,
+    source_sheet_code VARCHAR(64) DEFAULT NULL,
+    source_identification_code VARCHAR(64) NOT NULL,
+    company_code VARCHAR(64) NOT NULL,
+    company_name VARCHAR(255) DEFAULT NULL,
+    factory_name VARCHAR(255) DEFAULT NULL,
+    source_category_key VARCHAR(64) DEFAULT NULL,
+    scope_name VARCHAR(128) DEFAULT NULL,
+    scope_subcategory VARCHAR(255) DEFAULT NULL,
+    source_identification_name VARCHAR(255) DEFAULT NULL,
+    emission_source_name VARCHAR(255) DEFAULT NULL,
+    activity_unit VARCHAR(64) DEFAULT NULL,
+    activity_year INT DEFAULT NULL,
+    activity_month INT DEFAULT NULL,
+    activity_date DATE DEFAULT NULL,
+    activity_value DECIMAL(28, 10) DEFAULT NULL,
+    responsible_dept VARCHAR(255) DEFAULT NULL,
+    data_source VARCHAR(255) DEFAULT NULL,
+    source_remark VARCHAR(500) DEFAULT NULL,
+    factor_key VARCHAR(64) DEFAULT NULL,
     calculated_emission DECIMAL(28, 10) DEFAULT NULL,
     data_status VARCHAR(32) NOT NULL DEFAULT 'draft',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    KEY idx_ce_activity_data_period (activity_period, data_status),
-    KEY idx_ce_activity_data_source (emission_source_id),
+    KEY idx_ce_activity_data_period (activity_year, activity_month, data_status),
+    KEY idx_ce_activity_data_source (source_identification_code),
+    KEY idx_ce_activity_data_company (company_code),
     CONSTRAINT fk_ce_activity_data_batch
-        FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id),
-    CONSTRAINT fk_ce_activity_data_source
-        FOREIGN KEY (emission_source_id) REFERENCES ce_emission_source (id),
-    CONSTRAINT fk_ce_activity_data_factor
-        FOREIGN KEY (factor_confirmation_id) REFERENCES ce_factor_confirmation (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local activity data';
+        FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='3 activity data';
 
 CREATE TABLE IF NOT EXISTS ce_green_power_certificate (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    certificate_code VARCHAR(128) NOT NULL,
-    certificate_type VARCHAR(64) NOT NULL,
-    energy_period VARCHAR(32) NOT NULL,
-    energy_amount DECIMAL(28, 10) NOT NULL,
-    energy_unit VARCHAR(64) NOT NULL DEFAULT 'MWh',
+    row_no INT DEFAULT NULL,
+    factory_code VARCHAR(64) NOT NULL,
+    factory_name VARCHAR(255) DEFAULT NULL,
+    activity_year INT DEFAULT NULL,
+    activity_month INT DEFAULT NULL,
+    source_category_key VARCHAR(64) DEFAULT NULL,
+    scope_name VARCHAR(128) DEFAULT NULL,
+    scope_subcategory VARCHAR(255) DEFAULT NULL,
+    electricity_type VARCHAR(128) DEFAULT NULL,
+    electricity_type_desc VARCHAR(255) DEFAULT NULL,
+    quantity_kwh DECIMAL(28, 10) DEFAULT NULL,
+    certificate_code VARCHAR(128) DEFAULT NULL,
     issuing_org VARCHAR(255) DEFAULT NULL,
-    purchase_date DATETIME DEFAULT NULL,
-    expiry_date DATETIME DEFAULT NULL,
-    offset_source_code VARCHAR(64) DEFAULT NULL,
+    purchase_date DATE DEFAULT NULL,
+    expiry_date DATE DEFAULT NULL,
+    power_grid_region VARCHAR(255) DEFAULT NULL,
+    offset_power_source VARCHAR(255) DEFAULT NULL,
+    data_source VARCHAR(255) DEFAULT NULL,
+    source_remark VARCHAR(500) DEFAULT NULL,
+    emission_source_name VARCHAR(255) DEFAULT NULL,
+    factor_key VARCHAR(64) DEFAULT NULL,
     proof_status VARCHAR(32) NOT NULL DEFAULT 'draft',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_ce_green_power_certificate (certificate_code),
-    KEY idx_ce_green_power_period (energy_period, proof_status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local green electricity and certificate proof';
+    KEY idx_ce_green_power_factory (factory_code),
+    KEY idx_ce_green_power_period (activity_year, activity_month, proof_status),
+    KEY idx_ce_green_power_certificate (certificate_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='105 green power certificate activity data';
+
+CREATE TABLE IF NOT EXISTS ce_intensity_denominator_rule (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    denominator_rule_key VARCHAR(64) NOT NULL,
+    factory_type VARCHAR(128) NOT NULL,
+    denominator_type VARCHAR(128) NOT NULL,
+    denominator_metric_name VARCHAR(255) NOT NULL,
+    intensity_unit_display VARCHAR(128) DEFAULT NULL,
+    enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_intensity_denominator_rule (denominator_rule_key),
+    KEY idx_ce_intensity_denominator_rule_type (factory_type, denominator_type, enabled_flag)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='501 intensity denominator rule';
+
+CREATE TABLE IF NOT EXISTS ce_intensity_target (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    factory_type VARCHAR(128) NOT NULL,
+    target_year INT NOT NULL,
+    target_value DECIMAL(28, 10) NOT NULL,
+    unit_name VARCHAR(128) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_intensity_target (factory_type, target_year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='502 intensity target';
+
+CREATE TABLE IF NOT EXISTS ce_intensity_denominator_fact (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    batch_id BIGINT DEFAULT NULL,
+    source_sheet_code VARCHAR(64) DEFAULT NULL,
+    factory_code VARCHAR(64) NOT NULL,
+    factory_name VARCHAR(255) DEFAULT NULL,
+    factory_type VARCHAR(128) DEFAULT NULL,
+    fact_year INT NOT NULL,
+    fact_month INT DEFAULT NULL,
+    denominator_type VARCHAR(128) NOT NULL,
+    denominator_metric_name VARCHAR(255) NOT NULL,
+    denominator_value DECIMAL(28, 10) NOT NULL,
+    unit_name VARCHAR(128) DEFAULT NULL,
+    data_source VARCHAR(255) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    KEY idx_ce_denominator_fact_period (fact_year, fact_month),
+    KEY idx_ce_denominator_fact_factory (factory_code),
+    CONSTRAINT fk_ce_denominator_fact_batch
+        FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='503 denominator fact';
+
+CREATE TABLE IF NOT EXISTS ce_intensity_tolerance (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    tolerance_key VARCHAR(64) NOT NULL,
+    industry_section VARCHAR(255) NOT NULL,
+    tolerance_rate DECIMAL(18, 10) NOT NULL,
+    enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_intensity_tolerance (tolerance_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='504 intensity tolerance';
 
 CREATE TABLE IF NOT EXISTS ce_intensity_metric (
     id BIGINT NOT NULL AUTO_INCREMENT,
     metric_code VARCHAR(64) NOT NULL,
     metric_name VARCHAR(255) NOT NULL,
+    rule_code VARCHAR(64) DEFAULT NULL,
     metric_period VARCHAR(32) NOT NULL,
     numerator_emission DECIMAL(28, 10) NOT NULL DEFAULT 0,
+    denominator_fact_id BIGINT DEFAULT NULL,
     denominator_value DECIMAL(28, 10) NOT NULL DEFAULT 0,
     denominator_unit VARCHAR(64) NOT NULL,
     intensity_value DECIMAL(28, 10) DEFAULT NULL,
+    target_code VARCHAR(64) DEFAULT NULL,
     metric_status VARCHAR(32) NOT NULL DEFAULT 'draft',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_ce_intensity_metric (metric_code, metric_period),
-    KEY idx_ce_intensity_metric_status (metric_status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local carbon intensity metric';
+    KEY idx_ce_intensity_metric_rule (rule_code),
+    KEY idx_ce_intensity_metric_status (metric_status),
+    CONSTRAINT fk_ce_intensity_metric_denominator_fact
+        FOREIGN KEY (denominator_fact_id) REFERENCES ce_intensity_denominator_fact (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local carbon intensity metric result';
 
 CREATE TABLE IF NOT EXISTS ce_report_template_file (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -291,30 +544,6 @@ CREATE TABLE IF NOT EXISTS ce_license_state (
     UNIQUE KEY uk_ce_license_state_license (license_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local license runtime state';
 
-INSERT INTO ce_dimension_record (
-    dimension_code, record_code, record_name, parent_code,
-    field01, field02, field03, field04, field05, field06,
-    sort_order, status, remark
-)
-SELECT * FROM (
-    SELECT 'company' AS dimension_code, 'ENT-001' AS record_code, '宁波低碳示范企业' AS record_name, NULL AS parent_code, '法人主体' AS field01, '330200' AS field02, '91330200MA000001X1' AS field03, NULL AS field04, NULL AS field05, NULL AS field06, 1 AS sort_order, '0' AS status, '企业主体示例' AS remark UNION ALL
-    SELECT 'emission-source', 'ES-001', '总部办公楼外购电', NULL, 'ENT-001', 'SCOPE2-PURCHASED-ELEC', 'kWh', 'EF-ELEC-ZJ-2025', NULL, NULL, 1, '0', '排放源示例' UNION ALL
-    SELECT 'ef-factor', 'EF-DIESEL-2025', '柴油燃烧排放因子', NULL, 'tCO2e/t', '生态环境部指南', 'ES-柴油', '2025', NULL, NULL, 1, '0', '排放因子示例' UNION ALL
-    SELECT 'emission-activity-data', 'AD-2026-001', '2026年1月总部外购电', NULL, 'ES-001', '2026-01', '120000', 'kWh', '行政部', NULL, 1, '0', '活动数据示例' UNION ALL
-    SELECT 'green-electricity-data', 'GP-2026-001', '2026年1月绿证抵扣', NULL, '绿证', '5000', 'MWh', '2026-01-15', '2027-01-14', NULL, 1, '0', '绿电绿证示例' UNION ALL
-    SELECT 'intensity-denominator', 'DEN-REVENUE', '营业收入', NULL, '营收', '万元', 'ENT-001', NULL, NULL, NULL, 1, '0', '强度分母示例' UNION ALL
-    SELECT 'intensity-target', 'TARGET-2026-REV', '2026营收强度目标', NULL, '2026', '单位营收排放强度', '0.85', 'BASE-2025', NULL, NULL, 1, '0', '强度目标示例' UNION ALL
-    SELECT 'denominator-fact', 'FACT-2026-01-REV', '2026年1月营业收入', NULL, '2026-01', 'DEN-REVENUE', '8600', '财务部', NULL, NULL, 1, '0', '分母事实示例' UNION ALL
-    SELECT 'intensity-tolerance', 'TOL-REV-2026', '营收强度波动容忍率', NULL, '单位营收排放强度', '10', '2026-01', '2026-12', NULL, NULL, 1, '0', '容忍率示例' UNION ALL
-    SELECT 'data-validation', 'RULE-AD-NOT-NULL', '活动数据必填校验', NULL, '生产部', '月度', '强错误', 'activity_value != null', NULL, NULL, 1, '0', '验证规则示例'
-) seed
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM ce_dimension_record existing
-    WHERE existing.dimension_code = seed.dimension_code
-      AND existing.record_code = seed.record_code
-);
-
 CREATE TABLE IF NOT EXISTS ce_factor_cache_version (
     id BIGINT NOT NULL AUTO_INCREMENT,
     vendor_version_id VARCHAR(128) NOT NULL,
@@ -329,16 +558,61 @@ CREATE TABLE IF NOT EXISTS ce_factor_cache_version (
 CREATE TABLE IF NOT EXISTS ce_factor_cache_record (
     id BIGINT NOT NULL AUTO_INCREMENT,
     cache_version_id BIGINT NOT NULL,
+    factor_table_code VARCHAR(64) NOT NULL DEFAULT '201ef',
     factor_code VARCHAR(128) NOT NULL,
     factor_name VARCHAR(255) NOT NULL,
     factor_category VARCHAR(128) NOT NULL,
     factor_value DECIMAL(28, 10) NOT NULL,
     factor_unit VARCHAR(64) NOT NULL,
+    factor_key VARCHAR(64) DEFAULT NULL,
+    emission_source_name VARCHAR(255) DEFAULT NULL,
+    emission_source_name_en VARCHAR(255) DEFAULT NULL,
+    fuel_material_category VARCHAR(255) DEFAULT NULL,
+    source_unit VARCHAR(64) DEFAULT NULL,
+    co2 DECIMAL(28, 10) DEFAULT NULL,
+    ch4 DECIMAL(28, 10) DEFAULT NULL,
+    n2o DECIMAL(28, 10) DEFAULT NULL,
+    hfcs DECIMAL(28, 10) DEFAULT NULL,
+    pfcs DECIMAL(28, 10) DEFAULT NULL,
+    sf6 DECIMAL(28, 10) DEFAULT NULL,
+    nf3 DECIMAL(28, 10) DEFAULT NULL,
+    applicable_scope VARCHAR(255) DEFAULT NULL,
+    factor_source VARCHAR(512) DEFAULT NULL,
+    gwp_ch4 DECIMAL(28, 10) DEFAULT NULL,
+    gwp_n2o DECIMAL(28, 10) DEFAULT NULL,
+    gwp_hfcs DECIMAL(28, 10) DEFAULT NULL,
+    gwp_pfcs DECIMAL(28, 10) DEFAULT NULL,
+    gwp_sf6 DECIMAL(28, 10) DEFAULT NULL,
+    gwp_nf3 DECIMAL(28, 10) DEFAULT NULL,
+    factor_gwp DECIMAL(28, 10) DEFAULT NULL,
+    version_province_code VARCHAR(128) DEFAULT NULL,
+    factor_version VARCHAR(64) DEFAULT NULL,
+    division_code VARCHAR(64) DEFAULT NULL,
+    division_name VARCHAR(128) DEFAULT NULL,
+    region_name VARCHAR(128) DEFAULT NULL,
+    province_factor DECIMAL(28, 10) DEFAULT NULL,
+    region_factor DECIMAL(28, 10) DEFAULT NULL,
+    national_factor DECIMAL(28, 10) DEFAULT NULL,
+    non_fossil_excluded_factor DECIMAL(28, 10) DEFAULT NULL,
+    national_fossil_power_factor DECIMAL(28, 10) DEFAULT NULL,
+    row_no INT DEFAULT NULL,
+    fuel_level1 VARCHAR(255) DEFAULT NULL,
+    fuel_level2 VARCHAR(255) DEFAULT NULL,
+    fuel_level3 VARCHAR(255) DEFAULT NULL,
+    fuel_level4 VARCHAR(255) DEFAULT NULL,
+    lower_heat_value DECIMAL(28, 10) DEFAULT NULL,
+    lower_heat_value_cv DECIMAL(28, 10) DEFAULT NULL,
+    co2_factor DECIMAL(28, 10) DEFAULT NULL,
+    co2_factor_cv DECIMAL(28, 10) DEFAULT NULL,
+    gwp_value DECIMAL(28, 10) DEFAULT NULL,
+    converted_factor DECIMAL(28, 10) DEFAULT NULL,
     source_ref VARCHAR(512) DEFAULT NULL,
     enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
     synced_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_ce_factor_cache_record (cache_version_id, factor_code),
+    UNIQUE KEY uk_ce_factor_cache_record (cache_version_id, factor_table_code, factor_code),
+    KEY idx_ce_factor_cache_record_version (cache_version_id),
+    KEY idx_ce_factor_cache_record_table (factor_table_code),
     KEY idx_ce_factor_cache_record_code (factor_code),
     CONSTRAINT fk_ce_factor_cache_record_version
         FOREIGN KEY (cache_version_id) REFERENCES ce_factor_cache_version (id)

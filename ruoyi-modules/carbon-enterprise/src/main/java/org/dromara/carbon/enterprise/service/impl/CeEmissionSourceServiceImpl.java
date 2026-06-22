@@ -38,7 +38,8 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
     @Override
     public List<CeEmissionSourceVo> queryList(CeEmissionSourceBo bo) {
         return emissionSourceMapper.selectVoList(buildQueryWrapper(bo)
-            .orderByAsc(CeEmissionSource::getSourceCode)
+            .orderByAsc(CeEmissionSource::getRowNo)
+            .orderByAsc(CeEmissionSource::getSourceIdentificationCode)
             .orderByAsc(CeEmissionSource::getId));
     }
 
@@ -50,9 +51,6 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
     @Override
     public Boolean insertByBo(CeEmissionSourceBo bo) {
         CeEmissionSource add = MapstructUtils.convert(bo, CeEmissionSource.class);
-        if (add.getBoundaryScope() == null) {
-            add.setBoundaryScope("enterprise_local");
-        }
         if (add.getEnabledFlag() == null) {
             add.setEnabledFlag(Boolean.TRUE);
         }
@@ -76,12 +74,19 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
 
     private LambdaQueryWrapper<CeEmissionSource> buildQueryWrapper(CeEmissionSourceBo bo) {
         return new LambdaQueryWrapper<CeEmissionSource>()
-            .like(StringUtils.isNotBlank(bo.getSourceCode()), CeEmissionSource::getSourceCode, bo.getSourceCode())
-            .like(StringUtils.isNotBlank(bo.getSourceName()), CeEmissionSource::getSourceName, bo.getSourceName())
-            .eq(StringUtils.isNotBlank(bo.getSourceCategoryCode()), CeEmissionSource::getSourceCategoryCode, bo.getSourceCategoryCode())
-            .like(StringUtils.isNotBlank(bo.getSourceCategoryName()), CeEmissionSource::getSourceCategoryName, bo.getSourceCategoryName())
-            .like(StringUtils.isNotBlank(bo.getFacilityName()), CeEmissionSource::getFacilityName, bo.getFacilityName())
-            .eq(StringUtils.isNotBlank(bo.getBoundaryScope()), CeEmissionSource::getBoundaryScope, bo.getBoundaryScope())
+            .eq(bo.getRowNo() != null, CeEmissionSource::getRowNo, bo.getRowNo())
+            .like(StringUtils.isNotBlank(bo.getCompanyCode()), CeEmissionSource::getCompanyCode, bo.getCompanyCode())
+            .like(StringUtils.isNotBlank(bo.getCompanyName()), CeEmissionSource::getCompanyName, bo.getCompanyName())
+            .like(StringUtils.isNotBlank(bo.getFactoryName()), CeEmissionSource::getFactoryName, bo.getFactoryName())
+            .eq(StringUtils.isNotBlank(bo.getSourceCategoryKey()), CeEmissionSource::getSourceCategoryKey, bo.getSourceCategoryKey())
+            .like(StringUtils.isNotBlank(bo.getScopeName()), CeEmissionSource::getScopeName, bo.getScopeName())
+            .like(StringUtils.isNotBlank(bo.getScopeSubcategory()), CeEmissionSource::getScopeSubcategory, bo.getScopeSubcategory())
+            .like(StringUtils.isNotBlank(bo.getSourceIdentificationCode()), CeEmissionSource::getSourceIdentificationCode, bo.getSourceIdentificationCode())
+            .like(StringUtils.isNotBlank(bo.getSourceIdentificationName()), CeEmissionSource::getSourceIdentificationName, bo.getSourceIdentificationName())
+            .like(StringUtils.isNotBlank(bo.getEmissionSourceName()), CeEmissionSource::getEmissionSourceName, bo.getEmissionSourceName())
+            .like(StringUtils.isNotBlank(bo.getResponsibleDept()), CeEmissionSource::getResponsibleDept, bo.getResponsibleDept())
+            .like(StringUtils.isNotBlank(bo.getDataSource()), CeEmissionSource::getDataSource, bo.getDataSource())
+            .eq(StringUtils.isNotBlank(bo.getFactorKey()), CeEmissionSource::getFactorKey, bo.getFactorKey())
             .eq(bo.getEnabledFlag() != null, CeEmissionSource::getEnabledFlag, bo.getEnabledFlag());
     }
 }

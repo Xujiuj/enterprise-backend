@@ -27,19 +27,47 @@ public class CeActivityDataBo implements Serializable {
 
     private Long batchId;
 
-    @NotNull(message = "emissionSourceId cannot be null", groups = { AddGroup.class, EditGroup.class })
-    private Long emissionSourceId;
+    private String sourceSheetCode;
 
-    @NotBlank(message = "activityPeriod cannot be blank", groups = { AddGroup.class, EditGroup.class })
-    private String activityPeriod;
+    @NotBlank(message = "sourceIdentificationCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    private String sourceIdentificationCode;
 
-    @NotNull(message = "activityValue cannot be null", groups = { AddGroup.class, EditGroup.class })
-    private BigDecimal activityValue;
+    @NotBlank(message = "companyCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    private String companyCode;
+
+    private String companyName;
+
+    private String factoryName;
+
+    private String sourceCategoryKey;
+
+    private String scopeName;
+
+    private String scopeSubcategory;
+
+    private String sourceIdentificationName;
+
+    private String emissionSourceName;
 
     @NotBlank(message = "activityUnit cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String activityUnit;
 
-    private Long factorConfirmationId;
+    private Integer activityYear;
+
+    private Integer activityMonth;
+
+    private java.util.Date activityDate;
+
+    @NotNull(message = "activityValue cannot be null", groups = { AddGroup.class, EditGroup.class })
+    private BigDecimal activityValue;
+
+    private String responsibleDept;
+
+    private String dataSource;
+
+    private String sourceRemark;
+
+    private String factorKey;
 
     private BigDecimal calculatedEmission;
 

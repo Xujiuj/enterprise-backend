@@ -25,15 +25,21 @@ public class CeIntensityMetricVo implements Serializable {
 
     private String metricName;
 
+    private String ruleCode;
+
     private String metricPeriod;
 
     private BigDecimal numeratorEmission;
+
+    private Long denominatorFactId;
 
     private BigDecimal denominatorValue;
 
     private String denominatorUnit;
 
     private BigDecimal intensityValue;
+
+    private String targetCode;
 
     private String metricStatus;
 

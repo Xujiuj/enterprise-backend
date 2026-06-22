@@ -31,10 +31,14 @@ public class CeIntensityMetricBo implements Serializable {
     @NotBlank(message = "metricName cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String metricName;
 
+    private String ruleCode;
+
     @NotBlank(message = "metricPeriod cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String metricPeriod;
 
     private BigDecimal numeratorEmission;
+
+    private Long denominatorFactId;
 
     private BigDecimal denominatorValue;
 
@@ -42,6 +46,8 @@ public class CeIntensityMetricBo implements Serializable {
     private String denominatorUnit;
 
     private BigDecimal intensityValue;
+
+    private String targetCode;
 
     private String metricStatus;
 

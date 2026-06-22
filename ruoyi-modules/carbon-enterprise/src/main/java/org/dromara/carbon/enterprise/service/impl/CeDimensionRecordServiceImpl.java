@@ -1,20 +1,17 @@
 package org.dromara.carbon.enterprise.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.enterprise.client.CeVendorDimensionOpenClient;
-import org.dromara.carbon.enterprise.domain.CeDimensionRecord;
 import org.dromara.carbon.enterprise.domain.CeLicenseState;
 import org.dromara.carbon.enterprise.domain.bo.CeDimensionRecordBo;
 import org.dromara.carbon.enterprise.domain.sync.CeVendorDimensionListResponse;
 import org.dromara.carbon.enterprise.domain.sync.CeVendorDimensionRecord;
 import org.dromara.carbon.enterprise.domain.vo.CeDimensionRecordVo;
-import org.dromara.carbon.enterprise.mapper.CeDimensionRecordMapper;
+import org.dromara.carbon.enterprise.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.service.ICeDimensionRecordService;
 import org.dromara.common.core.exception.ServiceException;
-import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
@@ -24,9 +21,13 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
- * Enterprise dimension record service implementation.
+ * Vendor-open dimension proxy.
+ *
+ * <p>The former local ce_dimension_record table was removed when enterprise
+ * sample-aligned tables were split into concrete business tables.</p>
  */
 @RequiredArgsConstructor
 @Service
@@ -34,123 +35,143 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private static final String LICENSE_STATUS_VALID = "VALID";
 
-    private static final Set<String> ALLOWED_DIMENSION_CODES = Set.of(
+    private static final Set<String> ALLOWED_VENDOR_DIMENSION_CODES = Set.of(
+        "admin-division",
+        "emission-source-category",
+        "base-year",
+        "ef-factor",
+        "ef-electricity-factor",
+        "ef-electricity-version",
+        "ef-electricity-scope",
+        "greenhouse-gas"
+    );
+
+    private static final Set<String> ALLOWED_LOCAL_PROJECTION_CODES = Set.of(
         "admin-division",
         "company",
         "emission-source-category",
-        "emission-source",
         "base-year",
         "ef-factor",
         "ef-electricity-factor",
         "ef-electricity-version",
         "ef-electricity-scope",
         "greenhouse-gas",
-        "emission-activity-data",
-        "green-electricity-data",
         "intensity-denominator",
         "intensity-target",
         "denominator-fact",
         "intensity-tolerance",
-        "data-validation",
         "report-template-download"
     );
 
-    private static final Set<String> VENDOR_ONLY_DIMENSION_CODES = Set.of(
-        "admin-division",
-        "emission-source-category",
+    private static final Set<String> ENTERPRISE_EDITABLE_DIMENSION_CODES = Set.of(
+        "company",
         "base-year",
-        "ef-electricity-factor",
+        "ef-factor",
         "ef-electricity-version",
-        "ef-electricity-scope",
-        "greenhouse-gas",
-        "report-template-download"
+        "intensity-denominator",
+        "intensity-target",
+        "denominator-fact",
+        "intensity-tolerance"
     );
 
-    private final CeDimensionRecordMapper dimensionRecordMapper;
+    private final CeDimensionProjectionMapper dimensionProjectionMapper;
     private final CeLicenseStateMapper licenseStateMapper;
     private final CeVendorDimensionOpenClient vendorDimensionOpenClient;
 
     @Override
     public TableDataInfo<CeDimensionRecordVo> queryPageList(CeDimensionRecordBo bo, PageQuery pageQuery) {
         validateDimensionCode(bo.getDimensionCode());
-        if (isVendorOnlyDimension(bo.getDimensionCode())) {
-            return queryVendorPageList(bo, pageQuery);
+        if (!"report-template-download".equals(bo.getDimensionCode())) {
+            return queryLocalProjectionPageList(bo, pageQuery);
         }
-        LambdaQueryWrapper<CeDimensionRecord> wrapper = buildQueryWrapper(bo)
-            .orderByAsc(CeDimensionRecord::getSortOrder)
-            .orderByAsc(CeDimensionRecord::getId);
-        IPage<CeDimensionRecordVo> page = dimensionRecordMapper.selectVoPage(pageQuery.build(), wrapper);
-        return TableDataInfo.build(page);
+        return queryVendorPageList(bo, pageQuery);
     }
 
     @Override
     public List<CeDimensionRecordVo> queryList(CeDimensionRecordBo bo) {
         validateDimensionCode(bo.getDimensionCode());
-        if (isVendorOnlyDimension(bo.getDimensionCode())) {
-            return queryVendorPageList(bo, new PageQuery(Integer.MAX_VALUE, 1)).getRows();
+        if (!"report-template-download".equals(bo.getDimensionCode())) {
+            return filterProjectionRows(bo, dimensionProjectionMapper.selectByDimensionCode(bo.getDimensionCode()));
         }
-        return dimensionRecordMapper.selectVoList(buildQueryWrapper(bo)
-            .orderByAsc(CeDimensionRecord::getSortOrder)
-            .orderByAsc(CeDimensionRecord::getId));
+        return queryVendorPageList(bo, new PageQuery(Integer.MAX_VALUE, 1)).getRows();
     }
 
     @Override
-    public CeDimensionRecordVo queryById(Long id) {
-        CeDimensionRecordVo record = dimensionRecordMapper.selectVoById(id);
-        if (record != null && isVendorOnlyDimension(record.getDimensionCode())) {
-            throw new ServiceException("Vendor-owned dimension records must be queried through vendor open APIs");
+    public CeDimensionRecordVo queryById(String dimensionCode, Long id) {
+        validateDimensionCode(dimensionCode);
+        CeDimensionRecordVo record = dimensionProjectionMapper.selectByDimensionCodeAndId(dimensionCode, id);
+        if (record == null) {
+            throw new ServiceException("dimension record does not exist: " + dimensionCode + "/" + id);
         }
         return record;
     }
 
     @Override
     public Boolean insertByBo(CeDimensionRecordBo bo) {
-        validateDimensionCode(bo.getDimensionCode());
-        assertEnterpriseWritable(bo.getDimensionCode());
-        CeDimensionRecord add = MapstructUtils.convert(bo, CeDimensionRecord.class);
-        boolean flag = dimensionRecordMapper.insert(add) > 0;
-        if (flag) {
-            bo.setId(add.getId());
-        }
-        return flag;
+        validateEditableDimensionCode(bo.getDimensionCode());
+        return dimensionProjectionMapper.insertByDimensionCode(bo) > 0;
     }
 
     @Override
     public Boolean updateByBo(CeDimensionRecordBo bo) {
-        validateDimensionCode(bo.getDimensionCode());
-        assertEnterpriseWritable(bo.getDimensionCode());
-        CeDimensionRecord existing = requireLocalRecord(bo.getId());
-        assertEnterpriseWritable(existing.getDimensionCode());
-        CeDimensionRecord update = MapstructUtils.convert(bo, CeDimensionRecord.class);
-        return dimensionRecordMapper.updateById(update) > 0;
+        validateEditableDimensionCode(bo.getDimensionCode());
+        return dimensionProjectionMapper.updateByDimensionCode(bo) > 0;
     }
 
     @Override
-    public Boolean deleteByIds(Collection<Long> ids) {
+    public Boolean deleteByIds(String dimensionCode, Collection<Long> ids) {
+        validateEditableDimensionCode(dimensionCode);
+        boolean changed = false;
         for (Long id : ids) {
-            CeDimensionRecord existing = requireLocalRecord(id);
-            assertEnterpriseWritable(existing.getDimensionCode());
+            changed = dimensionProjectionMapper.deleteByDimensionCodeAndId(dimensionCode, id) > 0 || changed;
         }
-        return dimensionRecordMapper.deleteByIds(ids) > 0;
-    }
-
-    private LambdaQueryWrapper<CeDimensionRecord> buildQueryWrapper(CeDimensionRecordBo bo) {
-        return new LambdaQueryWrapper<CeDimensionRecord>()
-            .eq(StringUtils.isNotBlank(bo.getDimensionCode()), CeDimensionRecord::getDimensionCode, bo.getDimensionCode())
-            .notIn(StringUtils.isBlank(bo.getDimensionCode()), CeDimensionRecord::getDimensionCode, VENDOR_ONLY_DIMENSION_CODES)
-            .like(StringUtils.isNotBlank(bo.getRecordCode()), CeDimensionRecord::getRecordCode, bo.getRecordCode())
-            .like(StringUtils.isNotBlank(bo.getRecordName()), CeDimensionRecord::getRecordName, bo.getRecordName())
-            .eq(StringUtils.isNotBlank(bo.getParentCode()), CeDimensionRecord::getParentCode, bo.getParentCode())
-            .eq(StringUtils.isNotBlank(bo.getStatus()), CeDimensionRecord::getStatus, bo.getStatus());
+        return changed;
     }
 
     private void validateDimensionCode(String dimensionCode) {
         if (StringUtils.isBlank(dimensionCode)) {
-            return;
+            throw new ServiceException("dimension code cannot be blank");
         }
-        if (!ALLOWED_DIMENSION_CODES.contains(dimensionCode)) {
-            throw new ServiceException("Unsupported enterprise dimension code: " + dimensionCode);
+        if (!ALLOWED_LOCAL_PROJECTION_CODES.contains(dimensionCode)) {
+            throw new ServiceException("Dimension code now belongs to concrete enterprise tables: " + dimensionCode);
         }
+    }
+
+    private void validateEditableDimensionCode(String dimensionCode) {
+        validateDimensionCode(dimensionCode);
+        if (!ENTERPRISE_EDITABLE_DIMENSION_CODES.contains(dimensionCode)) {
+            throw new ServiceException("Dimension is read-only for enterprise users: " + dimensionCode);
+        }
+    }
+
+    private TableDataInfo<CeDimensionRecordVo> queryLocalProjectionPageList(CeDimensionRecordBo bo, PageQuery pageQuery) {
+        List<CeDimensionRecordVo> rows = filterProjectionRows(bo, dimensionProjectionMapper.selectByDimensionCode(bo.getDimensionCode()));
+        int pageNum = pageQuery == null || pageQuery.getPageNum() == null ? 1 : pageQuery.getPageNum();
+        int pageSize = pageQuery == null || pageQuery.getPageSize() == null ? rows.size() : pageQuery.getPageSize();
+        int fromIndex = Math.min(Math.max(pageNum - 1, 0) * pageSize, rows.size());
+        int toIndex = Math.min(fromIndex + pageSize, rows.size());
+        return new TableDataInfo<>(rows.subList(fromIndex, toIndex), rows.size());
+    }
+
+    private List<CeDimensionRecordVo> filterProjectionRows(CeDimensionRecordBo bo, List<CeDimensionRecordVo> rows) {
+        Stream<CeDimensionRecordVo> stream = rows.stream();
+        if (StringUtils.isNotBlank(bo.getRecordCode())) {
+            stream = stream.filter(row -> contains(row.getRecordCode(), bo.getRecordCode()));
+        }
+        if (StringUtils.isNotBlank(bo.getRecordName())) {
+            stream = stream.filter(row -> contains(row.getRecordName(), bo.getRecordName()));
+        }
+        if (StringUtils.isNotBlank(bo.getParentCode())) {
+            stream = stream.filter(row -> bo.getParentCode().equals(row.getParentCode()));
+        }
+        if (StringUtils.isNotBlank(bo.getStatus())) {
+            stream = stream.filter(row -> bo.getStatus().equals(row.getStatus()));
+        }
+        return stream.toList();
+    }
+
+    private boolean contains(String value, String query) {
+        return StringUtils.isNotBlank(value) && value.contains(query);
     }
 
     private TableDataInfo<CeDimensionRecordVo> queryVendorPageList(CeDimensionRecordBo bo, PageQuery pageQuery) {
@@ -184,6 +205,22 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         target.setField04(source.getField04());
         target.setField05(source.getField05());
         target.setField06(source.getField06());
+        target.setField07(source.getField07());
+        target.setField08(source.getField08());
+        target.setField09(source.getField09());
+        target.setField10(source.getField10());
+        target.setField11(source.getField11());
+        target.setField12(source.getField12());
+        target.setField13(source.getField13());
+        target.setField14(source.getField14());
+        target.setField15(source.getField15());
+        target.setField16(source.getField16());
+        target.setField17(source.getField17());
+        target.setField18(source.getField18());
+        target.setField19(source.getField19());
+        target.setField20(source.getField20());
+        target.setField21(source.getField21());
+        target.setField22(source.getField22());
         target.setSortOrder(source.getSortOrder());
         target.setStatus(source.getStatus());
         target.setCreateTime(source.getCreateTime());
@@ -208,26 +245,5 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
             throw new ServiceException("valid license state is not currently valid");
         }
         return license;
-    }
-
-    private CeDimensionRecord requireLocalRecord(Long id) {
-        if (id == null) {
-            throw new ServiceException("dimension record id cannot be null");
-        }
-        CeDimensionRecord existing = dimensionRecordMapper.selectById(id);
-        if (existing == null) {
-            throw new ServiceException("dimension record does not exist");
-        }
-        return existing;
-    }
-
-    private void assertEnterpriseWritable(String dimensionCode) {
-        if (isVendorOnlyDimension(dimensionCode)) {
-            throw new ServiceException("Vendor-owned dimension data must be maintained in vendor backend");
-        }
-    }
-
-    private boolean isVendorOnlyDimension(String dimensionCode) {
-        return VENDOR_ONLY_DIMENSION_CODES.contains(dimensionCode);
     }
 }

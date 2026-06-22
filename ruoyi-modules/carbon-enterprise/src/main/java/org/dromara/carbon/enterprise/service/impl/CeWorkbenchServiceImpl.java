@@ -61,9 +61,9 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
     @Override
     public CeWorkbenchOverviewVo overview() {
         CeActivityDataValidationDashboardVo dashboard = activityDataService.queryValidationDashboard(new CeActivityDataBo());
-        String period = dashboard.getActivityPeriod();
+        String period = periodLabel(dashboard);
         CeLicenseStateVo licenseState = licenseStateService.queryCurrent();
-        List<CeActivityData> activities = listActivities(period);
+        List<CeActivityData> activities = listActivities(dashboard);
         List<CeEmissionSource> sources = emissionSourceMapper.selectList(Wrappers.<CeEmissionSource>lambdaQuery());
         List<CeFactorConfirmation> factors = listLatestFactors();
         List<CeReportTemplateFile> templates = listLatestTemplates();
@@ -80,9 +80,10 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
         return overview;
     }
 
-    private List<CeActivityData> listActivities(String period) {
+    private List<CeActivityData> listActivities(CeActivityDataValidationDashboardVo dashboard) {
         return activityDataMapper.selectList(Wrappers.<CeActivityData>lambdaQuery()
-            .eq(StringUtils.isNotBlank(period), CeActivityData::getActivityPeriod, period)
+            .eq(dashboard.getActivityYear() != null, CeActivityData::getActivityYear, dashboard.getActivityYear())
+            .eq(dashboard.getActivityMonth() != null, CeActivityData::getActivityMonth, dashboard.getActivityMonth())
             .orderByDesc(CeActivityData::getUpdateTime)
             .orderByDesc(CeActivityData::getCreateTime)
             .orderByDesc(CeActivityData::getId));
@@ -115,7 +116,7 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
         return List.of(
             metricCard("授权状态", licenseStatusText(licenseState), licenseNote(licenseState),
                 isLicenseValid(licenseState) ? "is-success" : "is-warning", null, null),
-            metricCard("当前期间", emptyToDash(dashboard.getActivityPeriod()),
+            metricCard("当前期间", emptyToDash(periodLabel(dashboard)),
                 "已录入 " + number(dashboard.getSubmittedItems()) + " 项",
                 null, rate(dashboard.getPassRate()), "up"),
             metricCard("碳排放总量", totalEmission.signum() > 0 ? decimal(totalEmission) : "--",
@@ -134,7 +135,7 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
         int reportableRecordCount = Math.max(defaultInt(dashboard.getValidatedRecordCount()) - abnormalItems, 0);
         return List.of(
             cycleStage("已保存活动数据", number(dashboard.getSubmittedItems()),
-                "当前期间 " + emptyToDash(dashboard.getActivityPeriod()), "done"),
+                "当前期间 " + emptyToDash(periodLabel(dashboard)), "done"),
             cycleStage("待补录项目", number(missingItems),
                 StringUtils.isBlank(dashboard.getDueDate()) ? "暂无截止日期" : "截止 " + dashboard.getDueDate(),
                 missingItems > 0 ? "warn" : "done"),
@@ -148,10 +149,10 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
     private List<CeWorkbenchOverviewVo.ScopeEmission> scopeEmissions(List<CeActivityData> activities,
                                                                      List<CeEmissionSource> sources,
                                                                      BigDecimal totalEmission) {
-        Map<Long, String> scopeBySourceId = sources.stream()
-            .filter(source -> source.getId() != null)
+        Map<String, String> scopeBySourceId = sources.stream()
+            .filter(source -> StringUtils.isNotBlank(source.getSourceIdentificationCode()))
             .collect(LinkedHashMap::new,
-                (map, source) -> map.put(source.getId(), StringUtils.isBlank(source.getBoundaryScope()) ? "未配置边界" : source.getBoundaryScope()),
+                (map, source) -> map.put(source.getSourceIdentificationCode(), StringUtils.isBlank(source.getScopeName()) ? "未配置边界" : source.getScopeName()),
                 Map::putAll);
         Map<String, BigDecimal> totals = new LinkedHashMap<>();
         for (CeActivityData activity : activities) {
@@ -159,7 +160,7 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
             if (emission == null) {
                 continue;
             }
-            String scope = scopeBySourceId.getOrDefault(activity.getEmissionSourceId(), "未配置边界");
+            String scope = scopeBySourceId.getOrDefault(activity.getSourceIdentificationCode(), "未配置边界");
             totals.merge(scope, emission, BigDecimal::add);
         }
         return totals.entrySet().stream()
@@ -383,5 +384,15 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
 
     private String emptyToDash(String value) {
         return StringUtils.isBlank(value) ? "--" : value;
+    }
+
+    private String periodLabel(CeActivityDataValidationDashboardVo dashboard) {
+        if (dashboard == null || dashboard.getActivityYear() == null) {
+            return null;
+        }
+        if (dashboard.getActivityMonth() == null) {
+            return String.valueOf(dashboard.getActivityYear());
+        }
+        return dashboard.getActivityYear() + "-" + String.format("%02d", dashboard.getActivityMonth());
     }
 }

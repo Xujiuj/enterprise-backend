@@ -38,7 +38,8 @@ public class CeGreenPowerCertificateServiceImpl implements ICeGreenPowerCertific
     @Override
     public List<CeGreenPowerCertificateVo> queryList(CeGreenPowerCertificateBo bo) {
         return greenPowerCertificateMapper.selectVoList(buildQueryWrapper(bo)
-            .orderByAsc(CeGreenPowerCertificate::getEnergyPeriod)
+            .orderByAsc(CeGreenPowerCertificate::getActivityYear)
+            .orderByAsc(CeGreenPowerCertificate::getActivityMonth)
             .orderByAsc(CeGreenPowerCertificate::getCertificateCode));
     }
 
@@ -50,9 +51,6 @@ public class CeGreenPowerCertificateServiceImpl implements ICeGreenPowerCertific
     @Override
     public Boolean insertByBo(CeGreenPowerCertificateBo bo) {
         CeGreenPowerCertificate add = MapstructUtils.convert(bo, CeGreenPowerCertificate.class);
-        if (add.getEnergyUnit() == null) {
-            add.setEnergyUnit("MWh");
-        }
         if (add.getProofStatus() == null) {
             add.setProofStatus("draft");
         }
@@ -76,11 +74,18 @@ public class CeGreenPowerCertificateServiceImpl implements ICeGreenPowerCertific
 
     private LambdaQueryWrapper<CeGreenPowerCertificate> buildQueryWrapper(CeGreenPowerCertificateBo bo) {
         return new LambdaQueryWrapper<CeGreenPowerCertificate>()
+            .eq(bo.getRowNo() != null, CeGreenPowerCertificate::getRowNo, bo.getRowNo())
+            .like(StringUtils.isNotBlank(bo.getFactoryCode()), CeGreenPowerCertificate::getFactoryCode, bo.getFactoryCode())
+            .like(StringUtils.isNotBlank(bo.getFactoryName()), CeGreenPowerCertificate::getFactoryName, bo.getFactoryName())
+            .eq(bo.getActivityYear() != null, CeGreenPowerCertificate::getActivityYear, bo.getActivityYear())
+            .eq(bo.getActivityMonth() != null, CeGreenPowerCertificate::getActivityMonth, bo.getActivityMonth())
+            .eq(StringUtils.isNotBlank(bo.getSourceCategoryKey()), CeGreenPowerCertificate::getSourceCategoryKey, bo.getSourceCategoryKey())
+            .like(StringUtils.isNotBlank(bo.getScopeName()), CeGreenPowerCertificate::getScopeName, bo.getScopeName())
+            .like(StringUtils.isNotBlank(bo.getElectricityType()), CeGreenPowerCertificate::getElectricityType, bo.getElectricityType())
             .like(StringUtils.isNotBlank(bo.getCertificateCode()), CeGreenPowerCertificate::getCertificateCode, bo.getCertificateCode())
-            .eq(StringUtils.isNotBlank(bo.getCertificateType()), CeGreenPowerCertificate::getCertificateType, bo.getCertificateType())
-            .eq(StringUtils.isNotBlank(bo.getEnergyPeriod()), CeGreenPowerCertificate::getEnergyPeriod, bo.getEnergyPeriod())
             .like(StringUtils.isNotBlank(bo.getIssuingOrg()), CeGreenPowerCertificate::getIssuingOrg, bo.getIssuingOrg())
-            .eq(StringUtils.isNotBlank(bo.getOffsetSourceCode()), CeGreenPowerCertificate::getOffsetSourceCode, bo.getOffsetSourceCode())
+            .like(StringUtils.isNotBlank(bo.getPowerGridRegion()), CeGreenPowerCertificate::getPowerGridRegion, bo.getPowerGridRegion())
+            .like(StringUtils.isNotBlank(bo.getOffsetPowerSource()), CeGreenPowerCertificate::getOffsetPowerSource, bo.getOffsetPowerSource())
             .eq(StringUtils.isNotBlank(bo.getProofStatus()), CeGreenPowerCertificate::getProofStatus, bo.getProofStatus());
     }
 }

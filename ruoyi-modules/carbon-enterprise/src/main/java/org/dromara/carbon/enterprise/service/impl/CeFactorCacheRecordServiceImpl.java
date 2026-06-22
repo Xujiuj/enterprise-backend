@@ -32,6 +32,7 @@ public class CeFactorCacheRecordServiceImpl implements ICeFactorCacheRecordServi
     @Override
     public TableDataInfo<CeFactorCacheRecordVo> queryPageList(CeFactorCacheRecordBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<CeFactorCacheRecord> wrapper = buildQueryWrapper(bo)
+            .orderByAsc(CeFactorCacheRecord::getFactorTableCode)
             .orderByAsc(CeFactorCacheRecord::getFactorCode)
             .orderByAsc(CeFactorCacheRecord::getId);
         IPage<CeFactorCacheRecordVo> page = factorCacheRecordMapper.selectVoPage(pageQuery.build(), wrapper);
@@ -41,6 +42,7 @@ public class CeFactorCacheRecordServiceImpl implements ICeFactorCacheRecordServi
     @Override
     public List<CeFactorCacheRecordVo> queryList(CeFactorCacheRecordBo bo) {
         return factorCacheRecordMapper.selectVoList(buildQueryWrapper(bo)
+            .orderByAsc(CeFactorCacheRecord::getFactorTableCode)
             .orderByAsc(CeFactorCacheRecord::getFactorCode)
             .orderByAsc(CeFactorCacheRecord::getId));
     }
@@ -80,6 +82,7 @@ public class CeFactorCacheRecordServiceImpl implements ICeFactorCacheRecordServi
     private LambdaQueryWrapper<CeFactorCacheRecord> buildQueryWrapper(CeFactorCacheRecordBo bo) {
         return new LambdaQueryWrapper<CeFactorCacheRecord>()
             .eq(bo.getCacheVersionId() != null, CeFactorCacheRecord::getCacheVersionId, bo.getCacheVersionId())
+            .eq(StringUtils.isNotBlank(bo.getFactorTableCode()), CeFactorCacheRecord::getFactorTableCode, bo.getFactorTableCode())
             .eq(StringUtils.isNotBlank(bo.getFactorCode()), CeFactorCacheRecord::getFactorCode, bo.getFactorCode())
             .like(StringUtils.isNotBlank(bo.getFactorName()), CeFactorCacheRecord::getFactorName, bo.getFactorName())
             .eq(StringUtils.isNotBlank(bo.getFactorCategory()), CeFactorCacheRecord::getFactorCategory, bo.getFactorCategory())

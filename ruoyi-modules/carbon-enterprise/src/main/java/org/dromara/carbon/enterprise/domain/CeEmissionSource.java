@@ -21,17 +21,31 @@ public class CeEmissionSource implements Serializable {
     @TableId(value = "id")
     private Long id;
 
-    private String sourceCode;
+    private Integer rowNo;
 
-    private String sourceName;
+    private String companyCode;
 
-    private String sourceCategoryCode;
+    private String companyName;
 
-    private String sourceCategoryName;
+    private String factoryName;
 
-    private String facilityName;
+    private String sourceCategoryKey;
 
-    private String boundaryScope;
+    private String scopeName;
+
+    private String scopeSubcategory;
+
+    private String sourceIdentificationCode;
+
+    private String sourceIdentificationName;
+
+    private String emissionSourceName;
+
+    private String responsibleDept;
+
+    private String dataSource;
+
+    private String factorKey;
 
     private Boolean enabledFlag;
 

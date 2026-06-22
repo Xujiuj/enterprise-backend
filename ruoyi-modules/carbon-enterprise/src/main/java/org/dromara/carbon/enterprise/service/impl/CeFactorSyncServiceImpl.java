@@ -101,6 +101,8 @@ public class CeFactorSyncServiceImpl implements ICeFactorSyncService {
         for (CeVendorFactorRecord record : records) {
             CeFactorCacheRecord cacheRecord = factorCacheRecordMapper.selectOne(Wrappers.<CeFactorCacheRecord>lambdaQuery()
                 .eq(CeFactorCacheRecord::getCacheVersionId, cacheVersionId)
+                .eq(CeFactorCacheRecord::getFactorTableCode,
+                    StringUtils.isBlank(record.getFactorTableCode()) ? "201ef" : record.getFactorTableCode())
                 .eq(CeFactorCacheRecord::getFactorCode, record.getFactorCode()), false);
             if (cacheRecord == null) {
                 cacheRecord = new CeFactorCacheRecord();
@@ -115,11 +117,54 @@ public class CeFactorSyncServiceImpl implements ICeFactorSyncService {
     }
 
     private void copyRecord(CeVendorFactorRecord source, CeFactorCacheRecord target, Date syncedTime) {
+        target.setFactorTableCode(StringUtils.isBlank(source.getFactorTableCode()) ? "201ef" : source.getFactorTableCode());
         target.setFactorCode(source.getFactorCode());
         target.setFactorName(source.getFactorName());
         target.setFactorCategory(source.getFactorCategory());
         target.setFactorValue(source.getFactorValue());
         target.setFactorUnit(source.getFactorUnit());
+        target.setFactorKey(source.getFactorKey());
+        target.setEmissionSourceName(source.getEmissionSourceName());
+        target.setEmissionSourceNameEn(source.getEmissionSourceNameEn());
+        target.setFuelMaterialCategory(source.getFuelMaterialCategory());
+        target.setSourceUnit(source.getSourceUnit());
+        target.setCo2(source.getCo2());
+        target.setCh4(source.getCh4());
+        target.setN2o(source.getN2o());
+        target.setHfcs(source.getHfcs());
+        target.setPfcs(source.getPfcs());
+        target.setSf6(source.getSf6());
+        target.setNf3(source.getNf3());
+        target.setApplicableScope(source.getApplicableScope());
+        target.setFactorSource(source.getFactorSource());
+        target.setGwpCh4(source.getGwpCh4());
+        target.setGwpN2o(source.getGwpN2o());
+        target.setGwpHfcs(source.getGwpHfcs());
+        target.setGwpPfcs(source.getGwpPfcs());
+        target.setGwpSf6(source.getGwpSf6());
+        target.setGwpNf3(source.getGwpNf3());
+        target.setFactorGwp(source.getFactorGwp());
+        target.setVersionProvinceCode(source.getVersionProvinceCode());
+        target.setFactorVersion(source.getFactorVersion());
+        target.setDivisionCode(source.getDivisionCode());
+        target.setDivisionName(source.getDivisionName());
+        target.setRegionName(source.getRegionName());
+        target.setProvinceFactor(source.getProvinceFactor());
+        target.setRegionFactor(source.getRegionFactor());
+        target.setNationalFactor(source.getNationalFactor());
+        target.setNonFossilExcludedFactor(source.getNonFossilExcludedFactor());
+        target.setNationalFossilPowerFactor(source.getNationalFossilPowerFactor());
+        target.setRowNo(source.getRowNo());
+        target.setFuelLevel1(source.getFuelLevel1());
+        target.setFuelLevel2(source.getFuelLevel2());
+        target.setFuelLevel3(source.getFuelLevel3());
+        target.setFuelLevel4(source.getFuelLevel4());
+        target.setLowerHeatValue(source.getLowerHeatValue());
+        target.setLowerHeatValueCv(source.getLowerHeatValueCv());
+        target.setCo2Factor(source.getCo2Factor());
+        target.setCo2FactorCv(source.getCo2FactorCv());
+        target.setGwpValue(source.getGwpValue());
+        target.setConvertedFactor(source.getConvertedFactor());
         target.setSourceRef(source.getSourceRef());
         target.setEnabledFlag(Boolean.TRUE);
         target.setSyncedTime(syncedTime);

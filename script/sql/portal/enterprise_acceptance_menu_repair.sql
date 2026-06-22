@@ -18,39 +18,39 @@ values
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900110, '01 配置排放源', 0, 2, 'emission-source-config', 'Layout', '', 1, 0, 'M', '0', '0', '', 'tree', 103, 1, sysdate(), '配置排放源目录'),
-(900111, '行政区划', 900110, 1, 'admin-division', 'enterprise/dimension/index', '{"code":"admin-division"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'tree', 103, 1, sysdate(), '行政区划'),
-(900112, '公司表', 900110, 2, 'company', 'enterprise/dimension/index', '{"code":"company"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'company', 103, 1, sysdate(), '公司表'),
-(900113, '排放源分类', 900110, 3, 'emission-source-category', 'enterprise/dimension/index', '{"code":"emission-source-category"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'tree', 103, 1, sysdate(), '排放源分类'),
-(900114, '排放源识别', 900110, 4, 'emission-source', 'enterprise/emissionSource/index', '', 1, 0, 'C', '0', '0', 'enterprise:emissionSource:list', 'form', 103, 1, sysdate(), '排放源识别'),
-(900115, '基准年维度表', 900110, 5, 'base-year', 'enterprise/dimension/index', '{"code":"base-year"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'date-range', 103, 1, sysdate(), '基准年维度表');
+(900110, '1 配置排放源', 0, 2, 'emission-source-config', 'Layout', '', 1, 0, 'M', '0', '0', '', 'tree', 103, 1, sysdate(), '配置排放源目录'),
+(900111, '101 行政区划', 900110, 1, 'admin-division', 'enterprise/dimension/index', '{"code":"admin-division"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'tree', 103, 1, sysdate(), '行政区划'),
+(900112, '102 公司表', 900110, 2, 'company', 'enterprise/dimension/index', '{"code":"company"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'company', 103, 1, sysdate(), '公司表'),
+(900113, '103 排放源分类', 900110, 3, 'emission-source-category', 'enterprise/dimension/index', '{"code":"emission-source-category"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'tree', 103, 1, sysdate(), '排放源分类'),
+(900114, '104 排放源识别', 900110, 4, 'emission-source', 'enterprise/emissionSource/index', '', 1, 0, 'C', '0', '0', 'enterprise:emissionSource:list', 'form', 103, 1, sysdate(), '排放源识别'),
+(900115, '106 基准年维度表', 900110, 5, 'base-year', 'enterprise/dimension/index', '{"code":"base-year"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'date-range', 103, 1, sysdate(), '基准年维度表');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900120, '02 确认排放因子', 0, 3, 'factor-confirm', 'Layout', '', 1, 0, 'M', '0', '0', '', 'validCode', 103, 1, sysdate(), '确认排放因子目录'),
-(900121, 'EF排放因子维度表', 900120, 1, 'ef-factor', 'enterprise/dimension/index', '{"code":"ef-factor"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), 'EF排放因子维度表'),
-(900122, 'EF电力因子维度表', 900120, 2, 'ef-electricity-factor', 'enterprise/dimension/index', '{"code":"ef-electricity-factor"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), 'EF电力因子维度表'),
-(900123, 'EF电力因子版本对应', 900120, 3, 'ef-electricity-version', 'enterprise/dimension/index', '{"code":"ef-electricity-version"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'validCode', 103, 1, sysdate(), 'EF电力因子版本对应'),
-(900124, 'EF电力因子口径维度', 900120, 4, 'ef-electricity-scope', 'enterprise/dimension/index', '{"code":"ef-electricity-scope"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'validCode', 103, 1, sysdate(), 'EF电力因子口径维度'),
-(900125, '温室气体维度', 900120, 5, 'greenhouse-gas', 'enterprise/dimension/index', '{"code":"greenhouse-gas"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), '温室气体维度');
+(900120, '2 确认排放因子', 0, 3, 'factor-confirm', 'Layout', '', 1, 0, 'M', '0', '0', '', 'validCode', 103, 1, sysdate(), '确认排放因子目录'),
+(900121, '201 EF排放因子维度表', 900120, 1, 'ef-factor', 'enterprise/dimension/index', '{"code":"ef-factor"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), 'EF排放因子维度表'),
+(900122, '202 EF电力因子维度表', 900120, 2, 'ef-electricity-factor', 'enterprise/dimension/index', '{"code":"ef-electricity-factor"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), 'EF电力因子维度表'),
+(900123, '203 EF电力因子版本对应', 900120, 3, 'ef-electricity-version', 'enterprise/dimension/index', '{"code":"ef-electricity-version"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'validCode', 103, 1, sysdate(), 'EF电力因子版本对应'),
+(900124, '205 EF电力因子口径维度', 900120, 4, 'ef-electricity-scope', 'enterprise/dimension/index', '{"code":"ef-electricity-scope"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'validCode', 103, 1, sysdate(), 'EF电力因子口径维度'),
+(900125, '206 温室气体维度', 900120, 5, 'greenhouse-gas', 'enterprise/dimension/index', '{"code":"greenhouse-gas"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'search', 103, 1, sysdate(), '温室气体维度');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900130, '03 活动数据', 0, 4, 'activity-data', 'Layout', '', 1, 0, 'M', '0', '0', '', 'form', 103, 1, sysdate(), '活动数据目录'),
+(900130, '3 活动数据', 0, 4, 'activity-data', 'Layout', '', 1, 0, 'M', '0', '0', '', 'form', 103, 1, sysdate(), '活动数据目录'),
 (900131, '排放活动数据', 900130, 1, 'emission-activity-data', 'enterprise/activityData/index', '', 1, 0, 'C', '0', '0', 'enterprise:activityData:list', 'form', 103, 1, sysdate(), '排放活动数据'),
-(900140, '04 绿电绿证', 0, 5, 'green-electricity', 'Layout', '', 1, 0, 'M', '0', '0', '', 'international', 103, 1, sysdate(), '绿电绿证目录'),
-(900141, '绿电绿证数据', 900140, 1, 'green-electricity-data', 'enterprise/greenPowerCertificate/index', '', 1, 0, 'C', '0', '0', 'enterprise:greenPowerCertificate:list', 'international', 103, 1, sysdate(), '绿电绿证数据');
+(900140, '4 绿电绿证', 0, 5, 'green-electricity', 'Layout', '', 1, 0, 'M', '0', '0', '', 'international', 103, 1, sysdate(), '绿电绿证目录'),
+(900141, '401 绿电绿证数据', 900140, 1, 'green-electricity-data', 'enterprise/greenPowerCertificate/index', '', 1, 0, 'C', '0', '0', 'enterprise:greenPowerCertificate:list', 'international', 103, 1, sysdate(), '绿电绿证数据');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 values
-(900150, '05 强度管理', 0, 6, 'intensity', 'Layout', '', 1, 0, 'M', '0', '0', '', 'chart', 103, 1, sysdate(), '强度管理目录'),
-(900151, '碳排放强度分母维度表', 900150, 1, 'intensity-denominator', 'enterprise/dimension/index', '{"code":"intensity-denominator"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'form', 103, 1, sysdate(), '碳排放强度分母维度表'),
-(900152, '强度目标表', 900150, 2, 'intensity-target', 'enterprise/intensityMetric/index', '', 1, 0, 'C', '0', '0', 'enterprise:intensityMetric:list', 'chart', 103, 1, sysdate(), '强度目标表'),
-(900153, '分母事实表', 900150, 3, 'denominator-fact', 'enterprise/dimension/index', '{"code":"denominator-fact"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'form', 103, 1, sysdate(), '分母事实表'),
-(900154, '碳排放强度容忍率参数表', 900150, 4, 'intensity-tolerance', 'enterprise/dimension/index', '{"code":"intensity-tolerance"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'chart', 103, 1, sysdate(), '碳排放强度容忍率参数表');
+(900150, '5 强度管理', 0, 6, 'intensity', 'Layout', '', 1, 0, 'M', '0', '0', '', 'chart', 103, 1, sysdate(), '强度管理目录'),
+(900151, '501 碳排放强度分母维度表', 900150, 1, 'intensity-denominator', 'enterprise/dimension/index', '{"code":"intensity-denominator"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'form', 103, 1, sysdate(), '碳排放强度分母维度表'),
+(900152, '502 强度目标表', 900150, 2, 'intensity-target', 'enterprise/intensityMetric/index', '', 1, 0, 'C', '0', '0', 'enterprise:intensityMetric:list', 'chart', 103, 1, sysdate(), '强度目标表'),
+(900153, '503 分母事实表', 900150, 3, 'denominator-fact', 'enterprise/dimension/index', '{"code":"denominator-fact"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'form', 103, 1, sysdate(), '分母事实表'),
+(900154, '504 碳排放强度容忍率参数表', 900150, 4, 'intensity-tolerance', 'enterprise/dimension/index', '{"code":"intensity-tolerance"}', 1, 0, 'C', '0', '0', 'enterprise:dimension:view', 'chart', 103, 1, sysdate(), '碳排放强度容忍率参数表');
 
 insert into sys_menu
 (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)

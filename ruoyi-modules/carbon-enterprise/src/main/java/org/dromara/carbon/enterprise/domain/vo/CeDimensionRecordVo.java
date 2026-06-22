@@ -1,8 +1,6 @@
 package org.dromara.carbon.enterprise.domain.vo;
 
-import io.github.linpeilie.annotations.AutoMapper;
 import lombok.Data;
-import org.dromara.carbon.enterprise.domain.CeDimensionRecord;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -12,7 +10,6 @@ import java.util.Date;
  * Enterprise dimension record view object.
  */
 @Data
-@AutoMapper(target = CeDimensionRecord.class)
 public class CeDimensionRecordVo implements Serializable {
 
     @Serial
@@ -39,6 +36,38 @@ public class CeDimensionRecordVo implements Serializable {
     private String field05;
 
     private String field06;
+
+    private String field07;
+
+    private String field08;
+
+    private String field09;
+
+    private String field10;
+
+    private String field11;
+
+    private String field12;
+
+    private String field13;
+
+    private String field14;
+
+    private String field15;
+
+    private String field16;
+
+    private String field17;
+
+    private String field18;
+
+    private String field19;
+
+    private String field20;
+
+    private String field21;
+
+    private String field22;
 
     private Integer sortOrder;
 

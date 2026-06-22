@@ -18,7 +18,9 @@ public class CeActivityDataValidationDashboardVo implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private String activityPeriod;
+    private Integer activityYear;
+
+    private Integer activityMonth;
 
     private String dueDate;
 
@@ -52,7 +54,7 @@ public class CeActivityDataValidationDashboardVo implements Serializable {
 
         private String responsiblePerson;
 
-        private String facilityName;
+        private String factoryName;
 
         private String moduleName;
 
@@ -64,13 +66,15 @@ public class CeActivityDataValidationDashboardVo implements Serializable {
 
         private Integer warningCount;
 
-        private Long emissionSourceId;
+        private String sourceIdentificationCode;
 
-        private String emissionSourceCode;
+        private String sourceIdentificationName;
 
         private String emissionSourceName;
 
-        private String activityPeriod;
+        private Integer activityYear;
+
+        private Integer activityMonth;
 
         private String dueDate;
 
@@ -93,13 +97,15 @@ public class CeActivityDataValidationDashboardVo implements Serializable {
 
         private String severity;
 
-        private Long emissionSourceId;
+        private String sourceIdentificationCode;
 
-        private String emissionSourceCode;
+        private String sourceIdentificationName;
 
         private String objectName;
 
-        private String activityPeriod;
+        private Integer activityYear;
+
+        private Integer activityMonth;
 
         private String description;
 

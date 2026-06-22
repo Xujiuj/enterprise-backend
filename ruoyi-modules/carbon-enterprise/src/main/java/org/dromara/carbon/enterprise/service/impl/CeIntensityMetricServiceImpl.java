@@ -76,7 +76,10 @@ public class CeIntensityMetricServiceImpl implements ICeIntensityMetricService {
         return new LambdaQueryWrapper<CeIntensityMetric>()
             .like(StringUtils.isNotBlank(bo.getMetricCode()), CeIntensityMetric::getMetricCode, bo.getMetricCode())
             .like(StringUtils.isNotBlank(bo.getMetricName()), CeIntensityMetric::getMetricName, bo.getMetricName())
+            .eq(StringUtils.isNotBlank(bo.getRuleCode()), CeIntensityMetric::getRuleCode, bo.getRuleCode())
             .eq(StringUtils.isNotBlank(bo.getMetricPeriod()), CeIntensityMetric::getMetricPeriod, bo.getMetricPeriod())
+            .eq(bo.getDenominatorFactId() != null, CeIntensityMetric::getDenominatorFactId, bo.getDenominatorFactId())
+            .eq(StringUtils.isNotBlank(bo.getTargetCode()), CeIntensityMetric::getTargetCode, bo.getTargetCode())
             .eq(StringUtils.isNotBlank(bo.getMetricStatus()), CeIntensityMetric::getMetricStatus, bo.getMetricStatus());
     }
 

@@ -1,10 +1,8 @@
 package org.dromara.carbon.enterprise.domain.bo;
 
-import io.github.linpeilie.annotations.AutoMapper;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-import org.dromara.carbon.enterprise.domain.CeDimensionRecord;
 import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 
@@ -15,7 +13,6 @@ import java.io.Serializable;
  * Enterprise dimension record business object.
  */
 @Data
-@AutoMapper(target = CeDimensionRecord.class, reverseConvertGenerate = false)
 public class CeDimensionRecordBo implements Serializable {
 
     @Serial
@@ -46,6 +43,38 @@ public class CeDimensionRecordBo implements Serializable {
     private String field05;
 
     private String field06;
+
+    private String field07;
+
+    private String field08;
+
+    private String field09;
+
+    private String field10;
+
+    private String field11;
+
+    private String field12;
+
+    private String field13;
+
+    private String field14;
+
+    private String field15;
+
+    private String field16;
+
+    private String field17;
+
+    private String field18;
+
+    private String field19;
+
+    private String field20;
+
+    private String field21;
+
+    private String field22;
 
     private Integer sortOrder;
 

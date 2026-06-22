@@ -23,15 +23,43 @@ public class CeActivityDataVo implements Serializable {
 
     private Long batchId;
 
-    private Long emissionSourceId;
+    private String sourceSheetCode;
 
-    private String activityPeriod;
+    private String sourceIdentificationCode;
 
-    private BigDecimal activityValue;
+    private String companyCode;
+
+    private String companyName;
+
+    private String factoryName;
+
+    private String sourceCategoryKey;
+
+    private String scopeName;
+
+    private String scopeSubcategory;
+
+    private String sourceIdentificationName;
+
+    private String emissionSourceName;
 
     private String activityUnit;
 
-    private Long factorConfirmationId;
+    private Integer activityYear;
+
+    private Integer activityMonth;
+
+    private Date activityDate;
+
+    private BigDecimal activityValue;
+
+    private String responsibleDept;
+
+    private String dataSource;
+
+    private String sourceRemark;
+
+    private String factorKey;
 
     private BigDecimal calculatedEmission;
 

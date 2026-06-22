@@ -7,9 +7,9 @@ import org.dromara.carbon.enterprise.domain.CeActivityData;
 import org.dromara.carbon.enterprise.domain.CeCaptureBatch;
 import org.dromara.carbon.enterprise.domain.CeCaptureCell;
 import org.dromara.carbon.enterprise.domain.CeCaptureRow;
-import org.dromara.carbon.enterprise.domain.CeDimensionRecord;
 import org.dromara.carbon.enterprise.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.domain.CeGreenPowerCertificate;
+import org.dromara.carbon.enterprise.domain.CeIntensityDenominatorFact;
 import org.dromara.carbon.enterprise.domain.CeTemplateField;
 import org.dromara.carbon.enterprise.domain.CeTemplateSheet;
 import org.dromara.carbon.enterprise.domain.bo.CeActivityDataBo;
@@ -19,9 +19,9 @@ import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureCellMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureRowMapper;
-import org.dromara.carbon.enterprise.mapper.CeDimensionRecordMapper;
 import org.dromara.carbon.enterprise.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.mapper.CeGreenPowerCertificateMapper;
+import org.dromara.carbon.enterprise.mapper.CeIntensityDenominatorFactMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateFieldMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateSheetMapper;
 import org.dromara.carbon.enterprise.service.ICeActivityDataService;
@@ -35,7 +35,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -65,15 +64,13 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     private static final String FIELD_YEAR = "f011";
     private static final String FIELD_MONTH = "f012";
     private static final String FIELD_DEPARTMENT = "f015";
-    private static final String MODULE_ACTIVITY = "活动数据";
-    private static final String MODULE_GREEN_POWER = "绿电绿证";
-    private static final String MODULE_DENOMINATOR = "分母事实";
+    private static final String MODULE_ACTIVITY = "Activity data";
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final CeActivityDataMapper activityDataMapper;
     private final CeEmissionSourceMapper emissionSourceMapper;
     private final CeGreenPowerCertificateMapper greenPowerCertificateMapper;
-    private final CeDimensionRecordMapper dimensionRecordMapper;
+    private final CeIntensityDenominatorFactMapper denominatorFactMapper;
     private final CeTemplateSheetMapper templateSheetMapper;
     private final CeTemplateFieldMapper templateFieldMapper;
     private final CeCaptureRowMapper captureRowMapper;
@@ -83,6 +80,8 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     @Override
     public TableDataInfo<CeActivityDataVo> queryPageList(CeActivityDataBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<CeActivityData> wrapper = buildQueryWrapper(bo)
+            .orderByDesc(CeActivityData::getActivityYear)
+            .orderByDesc(CeActivityData::getActivityMonth)
             .orderByDesc(CeActivityData::getCreateTime)
             .orderByDesc(CeActivityData::getId);
         IPage<CeActivityDataVo> page = activityDataMapper.selectVoPage(pageQuery.build(), wrapper);
@@ -92,41 +91,45 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     @Override
     public List<CeActivityDataVo> queryList(CeActivityDataBo bo) {
         return activityDataMapper.selectVoList(buildQueryWrapper(bo)
+            .orderByDesc(CeActivityData::getActivityYear)
+            .orderByDesc(CeActivityData::getActivityMonth)
             .orderByDesc(CeActivityData::getCreateTime)
             .orderByDesc(CeActivityData::getId));
     }
 
     @Override
     public CeActivityDataValidationDashboardVo queryValidationDashboard(CeActivityDataBo bo) {
-        String period = resolvePeriod(bo);
+        ActivityPeriod period = resolvePeriod(bo);
         String dueDate = resolveDueDate(period);
         List<CeEmissionSource> sources = listEnabledEmissionSources();
         List<CeActivityData> activities = listActivities(period);
         List<CeGreenPowerCertificate> greenCertificates = listGreenPowerCertificates(period);
-        List<CeDimensionRecord> denominatorFacts = listDenominatorFacts(period);
-        Map<Long, List<CeActivityData>> activitiesBySourceId = activities.stream()
-            .filter(activity -> activity.getEmissionSourceId() != null)
-            .collect(Collectors.groupingBy(CeActivityData::getEmissionSourceId));
-        Map<Long, CeEmissionSource> sourceById = sources.stream()
-            .filter(source -> source.getId() != null)
-            .collect(Collectors.toMap(CeEmissionSource::getId, Function.identity(), (left, right) -> left));
-        Map<String, CaptureSubmissionMeta> captureMetaBySourceCode = loadCaptureMetaBySourceCode(period);
+        List<CeIntensityDenominatorFact> denominatorFacts = listDenominatorFacts(period);
+        Map<String, List<CeActivityData>> activitiesBySourceCode = activities.stream()
+            .filter(activity -> StringUtils.isNotBlank(activity.getSourceIdentificationCode()))
+            .collect(Collectors.groupingBy(activity -> activity.getSourceIdentificationCode().trim()));
+        Map<String, CeEmissionSource> sourceByCode = sources.stream()
+            .filter(source -> StringUtils.isNotBlank(source.getSourceIdentificationCode()))
+            .collect(Collectors.toMap(source -> source.getSourceIdentificationCode().trim(), Function.identity(), (left, right) -> left));
+        Map<String, CaptureSubmissionMeta> captureMetaBySourceCode = loadCaptureMetaBySourceCode(period.label());
 
         List<CeEmissionSource> expectedSources = new ArrayList<>(sources);
         for (CeActivityData activity : activities) {
-            Long sourceId = activity.getEmissionSourceId();
-            if (sourceId != null && !sourceById.containsKey(sourceId)) {
+            String sourceCode = activity.getSourceIdentificationCode();
+            if (StringUtils.isNotBlank(sourceCode) && !sourceByCode.containsKey(sourceCode.trim())) {
                 CeEmissionSource source = new CeEmissionSource();
-                source.setId(sourceId);
-                source.setSourceCode(String.valueOf(sourceId));
-                source.setSourceName("排放源 " + sourceId);
+                source.setSourceIdentificationCode(sourceCode.trim());
+                source.setSourceIdentificationName(activity.getSourceIdentificationName());
+                source.setEmissionSourceName(activity.getEmissionSourceName());
+                source.setFactoryName(activity.getFactoryName());
                 expectedSources.add(source);
-                sourceById.put(sourceId, source);
+                sourceByCode.put(sourceCode.trim(), source);
             }
         }
 
         CeActivityDataValidationDashboardVo dashboard = new CeActivityDataValidationDashboardVo();
-        dashboard.setActivityPeriod(period);
+        dashboard.setActivityYear(period.year());
+        dashboard.setActivityMonth(period.month());
         dashboard.setDueDate(dueDate);
 
         int submittedCount = 0;
@@ -139,8 +142,9 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         Map<String, SubmissionAggregate> submissionAggregates = new LinkedHashMap<>();
 
         for (CeEmissionSource source : expectedSources) {
-            CeActivityData activity = chooseLatestActivity(activitiesBySourceId.get(source.getId()));
-            CaptureSubmissionMeta captureMeta = captureMetaBySourceCode.get(source.getSourceCode());
+            String sourceCode = source.getSourceIdentificationCode();
+            CeActivityData activity = chooseLatestActivity(StringUtils.isBlank(sourceCode) ? null : activitiesBySourceCode.get(sourceCode.trim()));
+            CaptureSubmissionMeta captureMeta = StringUtils.isBlank(sourceCode) ? null : captureMetaBySourceCode.get(sourceCode.trim());
             List<CeActivityDataValidationDashboardVo.ValidationIssue> sourceIssues = buildIssues(source, activity, period);
             issues.addAll(sourceIssues);
 
@@ -165,7 +169,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
                 submissionAggregates,
                 resolveDepartment(captureMeta),
                 resolveResponsiblePerson(captureMeta),
-                StringUtils.isBlank(source.getFacilityName()) ? "--" : source.getFacilityName(),
+                StringUtils.isBlank(source.getFactoryName()) ? "--" : source.getFactoryName(),
                 period,
                 dueDate
             );
@@ -205,7 +209,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     public Boolean insertByBo(CeActivityDataBo bo) {
         CeActivityData add = MapstructUtils.convert(bo, CeActivityData.class);
         if (add.getDataStatus() == null) {
-            add.setDataStatus("draft");
+            add.setDataStatus(STATUS_DRAFT);
         }
         boolean flag = activityDataMapper.insert(add) > 0;
         if (flag) {
@@ -228,32 +232,44 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     private LambdaQueryWrapper<CeActivityData> buildQueryWrapper(CeActivityDataBo bo) {
         return new LambdaQueryWrapper<CeActivityData>()
             .eq(bo.getBatchId() != null, CeActivityData::getBatchId, bo.getBatchId())
-            .eq(bo.getEmissionSourceId() != null, CeActivityData::getEmissionSourceId, bo.getEmissionSourceId())
-            .eq(StringUtils.isNotBlank(bo.getActivityPeriod()), CeActivityData::getActivityPeriod, bo.getActivityPeriod())
+            .eq(StringUtils.isNotBlank(bo.getSourceSheetCode()), CeActivityData::getSourceSheetCode, bo.getSourceSheetCode())
+            .like(StringUtils.isNotBlank(bo.getSourceIdentificationCode()), CeActivityData::getSourceIdentificationCode, bo.getSourceIdentificationCode())
+            .like(StringUtils.isNotBlank(bo.getCompanyCode()), CeActivityData::getCompanyCode, bo.getCompanyCode())
+            .like(StringUtils.isNotBlank(bo.getCompanyName()), CeActivityData::getCompanyName, bo.getCompanyName())
+            .like(StringUtils.isNotBlank(bo.getFactoryName()), CeActivityData::getFactoryName, bo.getFactoryName())
+            .eq(StringUtils.isNotBlank(bo.getSourceCategoryKey()), CeActivityData::getSourceCategoryKey, bo.getSourceCategoryKey())
+            .like(StringUtils.isNotBlank(bo.getScopeName()), CeActivityData::getScopeName, bo.getScopeName())
             .eq(StringUtils.isNotBlank(bo.getActivityUnit()), CeActivityData::getActivityUnit, bo.getActivityUnit())
-            .eq(bo.getFactorConfirmationId() != null, CeActivityData::getFactorConfirmationId, bo.getFactorConfirmationId())
+            .eq(bo.getActivityYear() != null, CeActivityData::getActivityYear, bo.getActivityYear())
+            .eq(bo.getActivityMonth() != null, CeActivityData::getActivityMonth, bo.getActivityMonth())
             .eq(StringUtils.isNotBlank(bo.getDataStatus()), CeActivityData::getDataStatus, bo.getDataStatus());
     }
 
-    private String resolvePeriod(CeActivityDataBo bo) {
-        if (bo != null && StringUtils.isNotBlank(bo.getActivityPeriod())) {
-            return bo.getActivityPeriod().trim();
+    private ActivityPeriod resolvePeriod(CeActivityDataBo bo) {
+        if (bo != null && bo.getActivityYear() != null) {
+            return new ActivityPeriod(bo.getActivityYear(), bo.getActivityMonth());
         }
         return activityDataMapper.selectList(new LambdaQueryWrapper<CeActivityData>()
-                .isNotNull(CeActivityData::getActivityPeriod)
-                .orderByDesc(CeActivityData::getActivityPeriod)
+                .isNotNull(CeActivityData::getActivityYear)
+                .orderByDesc(CeActivityData::getActivityYear)
+                .orderByDesc(CeActivityData::getActivityMonth)
                 .last("limit 1"))
             .stream()
             .findFirst()
-            .map(CeActivityData::getActivityPeriod)
-            .filter(StringUtils::isNotBlank)
-            .orElse(YearMonth.now().toString());
+            .map(activity -> new ActivityPeriod(activity.getActivityYear(), activity.getActivityMonth()))
+            .orElseGet(() -> {
+                YearMonth now = YearMonth.now();
+                return new ActivityPeriod(now.getYear(), now.getMonthValue());
+            });
     }
 
-    private String resolveDueDate(String period) {
+    private String resolveDueDate(ActivityPeriod period) {
         try {
-            return YearMonth.parse(period).plusMonths(1).atDay(5).toString();
-        } catch (DateTimeParseException ex) {
+            if (period.month() == null) {
+                return LocalDate.of(period.year(), 12, 31).toString();
+            }
+            return YearMonth.of(period.year(), period.month()).plusMonths(1).atDay(5).toString();
+        } catch (RuntimeException ex) {
             return LocalDate.now().toString();
         }
     }
@@ -261,32 +277,35 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     private List<CeEmissionSource> listEnabledEmissionSources() {
         return emissionSourceMapper.selectList(new LambdaQueryWrapper<CeEmissionSource>()
             .eq(CeEmissionSource::getEnabledFlag, true)
-            .orderByAsc(CeEmissionSource::getSourceCode)
+            .orderByAsc(CeEmissionSource::getRowNo)
+            .orderByAsc(CeEmissionSource::getSourceIdentificationCode)
             .orderByAsc(CeEmissionSource::getId));
     }
 
-    private List<CeActivityData> listActivities(String period) {
+    private List<CeActivityData> listActivities(ActivityPeriod period) {
         return activityDataMapper.selectList(new LambdaQueryWrapper<CeActivityData>()
-            .eq(CeActivityData::getActivityPeriod, period)
+            .eq(CeActivityData::getActivityYear, period.year())
+            .eq(period.month() != null, CeActivityData::getActivityMonth, period.month())
             .orderByDesc(CeActivityData::getUpdateTime)
             .orderByDesc(CeActivityData::getCreateTime)
             .orderByDesc(CeActivityData::getId));
     }
 
-    private List<CeGreenPowerCertificate> listGreenPowerCertificates(String period) {
+    private List<CeGreenPowerCertificate> listGreenPowerCertificates(ActivityPeriod period) {
         return greenPowerCertificateMapper.selectList(new LambdaQueryWrapper<CeGreenPowerCertificate>()
-            .eq(CeGreenPowerCertificate::getEnergyPeriod, period)
+            .eq(CeGreenPowerCertificate::getActivityYear, period.year())
+            .eq(period.month() != null, CeGreenPowerCertificate::getActivityMonth, period.month())
             .orderByDesc(CeGreenPowerCertificate::getUpdateTime)
             .orderByDesc(CeGreenPowerCertificate::getCreateTime)
             .orderByDesc(CeGreenPowerCertificate::getId));
     }
 
-    private List<CeDimensionRecord> listDenominatorFacts(String period) {
-        return dimensionRecordMapper.selectList(new LambdaQueryWrapper<CeDimensionRecord>()
-            .eq(CeDimensionRecord::getDimensionCode, "denominator-fact")
-            .eq(CeDimensionRecord::getField01, period)
-            .orderByAsc(CeDimensionRecord::getSortOrder)
-            .orderByAsc(CeDimensionRecord::getId));
+    private List<CeIntensityDenominatorFact> listDenominatorFacts(ActivityPeriod period) {
+        return denominatorFactMapper.selectList(new LambdaQueryWrapper<CeIntensityDenominatorFact>()
+            .eq(CeIntensityDenominatorFact::getFactYear, period.year())
+            .eq(period.month() != null, CeIntensityDenominatorFact::getFactMonth, period.month())
+            .orderByAsc(CeIntensityDenominatorFact::getFactoryCode)
+            .orderByAsc(CeIntensityDenominatorFact::getId));
     }
 
     private CeActivityData chooseLatestActivity(List<CeActivityData> activities) {
@@ -317,65 +336,65 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     }
 
     private List<CeActivityDataValidationDashboardVo.ValidationIssue> buildIssues(CeEmissionSource source, CeActivityData activity,
-                                                                                  String period) {
+                                                                                  ActivityPeriod period) {
         List<CeActivityDataValidationDashboardVo.ValidationIssue> issues = new ArrayList<>();
         if (activity == null) {
-            issues.add(issue("MISSING_ACTIVITY_DATA", "活动数据缺失", "ERROR", source, period,
-                "已启用排放源未填报本期活动数据", "补录本期活动数据", "missing"));
+            issues.add(issue("MISSING_ACTIVITY_DATA", "Activity data missing", "ERROR", source, period,
+                "Enabled emission source has no activity data for the selected period.", "Record activity data for the period.", "missing"));
             return issues;
         }
         if (!isSubmitted(activity)) {
-            issues.add(issue("UNSUBMITTED_ACTIVITY_DATA", "活动数据未提交", "WARNING", source, period,
-                "本期活动数据仍为草稿，尚未提交", "提交或复核草稿数据", "pending"));
+            issues.add(issue("UNSUBMITTED_ACTIVITY_DATA", "Activity data not submitted", "WARNING", source, period,
+                "Activity data is still draft.", "Submit or review the draft data.", "pending"));
         }
         if (activity.getActivityValue() == null || BigDecimal.ZERO.compareTo(activity.getActivityValue()) >= 0) {
-            issues.add(issue("INVALID_ACTIVITY_VALUE", "活动数据异常", "ERROR", source, period,
-                "活动数据为空或小于等于 0", "核对原始读数并重新保存", "abnormal"));
+            issues.add(issue("INVALID_ACTIVITY_VALUE", "Invalid activity value", "ERROR", source, period,
+                "Activity value is empty or less than or equal to 0.", "Check the original reading and save again.", "abnormal"));
         }
         if (StringUtils.isBlank(activity.getActivityUnit())) {
-            issues.add(issue("MISSING_ACTIVITY_UNIT", "活动单位缺失", "ERROR", source, period,
-                "活动数据缺少单位", "核对排放源单位并重新保存", "abnormal"));
+            issues.add(issue("MISSING_ACTIVITY_UNIT", "Activity unit missing", "ERROR", source, period,
+                "Activity data is missing a unit.", "Check the emission source unit and save again.", "abnormal"));
         }
-        if (isSubmitted(activity) && activity.getFactorConfirmationId() == null) {
-            issues.add(issue("MISSING_FACTOR_CONFIRMATION", "因子未确认", "WARNING", source, period,
-                "已提交活动数据未关联确认后的排放因子", "完成因子确认后重新核算", "pending"));
+        if (isSubmitted(activity) && StringUtils.isBlank(activity.getFactorKey())) {
+            issues.add(issue("MISSING_FACTOR_CONFIRMATION", "Factor not confirmed", "WARNING", source, period,
+                "Submitted activity data is not linked to a confirmed emission factor.", "Confirm the factor and recalculate.", "pending"));
         }
         return issues;
     }
 
     private CeActivityDataValidationDashboardVo.ValidationIssue issue(String ruleCode, String ruleName, String severity,
-                                                                      CeEmissionSource source, String period, String description,
+                                                                      CeEmissionSource source, ActivityPeriod period, String description,
                                                                       String suggestion, String status) {
         CeActivityDataValidationDashboardVo.ValidationIssue issue = issueForObject(
             ruleCode,
             ruleName,
             severity,
-            source.getSourceCode() + " / " + source.getSourceName(),
+            source.getSourceIdentificationCode() + " / " + sourceName(source),
             period,
             description,
             suggestion,
             status
         );
-        issue.setEmissionSourceId(source.getId());
-        issue.setEmissionSourceCode(source.getSourceCode());
+        issue.setSourceIdentificationCode(source.getSourceIdentificationCode());
+        issue.setSourceIdentificationName(source.getSourceIdentificationName());
         return issue;
     }
 
     private List<CeActivityDataValidationDashboardVo.ValidationIssue> buildGreenCertificateIssues(
-        List<CeGreenPowerCertificate> certificates, String period) {
+        List<CeGreenPowerCertificate> certificates, ActivityPeriod period) {
         List<CeActivityDataValidationDashboardVo.ValidationIssue> issues = new ArrayList<>();
         for (CeGreenPowerCertificate certificate : certificates) {
-            String objectName = certificate.getCertificateCode() + " / " + certificate.getCertificateType();
-            if (certificate.getEnergyAmount() == null || BigDecimal.ZERO.compareTo(certificate.getEnergyAmount()) >= 0) {
-                issues.add(issueForObject("INVALID_GREEN_POWER_AMOUNT", "绿电绿证电量异常", "ERROR", objectName, period,
-                    "绿电绿证电量为空或小于等于 0", "核对凭证电量并重新保存", "abnormal"));
+            String objectName = certificate.getCertificateCode() + " / " + certificate.getElectricityType();
+            if (certificate.getQuantityKwh() == null || BigDecimal.ZERO.compareTo(certificate.getQuantityKwh()) >= 0) {
+                issues.add(issueForObject("INVALID_GREEN_POWER_AMOUNT", "Invalid green power quantity", "ERROR", objectName, period,
+                    "Green power certificate quantity is empty or less than or equal to 0.", "Check certificate quantity and save again.", "abnormal"));
             }
             if ("voided".equals(certificate.getProofStatus())) {
-                issues.add(issueForObject("VOIDED_GREEN_POWER_PROOF", "绿电绿证已作废", "ERROR", objectName, period,
-                    "绿电绿证凭证状态为已作废", "更换有效凭证或移除抵扣", "abnormal"));
+                issues.add(issueForObject("VOIDED_GREEN_POWER_PROOF", "Green power proof voided", "ERROR", objectName, period,
+                    "Green power certificate proof status is voided.", "Replace the certificate or remove the offset.", "abnormal"));
             } else if (!"verified".equals(certificate.getProofStatus())) {
-                issues.add(issueForObject("PENDING_GREEN_POWER_PROOF", "绿电绿证待核验", "WARNING", objectName, period,
-                    "绿电绿证凭证尚未完成核验", "完成凭证核验", "pending"));
+                issues.add(issueForObject("PENDING_GREEN_POWER_PROOF", "Green power proof pending", "WARNING", objectName, period,
+                    "Green power certificate proof is not verified.", "Complete certificate verification.", "pending"));
             }
         }
         return issues;
@@ -383,59 +402,51 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
 
     private long countInvalidGreenCertificateRecords(List<CeGreenPowerCertificate> certificates) {
         return certificates.stream()
-            .filter(certificate -> certificate.getEnergyAmount() == null
-                || BigDecimal.ZERO.compareTo(certificate.getEnergyAmount()) >= 0
+            .filter(certificate -> certificate.getQuantityKwh() == null
+                || BigDecimal.ZERO.compareTo(certificate.getQuantityKwh()) >= 0
                 || !"verified".equals(certificate.getProofStatus()))
             .count();
     }
 
-    private List<CeActivityDataValidationDashboardVo.ValidationIssue> buildDenominatorIssues(List<CeDimensionRecord> facts,
-                                                                                              String period) {
+    private List<CeActivityDataValidationDashboardVo.ValidationIssue> buildDenominatorIssues(List<CeIntensityDenominatorFact> facts,
+                                                                                              ActivityPeriod period) {
         List<CeActivityDataValidationDashboardVo.ValidationIssue> issues = new ArrayList<>();
-        for (CeDimensionRecord fact : facts) {
-            String objectName = fact.getRecordCode() + " / " + fact.getRecordName();
-            if (StringUtils.isBlank(fact.getField02())) {
-                issues.add(issueForObject("MISSING_DENOMINATOR_CODE", "分母口径缺失", "WARNING", objectName, period,
-                    "分母事实未关联分母编码", "补全分母编码", "pending"));
+        for (CeIntensityDenominatorFact fact : facts) {
+            String objectName = fact.getFactoryCode() + " / " + fact.getDenominatorMetricName();
+            if (StringUtils.isBlank(fact.getDenominatorType())) {
+                issues.add(issueForObject("MISSING_DENOMINATOR_CODE", "Denominator type missing", "WARNING", objectName, period,
+                    "Denominator fact is missing a denominator type.", "Complete denominator type.", "pending"));
             }
-            if (!isPositiveDecimal(fact.getField03())) {
-                issues.add(issueForObject("INVALID_DENOMINATOR_VALUE", "分母数值异常", "ERROR", objectName, period,
-                    "分母事实数值为空或小于等于 0", "核对分母原始数据", "abnormal"));
+            if (fact.getDenominatorValue() == null || BigDecimal.ZERO.compareTo(fact.getDenominatorValue()) >= 0) {
+                issues.add(issueForObject("INVALID_DENOMINATOR_VALUE", "Invalid denominator value", "ERROR", objectName, period,
+                    "Denominator value is empty or less than or equal to 0.", "Check denominator source data.", "abnormal"));
             }
         }
         return issues;
     }
 
-    private long countInvalidDenominatorRecords(List<CeDimensionRecord> facts) {
+    private long countInvalidDenominatorRecords(List<CeIntensityDenominatorFact> facts) {
         return facts.stream()
-            .filter(fact -> StringUtils.isBlank(fact.getField02()) || !isPositiveDecimal(fact.getField03()))
+            .filter(fact -> StringUtils.isBlank(fact.getDenominatorType())
+                || fact.getDenominatorValue() == null
+                || BigDecimal.ZERO.compareTo(fact.getDenominatorValue()) >= 0)
             .count();
     }
 
     private CeActivityDataValidationDashboardVo.ValidationIssue issueForObject(String ruleCode, String ruleName, String severity,
-                                                                               String objectName, String period, String description,
+                                                                               String objectName, ActivityPeriod period, String description,
                                                                                String suggestion, String status) {
         CeActivityDataValidationDashboardVo.ValidationIssue issue = new CeActivityDataValidationDashboardVo.ValidationIssue();
         issue.setRuleCode(ruleCode);
         issue.setRuleName(ruleName);
         issue.setSeverity(severity);
         issue.setObjectName(objectName);
-        issue.setActivityPeriod(period);
+        issue.setActivityYear(period.year());
+        issue.setActivityMonth(period.month());
         issue.setDescription(description);
         issue.setSuggestion(suggestion);
         issue.setIssueStatus(status);
         return issue;
-    }
-
-    private boolean isPositiveDecimal(String value) {
-        if (StringUtils.isBlank(value)) {
-            return false;
-        }
-        try {
-            return new BigDecimal(value.trim()).compareTo(BigDecimal.ZERO) > 0;
-        } catch (NumberFormatException ex) {
-            return false;
-        }
     }
 
     private BigDecimal resolveSubmissionAccuracy(String submissionStatus,
@@ -481,7 +492,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     }
 
     private String resolveDepartment(CaptureSubmissionMeta captureMeta) {
-        return captureMeta == null || StringUtils.isBlank(captureMeta.department()) ? "未配置部门" : captureMeta.department();
+        return captureMeta == null || StringUtils.isBlank(captureMeta.department()) ? "Unassigned department" : captureMeta.department();
     }
 
     private String resolveResponsiblePerson(CaptureSubmissionMeta captureMeta) {
@@ -566,6 +577,9 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         Map<String, CaptureSubmissionMeta> result = new HashMap<>();
         for (Long rowId : matchingRowIds) {
             Map<String, String> values = valuesByRowId.get(rowId);
+            if (values == null) {
+                continue;
+            }
             String sourceCode = values.get(FIELD_SOURCE_CODE);
             if (StringUtils.isBlank(sourceCode)) {
                 continue;
@@ -612,19 +626,32 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     }
 
     private SubmissionAggregate submissionAggregate(Map<String, SubmissionAggregate> aggregates, String department,
-                                                     String responsiblePerson, String facilityName, String period,
+                                                     String responsiblePerson, String factoryName, ActivityPeriod period,
                                                      String dueDate) {
-        String key = department + "|" + responsiblePerson + "|" + facilityName;
-        return aggregates.computeIfAbsent(key, ignored -> new SubmissionAggregate(department, responsiblePerson, facilityName,
+        String key = department + "|" + responsiblePerson + "|" + factoryName;
+        return aggregates.computeIfAbsent(key, ignored -> new SubmissionAggregate(department, responsiblePerson, factoryName,
             period, dueDate));
+    }
+
+    private static String sourceName(CeEmissionSource source) {
+        if (source == null) {
+            return "--";
+        }
+        if (StringUtils.isNotBlank(source.getEmissionSourceName())) {
+            return source.getEmissionSourceName();
+        }
+        if (StringUtils.isNotBlank(source.getSourceIdentificationName())) {
+            return source.getSourceIdentificationName();
+        }
+        return "--";
     }
 
     private static class SubmissionAggregate {
 
         private final String department;
         private final String responsiblePerson;
-        private final String facilityName;
-        private final String period;
+        private final String factoryName;
+        private final ActivityPeriod period;
         private final String dueDate;
         private int expectedCount;
         private int submittedCount;
@@ -633,10 +660,10 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         private Date latestSubmittedTime;
         private CeEmissionSource firstSource;
 
-        SubmissionAggregate(String department, String responsiblePerson, String facilityName, String period, String dueDate) {
+        SubmissionAggregate(String department, String responsiblePerson, String factoryName, ActivityPeriod period, String dueDate) {
             this.department = department;
             this.responsiblePerson = responsiblePerson;
-            this.facilityName = facilityName;
+            this.factoryName = factoryName;
             this.period = period;
             this.dueDate = dueDate;
         }
@@ -664,16 +691,17 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
             CeActivityDataValidationDashboardVo.SubmissionStatus submission = new CeActivityDataValidationDashboardVo.SubmissionStatus();
             submission.setDepartment(department);
             submission.setResponsiblePerson(responsiblePerson);
-            submission.setFacilityName(facilityName);
+            submission.setFactoryName(factoryName);
             submission.setModuleName(MODULE_ACTIVITY);
             submission.setExpectedCount(expectedCount);
             submission.setSubmittedCount(submittedCount);
             submission.setMissingCount(missingCount);
             submission.setWarningCount(warningCount);
-            submission.setEmissionSourceId(firstSource == null ? null : firstSource.getId());
-            submission.setEmissionSourceCode(firstSource == null ? null : firstSource.getSourceCode());
-            submission.setEmissionSourceName(firstSource == null ? null : firstSource.getSourceName());
-            submission.setActivityPeriod(period);
+            submission.setSourceIdentificationCode(firstSource == null ? null : firstSource.getSourceIdentificationCode());
+            submission.setSourceIdentificationName(firstSource == null ? null : firstSource.getSourceIdentificationName());
+            submission.setEmissionSourceName(firstSource == null ? null : sourceName(firstSource));
+            submission.setActivityYear(period.year());
+            submission.setActivityMonth(period.month());
             submission.setDueDate(dueDate);
             submission.setSubmissionStatus(resolveStatus());
             submission.setSubmittedTime(latestSubmittedTime);
@@ -702,5 +730,18 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     }
 
     private record CaptureSubmissionMeta(String department, String submittedBy, Date submittedTime) {
+    }
+
+    private record ActivityPeriod(Integer year, Integer month) {
+
+        String label() {
+            if (year == null) {
+                return "";
+            }
+            if (month == null) {
+                return String.valueOf(year);
+            }
+            return year + "-" + String.format("%02d", month);
+        }
     }
 }

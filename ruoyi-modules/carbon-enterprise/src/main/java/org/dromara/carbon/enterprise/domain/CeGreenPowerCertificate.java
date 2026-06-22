@@ -22,15 +22,29 @@ public class CeGreenPowerCertificate implements Serializable {
     @TableId(value = "id")
     private Long id;
 
+    private Integer rowNo;
+
+    private String factoryCode;
+
+    private String factoryName;
+
+    private Integer activityYear;
+
+    private Integer activityMonth;
+
+    private String sourceCategoryKey;
+
+    private String scopeName;
+
+    private String scopeSubcategory;
+
+    private String electricityType;
+
+    private String electricityTypeDesc;
+
+    private BigDecimal quantityKwh;
+
     private String certificateCode;
-
-    private String certificateType;
-
-    private String energyPeriod;
-
-    private BigDecimal energyAmount;
-
-    private String energyUnit;
 
     private String issuingOrg;
 
@@ -38,7 +52,17 @@ public class CeGreenPowerCertificate implements Serializable {
 
     private Date expiryDate;
 
-    private String offsetSourceCode;
+    private String powerGridRegion;
+
+    private String offsetPowerSource;
+
+    private String dataSource;
+
+    private String sourceRemark;
+
+    private String emissionSourceName;
+
+    private String factorKey;
 
     private String proofStatus;
 

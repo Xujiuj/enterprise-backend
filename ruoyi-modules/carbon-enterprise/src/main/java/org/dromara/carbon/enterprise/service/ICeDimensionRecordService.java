@@ -17,11 +17,11 @@ public interface ICeDimensionRecordService {
 
     List<CeDimensionRecordVo> queryList(CeDimensionRecordBo bo);
 
-    CeDimensionRecordVo queryById(Long id);
+    CeDimensionRecordVo queryById(String dimensionCode, Long id);
 
     Boolean insertByBo(CeDimensionRecordBo bo);
 
     Boolean updateByBo(CeDimensionRecordBo bo);
 
-    Boolean deleteByIds(Collection<Long> ids);
+    Boolean deleteByIds(String dimensionCode, Collection<Long> ids);
 }
