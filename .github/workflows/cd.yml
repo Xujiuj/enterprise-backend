@@ -233,16 +233,16 @@ jobs:
             return 1
           }
           upload_archive_with_chunks() {
-            echo "Rsync upload failed; falling back to 256KB chunked upload."
+            echo "Rsync upload failed; falling back to 4MB chunked upload."
             rm -f "$RUNNER_TEMP"/part-*
-            split -b 256k -d -a 5 "$JAR_ARCHIVE" "$CHUNK_PREFIX"
+            split -b 4m -d -a 5 "$JAR_ARCHIVE" "$CHUNK_PREFIX"
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -f '$REMOTE_JAR_ARCHIVE_PART' '$REMOTE_JAR_ARCHIVE' '$REMOTE_UPLOAD_DIR'/part-*"
             for chunk in "$RUNNER_TEMP"/part-*; do
               chunk_name="$(basename "$chunk")"
               uploaded=0
-              for attempt in 1 2 3 4 5 6 7 8; do
-                echo "Uploading $chunk_name (attempt $attempt/8)"
-                if timeout 180 sshpass -p "$DEPLOY_PASSWORD" scp -l 512 "${SCP_OPTS[@]}" "$chunk" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPLOAD_DIR/$chunk_name"; then
+              for attempt in 1 2 3; do
+                echo "Uploading $chunk_name (attempt $attempt/3)"
+                if timeout 120 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$chunk" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_UPLOAD_DIR/$chunk_name"; then
                   uploaded=1
                   break
                 fi
@@ -255,5 +255,5 @@ jobs:
             done
           }
           upload_archive_with_rsync || upload_archive_with_ssh_stream || upload_archive_with_chunks
-          timeout 1800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "REMOTE_UPLOAD_DIR='$REMOTE_UPLOAD_DIR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' JAR_ARCHIVE_SHA256='$(cat "$JAR_ARCHIVE_SHA256")' GITHUB_RUN_ID='$GITHUB_RUN_ID' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 1700 bash -s" < deploy-backend.sh
+          timeout 600 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "REMOTE_UPLOAD_DIR='$REMOTE_UPLOAD_DIR' REMOTE_JAR_ARCHIVE='$REMOTE_JAR_ARCHIVE' JAR_ARCHIVE_SHA256='$(cat "$JAR_ARCHIVE_SHA256")' GITHUB_RUN_ID='$GITHUB_RUN_ID' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_JAR='$REMOTE_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 540 bash -s" < deploy-backend.sh
