@@ -204,9 +204,9 @@ jobs:
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
           fi
           upload_archive_with_ssh_stream() {
-            for attempt in 1 2; do
-              echo "Uploading backend archive via SSH stream (attempt $attempt/2)"
-              if timeout 600 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cat > '$REMOTE_JAR_ARCHIVE'" < "$JAR_ARCHIVE"; then
+            for attempt in 1; do
+              echo "Uploading backend archive via SSH stream (attempt $attempt/1)"
+              if timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cat > '$REMOTE_JAR_ARCHIVE'" < "$JAR_ARCHIVE"; then
                 return 0
               fi
               sleep $((attempt * 10))
@@ -214,13 +214,13 @@ jobs:
             return 1
           }
           upload_archive_with_rsync() {
-            for attempt in 1 2 3 4; do
-              echo "Uploading backend archive via rsync (attempt $attempt/4)"
-              if timeout 1200 sshpass -p "$DEPLOY_PASSWORD" rsync \
+            for attempt in 1 2; do
+              echo "Uploading backend archive via rsync (attempt $attempt/2)"
+              if timeout 300 sshpass -p "$DEPLOY_PASSWORD" rsync \
                 --archive \
                 --partial \
                 --append-verify \
-                --timeout=180 \
+                --timeout=60 \
                 --contimeout=20 \
                 -e "$RSYNC_RSH" \
                 "$JAR_ARCHIVE" \
