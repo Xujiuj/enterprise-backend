@@ -88,6 +88,8 @@ public class CeGreenPowerCertificateServiceImpl implements ICeGreenPowerCertific
             .like(StringUtils.isNotBlank(bo.getIssuingOrg()), CeGreenPowerCertificate::getIssuingOrg, bo.getIssuingOrg())
             .like(StringUtils.isNotBlank(bo.getPowerGridRegion()), CeGreenPowerCertificate::getPowerGridRegion, bo.getPowerGridRegion())
             .like(StringUtils.isNotBlank(bo.getOffsetPowerSource()), CeGreenPowerCertificate::getOffsetPowerSource, bo.getOffsetPowerSource())
+            .eq(StringUtils.isNotBlank(bo.getDataSource()), CeGreenPowerCertificate::getDataSource, bo.getDataSource())
+            .eq(StringUtils.isNotBlank(bo.getFactorKey()), CeGreenPowerCertificate::getFactorKey, bo.getFactorKey())
             .eq(StringUtils.isNotBlank(bo.getProofStatus()), CeGreenPowerCertificate::getProofStatus, bo.getProofStatus());
     }
 }
