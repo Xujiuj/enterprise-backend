@@ -80,10 +80,12 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     @Override
     public TableDataInfo<CeActivityDataVo> queryPageList(CeActivityDataBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<CeActivityData> wrapper = buildQueryWrapper(bo)
-            .orderByDesc(CeActivityData::getActivityYear)
-            .orderByDesc(CeActivityData::getActivityMonth)
-            .orderByDesc(CeActivityData::getCreateTime)
-            .orderByDesc(CeActivityData::getId);
+            .orderByAsc(CeActivityData::getSourceSheetCode)
+            .orderByAsc(CeActivityData::getSourceIdentificationCode)
+            .orderByAsc(CeActivityData::getActivityYear)
+            .orderByAsc(CeActivityData::getActivityMonth)
+            .orderByAsc(CeActivityData::getActivityDate)
+            .orderByAsc(CeActivityData::getId);
         IPage<CeActivityDataVo> page = activityDataMapper.selectVoPage(pageQuery.build(), wrapper);
         return TableDataInfo.build(page);
     }
@@ -91,10 +93,12 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     @Override
     public List<CeActivityDataVo> queryList(CeActivityDataBo bo) {
         return activityDataMapper.selectVoList(buildQueryWrapper(bo)
-            .orderByDesc(CeActivityData::getActivityYear)
-            .orderByDesc(CeActivityData::getActivityMonth)
-            .orderByDesc(CeActivityData::getCreateTime)
-            .orderByDesc(CeActivityData::getId));
+            .orderByAsc(CeActivityData::getSourceSheetCode)
+            .orderByAsc(CeActivityData::getSourceIdentificationCode)
+            .orderByAsc(CeActivityData::getActivityYear)
+            .orderByAsc(CeActivityData::getActivityMonth)
+            .orderByAsc(CeActivityData::getActivityDate)
+            .orderByAsc(CeActivityData::getId));
     }
 
     @Override

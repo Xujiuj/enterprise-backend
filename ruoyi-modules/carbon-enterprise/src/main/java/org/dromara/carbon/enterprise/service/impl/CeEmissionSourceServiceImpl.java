@@ -29,8 +29,9 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
     @Override
     public TableDataInfo<CeEmissionSourceVo> queryPageList(CeEmissionSourceBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<CeEmissionSource> wrapper = buildQueryWrapper(bo)
-            .orderByDesc(CeEmissionSource::getCreateTime)
-            .orderByDesc(CeEmissionSource::getId);
+            .orderByAsc(CeEmissionSource::getCompanyCode)
+            .orderByAsc(CeEmissionSource::getSourceIdentificationCode)
+            .orderByAsc(CeEmissionSource::getId);
         IPage<CeEmissionSourceVo> page = emissionSourceMapper.selectVoPage(pageQuery.build(), wrapper);
         return TableDataInfo.build(page);
     }

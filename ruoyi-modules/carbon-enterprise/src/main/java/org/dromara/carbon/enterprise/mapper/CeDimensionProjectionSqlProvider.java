@@ -341,14 +341,14 @@ public class CeDimensionProjectionSqlProvider {
                 select id,
                        'intensity-denominator' as dimension_code,
                        denominator_rule_key as record_code,
-                       denominator_metric_name as record_name,
-                       factory_type as parent_code,
+                       factory_type as record_name,
+                       null as parent_code,
                        factory_type as field01,
                        denominator_type as field02,
-                       intensity_unit_display as field03,
-                       null as field04,
-                       null as field05,
-                       null as field06,
+                       denominator_metric_name as field03,
+                       intensity_unit_display as field04,
+                       case when enabled_flag = 1 then '是' else '否' end as field05,
+                       remark as field06,
                        null as field07,
                        null as field08,
                        null as field09,
@@ -377,7 +377,7 @@ public class CeDimensionProjectionSqlProvider {
                 select id,
                        'intensity-target' as dimension_code,
                        factory_type as record_code,
-                       concat(factory_type, ' ', target_year) as record_name,
+                       cast(target_year as char) as record_name,
                        null as parent_code,
                        factory_type as field01,
                        cast(target_year as char) as field02,
@@ -413,7 +413,7 @@ public class CeDimensionProjectionSqlProvider {
                 select id,
                        'denominator-fact' as dimension_code,
                        factory_code as record_code,
-                       denominator_metric_name as record_name,
+                       factory_name as record_name,
                        null as parent_code,
                        factory_name as field01,
                        factory_type as field02,
@@ -424,7 +424,7 @@ public class CeDimensionProjectionSqlProvider {
                        cast(denominator_value as char) as field07,
                        unit_name as field08,
                        data_source as field09,
-                       null as field10,
+                       remark as field10,
                        null as field11,
                        null as field12,
                        null as field13,
@@ -453,8 +453,8 @@ public class CeDimensionProjectionSqlProvider {
                        null as parent_code,
                        industry_section as field01,
                        cast(tolerance_rate as char) as field02,
-                       null as field03,
-                       null as field04,
+                       case when enabled_flag = 1 then '是' else '否' end as field03,
+                       remark as field04,
                        null as field05,
                        null as field06,
                        null as field07,
@@ -584,17 +584,17 @@ public class CeDimensionProjectionSqlProvider {
                   denominator_rule_key, factory_type, denominator_type,
                   denominator_metric_name, intensity_unit_display, enabled_flag, remark
                 ) values (
-                  #{record.recordCode}, #{record.field01}, #{record.field02},
-                  #{record.recordName}, #{record.field03},
-                  case when #{record.status} = '1' then 0 else 1 end,
-                  #{record.remark}
+                  #{record.recordCode}, #{record.recordName}, #{record.field02},
+                  #{record.field03}, #{record.field04},
+                  case when #{record.field05} = '否' or #{record.status} = '1' then 0 else 1 end,
+                  #{record.field06}
                 )
               </when>
               <when test="record.dimensionCode == 'intensity-target'">
                 insert into ce_intensity_target (
                   factory_type, target_year, target_value, unit_name, remark
                 ) values (
-                  #{record.recordCode}, #{record.field02}, #{record.field03}, #{record.field04}, #{record.remark}
+                  #{record.recordCode}, #{record.recordName}, #{record.field03}, #{record.field04}, #{record.remark}
                 )
               </when>
               <when test="record.dimensionCode == 'denominator-fact'">
@@ -603,9 +603,9 @@ public class CeDimensionProjectionSqlProvider {
                   denominator_type, denominator_metric_name, denominator_value,
                   unit_name, data_source, remark
                 ) values (
-                  #{record.recordCode}, #{record.field01}, #{record.field02}, #{record.field03}, #{record.field04},
-                  #{record.field05}, #{record.recordName}, #{record.field07},
-                  #{record.field08}, #{record.field09}, #{record.remark}
+                  #{record.recordCode}, #{record.recordName}, #{record.field02}, #{record.field03}, #{record.field04},
+                  #{record.field05}, #{record.field06}, #{record.field07},
+                  #{record.field08}, #{record.field09}, #{record.field10}
                 )
               </when>
               <when test="record.dimensionCode == 'intensity-tolerance'">
@@ -613,8 +613,8 @@ public class CeDimensionProjectionSqlProvider {
                   tolerance_key, industry_section, tolerance_rate, enabled_flag, remark
                 ) values (
                   #{record.recordCode}, #{record.recordName}, #{record.field02},
-                  case when #{record.status} = '1' then 0 else 1 end,
-                  #{record.remark}
+                  case when #{record.field03} = '否' or #{record.status} = '1' then 0 else 1 end,
+                  #{record.field04}
                 )
               </when>
               <otherwise>
@@ -703,19 +703,19 @@ public class CeDimensionProjectionSqlProvider {
               <when test="record.dimensionCode == 'intensity-denominator'">
                 update ce_intensity_denominator_rule
                    set denominator_rule_key = #{record.recordCode},
-                       factory_type = #{record.field01},
+                       factory_type = #{record.recordName},
                        denominator_type = #{record.field02},
-                       denominator_metric_name = #{record.recordName},
-                       intensity_unit_display = #{record.field03},
-                       enabled_flag = case when #{record.status} = '1' then 0 else 1 end,
+                       denominator_metric_name = #{record.field03},
+                       intensity_unit_display = #{record.field04},
+                       enabled_flag = case when #{record.field05} = '否' or #{record.status} = '1' then 0 else 1 end,
                        update_time = now(),
-                       remark = #{record.remark}
+                       remark = #{record.field06}
                  where id = #{record.id}
               </when>
               <when test="record.dimensionCode == 'intensity-target'">
                 update ce_intensity_target
                    set factory_type = #{record.recordCode},
-                       target_year = #{record.field02},
+                       target_year = #{record.recordName},
                        target_value = #{record.field03},
                        unit_name = #{record.field04},
                        update_time = now(),
@@ -725,17 +725,17 @@ public class CeDimensionProjectionSqlProvider {
               <when test="record.dimensionCode == 'denominator-fact'">
                 update ce_intensity_denominator_fact
                    set factory_code = #{record.recordCode},
-                       factory_name = #{record.field01},
+                       factory_name = #{record.recordName},
                        factory_type = #{record.field02},
                        fact_year = #{record.field03},
                        fact_month = #{record.field04},
                        denominator_type = #{record.field05},
-                       denominator_metric_name = #{record.recordName},
+                       denominator_metric_name = #{record.field06},
                        denominator_value = #{record.field07},
                        unit_name = #{record.field08},
                        data_source = #{record.field09},
                        update_time = now(),
-                       remark = #{record.remark}
+                       remark = #{record.field10}
                  where id = #{record.id}
               </when>
               <when test="record.dimensionCode == 'intensity-tolerance'">
@@ -743,9 +743,9 @@ public class CeDimensionProjectionSqlProvider {
                    set tolerance_key = #{record.recordCode},
                        industry_section = #{record.recordName},
                        tolerance_rate = #{record.field02},
-                       enabled_flag = case when #{record.status} = '1' then 0 else 1 end,
+                       enabled_flag = case when #{record.field03} = '否' or #{record.status} = '1' then 0 else 1 end,
                        update_time = now(),
-                       remark = #{record.remark}
+                       remark = #{record.field04}
                  where id = #{record.id}
               </when>
               <otherwise>

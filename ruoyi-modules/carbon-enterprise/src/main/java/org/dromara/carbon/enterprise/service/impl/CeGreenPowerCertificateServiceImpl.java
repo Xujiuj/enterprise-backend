@@ -29,8 +29,11 @@ public class CeGreenPowerCertificateServiceImpl implements ICeGreenPowerCertific
     @Override
     public TableDataInfo<CeGreenPowerCertificateVo> queryPageList(CeGreenPowerCertificateBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<CeGreenPowerCertificate> wrapper = buildQueryWrapper(bo)
-            .orderByDesc(CeGreenPowerCertificate::getCreateTime)
-            .orderByDesc(CeGreenPowerCertificate::getId);
+            .orderByAsc(CeGreenPowerCertificate::getFactoryCode)
+            .orderByAsc(CeGreenPowerCertificate::getActivityYear)
+            .orderByAsc(CeGreenPowerCertificate::getActivityMonth)
+            .orderByAsc(CeGreenPowerCertificate::getCertificateCode)
+            .orderByAsc(CeGreenPowerCertificate::getId);
         IPage<CeGreenPowerCertificateVo> page = greenPowerCertificateMapper.selectVoPage(pageQuery.build(), wrapper);
         return TableDataInfo.build(page);
     }
