@@ -32,6 +32,70 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Sync enterprise business database from runner
+        id: sync_business_runner
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT || 3306 }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$DB_HOST" ] || [ -z "$DB_USERNAME" ] || [ -z "$DB_PASSWORD" ]; then
+            echo "Enterprise business database sync skipped because database secrets are incomplete."
+            echo "status=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+          mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            "$DB_NAME" \
+            < script/sql/mysql/carbon_enterprise_schema_v1.sql
+          template_count="$(mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            --batch \
+            --skip-column-names \
+            "$DB_NAME" \
+            -e "select count(*) from ce_template_version;")"
+          if [ "${template_count:-0}" = "0" ]; then
+            echo "Enterprise template inventory is empty; loading template seed."
+            mysql \
+              --connect-timeout=20 \
+              --host="$DB_HOST" \
+              --port="$DB_PORT" \
+              --user="$DB_USERNAME" \
+              --password="$DB_PASSWORD" \
+              --default-character-set=utf8mb4 \
+              "$DB_NAME" \
+              < script/sql/mysql/carbon_enterprise_template_seed_v1.sql
+          else
+            echo "Enterprise template inventory already has $template_count row(s); skipping destructive template seed."
+          fi
+          mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            --batch \
+            --skip-column-names \
+            "$DB_NAME" \
+            -e "select count(*) from information_schema.tables where table_schema = '$DB_NAME' and table_name like 'ce\\_%';"
+          echo "status=success" >> "$GITHUB_OUTPUT"
+
       - name: Sync enterprise menu database from runner
         id: sync_menu_runner
         env:
@@ -97,6 +161,8 @@ jobs:
           REMOTE_UPLOAD_DIR="$DEPLOY_PATH/uploads/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
           REMOTE_SOURCE_ARCHIVE="$REMOTE_UPLOAD_DIR/source.tar.gz"
           REMOTE_BUILD_DIR="$DEPLOY_PATH/builds/$DEPLOY_SERVICE-${GITHUB_RUN_ID}"
+          ENTERPRISE_SCHEMA_FILE="script/sql/mysql/carbon_enterprise_schema_v1.sql"
+          ENTERPRISE_TEMPLATE_SEED_FILE="script/sql/mysql/carbon_enterprise_template_seed_v1.sql"
           sudo apt-get update
           sudo apt-get install -y sshpass gzip tar coreutils
           tar \
@@ -121,6 +187,8 @@ jobs:
           )
           SQL_FILE="ruoyi-modules/ruoyi-system/src/main/resources/sql/enterprise_portal_menu_sync.sql"
           REMOTE_SQL="$DEPLOY_PATH/enterprise_portal_menu_sync-${GITHUB_RUN_ID}.sql"
+          REMOTE_SCHEMA="$DEPLOY_PATH/carbon_enterprise_schema_v1-${GITHUB_RUN_ID}.sql"
+          REMOTE_TEMPLATE_SEED="$DEPLOY_PATH/carbon_enterprise_template_seed_v1-${GITHUB_RUN_ID}.sql"
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
@@ -171,6 +239,43 @@ jobs:
           echo "$SUDO_PASSWORD" | sudo -S systemctl enable "$DEPLOY_SERVICE"
           echo "$SUDO_PASSWORD" | sudo -S systemctl restart "$DEPLOY_SERVICE"
           EOF
+          cat > sync-business-db.sh <<'EOF'
+          set -euo pipefail
+          echo "$SUDO_PASSWORD" | sudo -S apt-get update
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y default-mysql-client
+          mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            "$DB_NAME" \
+            < "$REMOTE_SCHEMA"
+          template_count="$(mysql \
+            --connect-timeout=20 \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USERNAME" \
+            --password="$DB_PASSWORD" \
+            --default-character-set=utf8mb4 \
+            --batch \
+            --skip-column-names \
+            "$DB_NAME" \
+            -e "select count(*) from ce_template_version;")"
+          if [ "${template_count:-0}" = "0" ]; then
+            mysql \
+              --connect-timeout=20 \
+              --host="$DB_HOST" \
+              --port="$DB_PORT" \
+              --user="$DB_USERNAME" \
+              --password="$DB_PASSWORD" \
+              --default-character-set=utf8mb4 \
+              "$DB_NAME" \
+              < "$REMOTE_TEMPLATE_SEED"
+          fi
+          rm -f "$REMOTE_SCHEMA" "$REMOTE_TEMPLATE_SEED"
+          EOF
           cat > sync-menu-db.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
@@ -187,6 +292,12 @@ jobs:
           rm -f "$REMOTE_SQL"
           EOF
           timeout 60 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "rm -rf '$REMOTE_UPLOAD_DIR' && mkdir -p '$DEPLOY_PATH' '$REMOTE_UPLOAD_DIR' '$DEPLOY_PATH/apps/$DEPLOY_SERVICE' '$DEPLOY_PATH/logs/$DEPLOY_SERVICE'"
+          if [ "${{ steps.sync_business_runner.outputs.status }}" != "success" ]; then
+            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$ENTERPRISE_SCHEMA_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SCHEMA"
+            timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$ENTERPRISE_TEMPLATE_SEED_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_TEMPLATE_SEED"
+            timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+              "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SCHEMA='$REMOTE_SCHEMA' REMOTE_TEMPLATE_SEED='$REMOTE_TEMPLATE_SEED' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 240 bash -s" < sync-business-db.sh
+          fi
           if [ "${{ steps.sync_menu_runner.outputs.status }}" != "success" ]; then
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$SQL_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SQL"
             timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
