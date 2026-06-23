@@ -244,6 +244,8 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
             .eq(StringUtils.isNotBlank(bo.getSourceCategoryKey()), CeActivityData::getSourceCategoryKey, bo.getSourceCategoryKey())
             .like(StringUtils.isNotBlank(bo.getScopeName()), CeActivityData::getScopeName, bo.getScopeName())
             .eq(StringUtils.isNotBlank(bo.getActivityUnit()), CeActivityData::getActivityUnit, bo.getActivityUnit())
+            .like(StringUtils.isNotBlank(bo.getResponsibleDept()), CeActivityData::getResponsibleDept, bo.getResponsibleDept())
+            .eq(StringUtils.isNotBlank(bo.getDataSource()), CeActivityData::getDataSource, bo.getDataSource())
             .eq(bo.getActivityYear() != null, CeActivityData::getActivityYear, bo.getActivityYear())
             .eq(bo.getActivityMonth() != null, CeActivityData::getActivityMonth, bo.getActivityMonth())
             .eq(StringUtils.isNotBlank(bo.getDataStatus()), CeActivityData::getDataStatus, bo.getDataStatus());
