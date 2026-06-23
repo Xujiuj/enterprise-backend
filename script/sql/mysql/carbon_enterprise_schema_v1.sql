@@ -133,6 +133,45 @@ CREATE TABLE IF NOT EXISTS ce_extension_field (
         FOREIGN KEY (sheet_id) REFERENCES ce_template_sheet (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise allowed extension fields';
 
+CREATE TABLE IF NOT EXISTS ce_dimension_record (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    dimension_code VARCHAR(128) NOT NULL,
+    record_code VARCHAR(128) NOT NULL,
+    record_name VARCHAR(255) NOT NULL,
+    parent_code VARCHAR(128) DEFAULT NULL,
+    field01 VARCHAR(512) DEFAULT NULL,
+    field02 VARCHAR(512) DEFAULT NULL,
+    field03 VARCHAR(512) DEFAULT NULL,
+    field04 VARCHAR(512) DEFAULT NULL,
+    field05 VARCHAR(512) DEFAULT NULL,
+    field06 VARCHAR(512) DEFAULT NULL,
+    field07 VARCHAR(512) DEFAULT NULL,
+    field08 VARCHAR(512) DEFAULT NULL,
+    field09 VARCHAR(512) DEFAULT NULL,
+    field10 VARCHAR(512) DEFAULT NULL,
+    field11 VARCHAR(512) DEFAULT NULL,
+    field12 VARCHAR(512) DEFAULT NULL,
+    field13 VARCHAR(512) DEFAULT NULL,
+    field14 VARCHAR(512) DEFAULT NULL,
+    field15 VARCHAR(512) DEFAULT NULL,
+    field16 VARCHAR(512) DEFAULT NULL,
+    field17 VARCHAR(512) DEFAULT NULL,
+    field18 VARCHAR(512) DEFAULT NULL,
+    field19 VARCHAR(512) DEFAULT NULL,
+    field20 VARCHAR(512) DEFAULT NULL,
+    field21 VARCHAR(512) DEFAULT NULL,
+    field22 VARCHAR(512) DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    status CHAR(1) NOT NULL DEFAULT '0',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_dimension_record (dimension_code, record_code),
+    KEY idx_ce_dimension_record_parent (dimension_code, parent_code),
+    KEY idx_ce_dimension_record_status (dimension_code, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise controlled dimension option records';
+
 CREATE TABLE IF NOT EXISTS ce_admin_division (
     id BIGINT NOT NULL AUTO_INCREMENT,
     division_code VARCHAR(64) NOT NULL,
@@ -170,8 +209,11 @@ CREATE TABLE IF NOT EXISTS ce_company_factory (
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_ce_company_factory (company_code, factory_code),
+    UNIQUE KEY uk_ce_company_factory_factory (factory_code),
     KEY idx_ce_company_factory_type (factory_type),
-    KEY idx_ce_company_factory_province (province_code)
+    KEY idx_ce_company_factory_province (province_code),
+    CONSTRAINT fk_ce_company_factory_province
+        FOREIGN KEY (province_code) REFERENCES ce_admin_division (division_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='102 company and factory';
 
 CREATE TABLE IF NOT EXISTS ce_emission_source_category (
@@ -205,15 +247,16 @@ CREATE TABLE IF NOT EXISTS ce_emission_source_category (
 
 CREATE TABLE IF NOT EXISTS ce_base_year (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    factory_code VARCHAR(64) NOT NULL,
-    factory_name VARCHAR(255) DEFAULT NULL,
+    base_year_key VARCHAR(64) DEFAULT NULL,
     base_year INT NOT NULL,
+    current_flag CHAR(1) NOT NULL DEFAULT 'N',
     enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
+    description VARCHAR(500) DEFAULT NULL,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_ce_base_year_factory (factory_code, base_year)
+    UNIQUE KEY uk_ce_base_year (base_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='106 base year dimension';
 
 CREATE TABLE IF NOT EXISTS ce_ef_factor (
@@ -265,7 +308,9 @@ CREATE TABLE IF NOT EXISTS ce_electricity_factor (
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uk_ce_electricity_factor (version_province_code),
-    KEY idx_ce_electricity_factor_version (factor_version, division_code)
+    KEY idx_ce_electricity_factor_version (factor_version, division_code),
+    CONSTRAINT fk_ce_electricity_factor_division
+        FOREIGN KEY (division_code) REFERENCES ce_admin_division (division_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='202 electricity factor dimension';
 
 CREATE TABLE IF NOT EXISTS ce_electricity_factor_version_map (
@@ -345,7 +390,12 @@ CREATE TABLE IF NOT EXISTS ce_emission_source (
     PRIMARY KEY (id),
     UNIQUE KEY uk_ce_emission_source_code (source_identification_code),
     KEY idx_ce_emission_source_company (company_code),
-    KEY idx_ce_emission_source_category (source_category_key)
+    KEY idx_ce_emission_source_category (source_category_key),
+    KEY idx_ce_emission_source_factor (factor_key),
+    CONSTRAINT fk_ce_emission_source_factory
+        FOREIGN KEY (company_code) REFERENCES ce_company_factory (factory_code),
+    CONSTRAINT fk_ce_emission_source_category
+        FOREIGN KEY (source_category_key) REFERENCES ce_emission_source_category (category_sk)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='104 emission source identification';
 
 CREATE TABLE IF NOT EXISTS ce_activity_data (
@@ -380,7 +430,13 @@ CREATE TABLE IF NOT EXISTS ce_activity_data (
     KEY idx_ce_activity_data_source (source_identification_code),
     KEY idx_ce_activity_data_company (company_code),
     CONSTRAINT fk_ce_activity_data_batch
-        FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id)
+        FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id),
+    CONSTRAINT fk_ce_activity_data_source
+        FOREIGN KEY (source_identification_code) REFERENCES ce_emission_source (source_identification_code),
+    CONSTRAINT fk_ce_activity_data_company
+        FOREIGN KEY (company_code) REFERENCES ce_company_factory (factory_code),
+    CONSTRAINT fk_ce_activity_data_category
+        FOREIGN KEY (source_category_key) REFERENCES ce_emission_source_category (category_sk)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='3 activity data';
 
 CREATE TABLE IF NOT EXISTS ce_green_power_certificate (
@@ -412,7 +468,13 @@ CREATE TABLE IF NOT EXISTS ce_green_power_certificate (
     PRIMARY KEY (id),
     KEY idx_ce_green_power_factory (factory_code),
     KEY idx_ce_green_power_period (activity_year, activity_month, proof_status),
-    KEY idx_ce_green_power_certificate (certificate_code)
+    KEY idx_ce_green_power_certificate (certificate_code),
+    KEY idx_ce_green_power_category (source_category_key),
+    KEY idx_ce_green_power_factor (factor_key),
+    CONSTRAINT fk_ce_green_power_factory
+        FOREIGN KEY (factory_code) REFERENCES ce_company_factory (factory_code),
+    CONSTRAINT fk_ce_green_power_category
+        FOREIGN KEY (source_category_key) REFERENCES ce_emission_source_category (category_sk)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='105 green power certificate activity data';
 
 CREATE TABLE IF NOT EXISTS ce_intensity_denominator_rule (
@@ -465,7 +527,9 @@ CREATE TABLE IF NOT EXISTS ce_intensity_denominator_fact (
     KEY idx_ce_denominator_fact_period (fact_year, fact_month),
     KEY idx_ce_denominator_fact_factory (factory_code),
     CONSTRAINT fk_ce_denominator_fact_batch
-        FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id)
+        FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id),
+    CONSTRAINT fk_ce_denominator_fact_factory
+        FOREIGN KEY (factory_code) REFERENCES ce_company_factory (factory_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='503 denominator fact';
 
 CREATE TABLE IF NOT EXISTS ce_intensity_tolerance (
