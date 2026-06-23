@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.enterprise.domain.CeActivityData;
 import org.dromara.carbon.enterprise.domain.CeCaptureBatch;
+import org.dromara.carbon.enterprise.domain.CeCompanyFactory;
 import org.dromara.carbon.enterprise.domain.CeEmissionSource;
+import org.dromara.carbon.enterprise.domain.CeEmissionSourceCategory;
 import org.dromara.carbon.enterprise.domain.CeFactorCacheRecord;
 import org.dromara.carbon.enterprise.domain.CeFactorConfirmation;
 import org.dromara.carbon.enterprise.domain.CeGreenPowerCertificate;
@@ -17,8 +19,10 @@ import org.dromara.carbon.enterprise.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.domain.vo.CeOptionVo;
 import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureBatchMapper;
+import org.dromara.carbon.enterprise.mapper.CeCompanyFactoryMapper;
 import org.dromara.carbon.enterprise.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.mapper.CeEmissionSourceMapper;
+import org.dromara.carbon.enterprise.mapper.CeEmissionSourceCategoryMapper;
 import org.dromara.carbon.enterprise.mapper.CeFactorCacheRecordMapper;
 import org.dromara.carbon.enterprise.mapper.CeFactorConfirmationMapper;
 import org.dromara.carbon.enterprise.mapper.CeGreenPowerCertificateMapper;
@@ -37,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * Enterprise option service implementation.
@@ -98,7 +103,9 @@ public class CeOptionServiceImpl implements ICeOptionService {
     );
 
     private final CeActivityDataMapper activityDataMapper;
+    private final CeCompanyFactoryMapper companyFactoryMapper;
     private final CeEmissionSourceMapper emissionSourceMapper;
+    private final CeEmissionSourceCategoryMapper emissionSourceCategoryMapper;
     private final CeGreenPowerCertificateMapper greenPowerCertificateMapper;
     private final CeIntensityDenominatorFactMapper denominatorFactMapper;
     private final CeFactorCacheRecordMapper factorCacheRecordMapper;
@@ -112,6 +119,49 @@ public class CeOptionServiceImpl implements ICeOptionService {
     public List<CeOptionVo> listOptions(String optionCode, String dimensionCode, String field) {
         List<CeOptionVo> options = new ArrayList<>();
         switch (optionCode) {
+            case "company-code" -> {
+                collectDistinctWithLabel(options, companyFactoryMapper, CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName);
+                collectDistinctWithLabel(options, activityDataMapper, CeActivityData::getCompanyCode, CeActivityData::getCompanyName);
+                collectDistinctWithLabel(options, emissionSourceMapper, CeEmissionSource::getCompanyCode, CeEmissionSource::getCompanyName);
+            }
+            case "company-name" -> {
+                collectDistinct(options, companyFactoryMapper, CeCompanyFactory::getCompanyName, this::labelForRaw);
+                collectDistinct(options, activityDataMapper, CeActivityData::getCompanyName, this::labelForRaw);
+                collectDistinct(options, emissionSourceMapper, CeEmissionSource::getCompanyName, this::labelForRaw);
+            }
+            case "factory-code" -> {
+                collectDistinctWithLabel(options, companyFactoryMapper, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName);
+                collectDistinctWithLabel(options, activityDataMapper, CeActivityData::getCompanyCode, CeActivityData::getFactoryName);
+                collectDistinctWithLabel(options, emissionSourceMapper, CeEmissionSource::getCompanyCode, CeEmissionSource::getFactoryName);
+                collectDistinctWithLabel(
+                    options,
+                    greenPowerCertificateMapper,
+                    CeGreenPowerCertificate::getFactoryCode,
+                    CeGreenPowerCertificate::getFactoryName
+                );
+            }
+            case "factory-name" -> {
+                collectDistinct(options, companyFactoryMapper, CeCompanyFactory::getFactoryName, this::labelForRaw);
+                collectDistinct(options, activityDataMapper, CeActivityData::getFactoryName, this::labelForRaw);
+                collectDistinct(options, emissionSourceMapper, CeEmissionSource::getFactoryName, this::labelForRaw);
+                collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getFactoryName, this::labelForRaw);
+            }
+            case "source-category-key" -> {
+                collectSourceCategoryOptions(options);
+                collectDistinct(options, activityDataMapper, CeActivityData::getSourceCategoryKey, this::labelForRaw);
+                collectDistinct(options, emissionSourceMapper, CeEmissionSource::getSourceCategoryKey, this::labelForRaw);
+                collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getSourceCategoryKey, this::labelForRaw);
+            }
+            case "responsible-dept" -> {
+                collectDistinct(options, activityDataMapper, CeActivityData::getResponsibleDept, this::labelForRaw);
+                collectDistinct(options, emissionSourceMapper, CeEmissionSource::getResponsibleDept, this::labelForRaw);
+            }
+            case "emission-source-code" -> collectDistinct(
+                options,
+                emissionSourceMapper,
+                CeEmissionSource::getSourceIdentificationCode,
+                this::labelForRaw
+            );
             case "data-source" -> {
                 collectDistinct(options, activityDataMapper, CeActivityData::getDataSource, this::labelForRaw);
                 collectDistinct(options, emissionSourceMapper, CeEmissionSource::getDataSource, this::labelForRaw);
@@ -157,6 +207,44 @@ public class CeOptionServiceImpl implements ICeOptionService {
             .orderByAsc(column));
         for (Object value : values) {
             addOption(target, labelResolver.apply(value), value);
+        }
+    }
+
+    private <T> void collectDistinctWithLabel(List<CeOptionVo> target, BaseMapper<T> mapper, SFunction<T, ?> valueColumn,
+                                              SFunction<T, ?> labelColumn) {
+        List<T> rows = mapper.selectList(new LambdaQueryWrapper<T>()
+            .select(valueColumn, labelColumn)
+            .isNotNull(valueColumn)
+            .groupBy(valueColumn, labelColumn)
+            .orderByAsc(valueColumn));
+        for (T row : rows) {
+            Object value = valueColumn.apply(row);
+            String rawLabel = normalizeValue(labelColumn.apply(row));
+            String rawValue = normalizeValue(value);
+            String label = StringUtils.isBlank(rawLabel) || rawLabel.equals(rawValue)
+                ? rawValue
+                : rawValue + " / " + rawLabel;
+            addOption(target, label, value);
+        }
+    }
+
+    private void collectSourceCategoryOptions(List<CeOptionVo> target) {
+        List<CeEmissionSourceCategory> rows = emissionSourceCategoryMapper.selectList(new LambdaQueryWrapper<CeEmissionSourceCategory>()
+            .select(
+                CeEmissionSourceCategory::getCategorySk,
+                CeEmissionSourceCategory::getGhgScope,
+                CeEmissionSourceCategory::getGhgScopeCategory
+            )
+            .isNotNull(CeEmissionSourceCategory::getCategorySk)
+            .orderByAsc(CeEmissionSourceCategory::getCategorySk));
+        for (CeEmissionSourceCategory row : rows) {
+            String label = Stream.of(row.getGhgScope(), row.getGhgScopeCategory())
+                .map(this::normalizeValue)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .reduce((left, right) -> left + " / " + right)
+                .orElse(normalizeValue(row.getCategorySk()));
+            addOption(target, label, row.getCategorySk());
         }
     }
 
