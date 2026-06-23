@@ -148,9 +148,27 @@ public class CeOptionServiceImpl implements ICeOptionService {
             }
             case "source-category-key" -> {
                 collectSourceCategoryOptions(options);
-                collectDistinct(options, activityDataMapper, CeActivityData::getSourceCategoryKey, this::labelForRaw);
-                collectDistinct(options, emissionSourceMapper, CeEmissionSource::getSourceCategoryKey, this::labelForRaw);
-                collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getSourceCategoryKey, this::labelForRaw);
+                collectSourceCategoryOptionsFromRows(
+                    options,
+                    activityDataMapper,
+                    CeActivityData::getSourceCategoryKey,
+                    CeActivityData::getScopeName,
+                    CeActivityData::getScopeSubcategory
+                );
+                collectSourceCategoryOptionsFromRows(
+                    options,
+                    emissionSourceMapper,
+                    CeEmissionSource::getSourceCategoryKey,
+                    CeEmissionSource::getScopeName,
+                    CeEmissionSource::getScopeSubcategory
+                );
+                collectSourceCategoryOptionsFromRows(
+                    options,
+                    greenPowerCertificateMapper,
+                    CeGreenPowerCertificate::getSourceCategoryKey,
+                    CeGreenPowerCertificate::getScopeName,
+                    CeGreenPowerCertificate::getScopeSubcategory
+                );
             }
             case "responsible-dept" -> {
                 collectDistinct(options, activityDataMapper, CeActivityData::getResponsibleDept, this::labelForRaw);
@@ -248,6 +266,27 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
+    private <T> void collectSourceCategoryOptionsFromRows(List<CeOptionVo> target, BaseMapper<T> mapper,
+                                                          SFunction<T, ?> valueColumn,
+                                                          SFunction<T, ?> scopeColumn,
+                                                          SFunction<T, ?> subcategoryColumn) {
+        List<T> rows = mapper.selectList(new LambdaQueryWrapper<T>()
+            .select(valueColumn, scopeColumn, subcategoryColumn)
+            .isNotNull(valueColumn)
+            .groupBy(valueColumn, scopeColumn, subcategoryColumn)
+            .orderByAsc(valueColumn));
+        for (T row : rows) {
+            Object value = valueColumn.apply(row);
+            String label = Stream.of(scopeColumn.apply(row), subcategoryColumn.apply(row))
+                .map(this::normalizeValue)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .reduce((left, right) -> left + " / " + right)
+                .orElse(normalizeValue(value));
+            addOption(target, label, value);
+        }
+    }
+
     private void collectDimensionStatusOptions(List<CeOptionVo> target) {
         for (String dimensionCode : ALLOWED_DIMENSION_CODES) {
             for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
@@ -318,12 +357,22 @@ public class CeOptionServiceImpl implements ICeOptionService {
         for (CeOptionVo option : options) {
             String key = normalizeValue(option.getValue());
             if (StringUtils.isNotBlank(key)) {
-                unique.putIfAbsent(key, option);
+                CeOptionVo existing = unique.get(key);
+                if (existing == null || isMoreReadableLabel(option, existing)) {
+                    unique.put(key, option);
+                }
             }
         }
         return unique.values().stream()
             .sorted(Comparator.comparing(option -> normalizeValue(option.getValue()), this::compareOptionValue))
             .toList();
+    }
+
+    private boolean isMoreReadableLabel(CeOptionVo candidate, CeOptionVo existing) {
+        String value = normalizeValue(candidate.getValue());
+        String candidateLabel = normalizeValue(candidate.getLabel());
+        String existingLabel = normalizeValue(existing.getLabel());
+        return existingLabel.equals(value) && StringUtils.isNotBlank(candidateLabel) && !candidateLabel.equals(value);
     }
 
     private int compareOptionValue(String left, String right) {
