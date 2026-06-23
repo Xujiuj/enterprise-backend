@@ -20,8 +20,6 @@ public class CeEmissionSourceVo implements Serializable {
 
     private Long id;
 
-    private Integer rowNo;
-
     private String companyCode;
 
     private String companyName;

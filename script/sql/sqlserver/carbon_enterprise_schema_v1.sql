@@ -317,7 +317,6 @@ GO
 
 CREATE TABLE ce_emission_source (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    row_no INT NULL,
     company_code NVARCHAR(64) NOT NULL,
     company_name NVARCHAR(255) NULL,
     factory_name NVARCHAR(255) NULL,
@@ -372,7 +371,6 @@ GO
 
 CREATE TABLE ce_green_power_certificate (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    row_no INT NULL,
     factory_code NVARCHAR(64) NOT NULL,
     factory_name NVARCHAR(255) NULL,
     activity_year INT NULL,
@@ -710,7 +708,6 @@ GO
 CREATE VIEW rpt.v_GreenElectricityFact AS
 SELECT
     id AS certificate_id,
-    row_no,
     factory_code,
     factory_name,
     activity_year,

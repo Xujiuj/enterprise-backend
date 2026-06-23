@@ -19,6 +19,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -38,6 +41,34 @@ import static org.mockito.Mockito.when;
 
 @Tag("dev")
 class CeSheet656ActivityImportValidationServiceTest {
+
+    @Test
+    void parsesCustomerActivitySampleWithoutTreatingExcelRowNumberAsBusinessField() throws IOException {
+        CeSheet656ActivityImportValidationServiceImpl service = new CeSheet656ActivityImportValidationServiceImpl(
+            new CeSheet656ValidationServiceImpl(fakeResolver())
+        );
+        Path sample = findWorkspaceFile("source（A）/活动数据表/3 排放活动数据表10101.xlsx");
+
+        CeSheet656ImportValidationRequest request = service.parseImportFile(new MockMultipartFile(
+            "file",
+            sample.getFileName().toString(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Files.readAllBytes(sample)
+        ));
+
+        assertEquals(18, request.getHeaderFields().size());
+        assertEquals("f001", request.getHeaderFields().get(0).getSourceColumnCode());
+        assertEquals("f018", request.getHeaderFields().get(17).getSourceColumnCode());
+        assertEquals(1025, request.getRows().size());
+        assertEquals(2, request.getRows().get(0).getRowNumber());
+        assertEquals(1026, request.getRows().get(1024).getRowNumber());
+        assertEquals(18, request.getRows().get(0).getFieldValues().size());
+        assertTrue(request.getRows().stream()
+            .flatMap(row -> row.getFieldValues().stream())
+            .noneMatch(field -> "rowNo".equals(field.getSourceColumnCode())
+                || "row_no".equals(field.getSourceColumnCode())
+                || "行号".equals(field.getSourceColumnName())));
+    }
 
     @Test
     void parsesXlsxRowsByHeaderCodeAndSkipsBlankRows() {
@@ -62,7 +93,7 @@ class CeSheet656ActivityImportValidationServiceTest {
         assertEquals("PK_排放源识别编号", request.getHeaderFields().get(0).getSourceColumnName());
         assertEquals(2, request.getRows().size());
         assertEquals(2, request.getRows().get(0).getRowNumber());
-        assertEquals(4, request.getRows().get(1).getRowNumber());
+        assertEquals(3, request.getRows().get(1).getRowNumber());
         assertEquals("12.5", fieldValue(request.getRows().get(0), "f014"));
         assertEquals("Second record", fieldValue(request.getRows().get(1), "f017"));
     }
@@ -392,5 +423,17 @@ class CeSheet656ActivityImportValidationServiceTest {
             row.setEmissionFactorCode("EF-2026-001");
             return Optional.of(row);
         };
+    }
+
+    private Path findWorkspaceFile(String relativePath) {
+        Path current = Path.of("").toAbsolutePath();
+        while (current != null) {
+            Path candidate = current.resolve(relativePath);
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+            current = current.getParent();
+        }
+        throw new IllegalStateException("missing workspace file: " + relativePath);
     }
 }

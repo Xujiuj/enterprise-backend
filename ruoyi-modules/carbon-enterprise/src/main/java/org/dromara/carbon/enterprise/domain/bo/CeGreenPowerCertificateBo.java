@@ -26,8 +26,6 @@ public class CeGreenPowerCertificateBo implements Serializable {
     @NotNull(message = "id cannot be null", groups = { EditGroup.class })
     private Long id;
 
-    private Integer rowNo;
-
     @NotBlank(message = "factoryCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String factoryCode;
 

@@ -53,7 +53,7 @@ class CeSheet656ActivityValidationTest {
             "f012:月份:false:true:false",
             "f013:日期:false:true:false",
             "f014:活动数据:false:true:false",
-            "f015:负责部门:false:true:false",
+            "f015:负责部门:false:false:false",
             "f016:数据来源:false:true:false",
             "f017:备注:false:false:false",
             "f018:FK_排放因子:false:false:true"
@@ -131,7 +131,6 @@ class CeSheet656ActivityValidationTest {
         assertFalse(result.isDraftSavable());
         assertEquals(List.of(
             "REQUIRED_FIELD_MISSING:f001:PK_排放源识别编号",
-            "REQUIRED_FIELD_MISSING:f015:负责部门",
             "INVALID_VALUE_DOMAIN:f012:月份",
             "INVALID_TYPE:f013:日期",
             "INVALID_VALUE_DOMAIN:f014:活动数据"

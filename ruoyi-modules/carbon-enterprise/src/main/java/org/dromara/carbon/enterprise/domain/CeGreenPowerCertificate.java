@@ -22,8 +22,6 @@ public class CeGreenPowerCertificate implements Serializable {
     @TableId(value = "id")
     private Long id;
 
-    private Integer rowNo;
-
     private String factoryCode;
 
     private String factoryName;

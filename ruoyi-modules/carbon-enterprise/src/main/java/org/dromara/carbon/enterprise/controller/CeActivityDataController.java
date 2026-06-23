@@ -42,7 +42,7 @@ public class CeActivityDataController extends BaseController {
 
     @SaCheckPermission("enterprise:activityData:query")
     @GetMapping("/{id}")
-    public R<CeActivityDataVo> getInfo(@NotNull(message = "id cannot be null") @PathVariable Long id) {
+    public R<CeActivityDataVo> getInfo(@NotNull(message = "ID不能为空") @PathVariable Long id) {
         return R.ok(activityDataService.queryById(id));
     }
 
@@ -60,7 +60,7 @@ public class CeActivityDataController extends BaseController {
 
     @SaCheckPermission("enterprise:activityDataRaw:remove")
     @DeleteMapping("/{ids}")
-    public R<Void> remove(@NotEmpty(message = "ids cannot be empty") @PathVariable Long[] ids) {
+    public R<Void> remove(@NotEmpty(message = "请选择要删除的数据") @PathVariable Long[] ids) {
         return R.fail(RAW_WRITE_DISABLED_MESSAGE);
     }
 }

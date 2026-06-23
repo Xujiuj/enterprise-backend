@@ -21,8 +21,6 @@ public class CeGreenPowerCertificateVo implements Serializable {
 
     private Long id;
 
-    private Integer rowNo;
-
     private String factoryCode;
 
     private String factoryName;

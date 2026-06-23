@@ -46,7 +46,7 @@ public class CeSheet656ValidationServiceImpl implements ICeSheet656ValidationSer
         new FieldDescriptor(12, "f012", "月份", false, true, false),
         new FieldDescriptor(13, "f013", "日期", false, true, false),
         new FieldDescriptor(14, "f014", "活动数据", false, true, false),
-        new FieldDescriptor(15, "f015", "负责部门", false, true, false),
+        new FieldDescriptor(15, "f015", "负责部门", false, false, false),
         new FieldDescriptor(16, "f016", "数据来源", false, true, false),
         new FieldDescriptor(17, "f017", "备注", false, false, false),
         new FieldDescriptor(18, "f018", "FK_排放因子", false, false, true)

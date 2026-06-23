@@ -74,7 +74,6 @@ public class CeGreenPowerCertificateServiceImpl implements ICeGreenPowerCertific
 
     private LambdaQueryWrapper<CeGreenPowerCertificate> buildQueryWrapper(CeGreenPowerCertificateBo bo) {
         return new LambdaQueryWrapper<CeGreenPowerCertificate>()
-            .eq(bo.getRowNo() != null, CeGreenPowerCertificate::getRowNo, bo.getRowNo())
             .like(StringUtils.isNotBlank(bo.getFactoryCode()), CeGreenPowerCertificate::getFactoryCode, bo.getFactoryCode())
             .like(StringUtils.isNotBlank(bo.getFactoryName()), CeGreenPowerCertificate::getFactoryName, bo.getFactoryName())
             .eq(bo.getActivityYear() != null, CeGreenPowerCertificate::getActivityYear, bo.getActivityYear())

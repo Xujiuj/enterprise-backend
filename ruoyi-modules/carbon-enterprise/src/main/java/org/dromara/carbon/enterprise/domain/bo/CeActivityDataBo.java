@@ -22,17 +22,17 @@ public class CeActivityDataBo implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    @NotNull(message = "id cannot be null", groups = { EditGroup.class })
+    @NotNull(message = "ID不能为空", groups = { EditGroup.class })
     private Long id;
 
     private Long batchId;
 
     private String sourceSheetCode;
 
-    @NotBlank(message = "sourceIdentificationCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "排放源识别编号不能为空", groups = { AddGroup.class, EditGroup.class })
     private String sourceIdentificationCode;
 
-    @NotBlank(message = "companyCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "公司编号不能为空", groups = { AddGroup.class, EditGroup.class })
     private String companyCode;
 
     private String companyName;
@@ -49,7 +49,7 @@ public class CeActivityDataBo implements Serializable {
 
     private String emissionSourceName;
 
-    @NotBlank(message = "activityUnit cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "活动单位不能为空", groups = { AddGroup.class, EditGroup.class })
     private String activityUnit;
 
     private Integer activityYear;
@@ -58,7 +58,7 @@ public class CeActivityDataBo implements Serializable {
 
     private java.util.Date activityDate;
 
-    @NotNull(message = "activityValue cannot be null", groups = { AddGroup.class, EditGroup.class })
+    @NotNull(message = "活动数据不能为空", groups = { AddGroup.class, EditGroup.class })
     private BigDecimal activityValue;
 
     private String responsibleDept;

@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -124,9 +125,8 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
         List<ParsedSheetRow> rows = new ArrayList<>();
         FastExcel.read(inputStream, new Sheet656RowListener(rows))
             .autoCloseStream(false)
-            .sheet(0)
             .headRowNumber(0)
-            .doRead();
+            .doReadAll();
         return rows;
     }
 
@@ -135,12 +135,20 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
             throw new ServiceException("sheet_656 Excel 至少需要一行表头");
         }
 
-        Map<String, HeaderBinding> bindingsByCode = resolveHeaderBindings(sheetRows.get(0).values());
         List<CeSheet656ValidationRequest> rows = new ArrayList<>();
-        for (int index = 1; index < sheetRows.size(); index++) {
-            CeSheet656ValidationRequest row = toValidationRow(sheetRows.get(index), bindingsByCode);
+        Map<String, HeaderBinding> bindingsByCode = Collections.emptyMap();
+        Integer currentSheetNo = null;
+        int importRowNumber = 2;
+        for (ParsedSheetRow sheetRow : sheetRows) {
+            if (sheetRow.rowIndex() == 0 || !Objects.equals(currentSheetNo, sheetRow.sheetNo())) {
+                bindingsByCode = resolveHeaderBindings(sheetRow.values());
+                currentSheetNo = sheetRow.sheetNo();
+                continue;
+            }
+            CeSheet656ValidationRequest row = toValidationRow(sheetRow, bindingsByCode, importRowNumber);
             if (row != null) {
                 rows.add(row);
+                importRowNumber++;
             }
         }
 
@@ -190,7 +198,8 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
         return bindingsByCode;
     }
 
-    private CeSheet656ValidationRequest toValidationRow(ParsedSheetRow sheetRow, Map<String, HeaderBinding> bindingsByCode) {
+    private CeSheet656ValidationRequest toValidationRow(ParsedSheetRow sheetRow, Map<String, HeaderBinding> bindingsByCode,
+                                                        int importRowNumber) {
         List<CeSheet656FieldValue> fieldValues = new ArrayList<>(expectedHeaderFields.size());
         boolean blankRow = true;
         Map<Integer, String> rowValues = sheetRow == null ? Collections.emptyMap() : sheetRow.values();
@@ -209,7 +218,7 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
         }
 
         CeSheet656ValidationRequest request = new CeSheet656ValidationRequest();
-        request.setRowNumber(sheetRow.rowIndex() + 1);
+        request.setRowNumber(importRowNumber);
         request.setFieldValues(fieldValues);
         return request;
     }
@@ -391,7 +400,7 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
     private record HeaderBinding(CeSheet656FieldDescriptor descriptor, Integer columnIndex) {
     }
 
-    private record ParsedSheetRow(int rowIndex, Map<Integer, String> values) {
+    private record ParsedSheetRow(Integer sheetNo, int rowIndex, Map<Integer, String> values) {
     }
 
     private static final class Sheet656RowListener extends AnalysisEventListener<Map<Integer, String>> {
@@ -405,7 +414,7 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
         @Override
         public void invoke(Map<Integer, String> data, AnalysisContext context) {
             Map<Integer, String> values = data == null ? Collections.emptyMap() : new LinkedHashMap<>(data);
-            rows.add(new ParsedSheetRow(context.readRowHolder().getRowIndex(), values));
+            rows.add(new ParsedSheetRow(context.readSheetHolder().getSheetNo(), context.readRowHolder().getRowIndex(), values));
         }
 
         @Override

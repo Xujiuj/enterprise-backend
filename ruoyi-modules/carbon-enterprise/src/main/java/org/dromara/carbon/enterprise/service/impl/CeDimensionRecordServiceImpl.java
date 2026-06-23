@@ -101,7 +101,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         validateDimensionCode(dimensionCode);
         CeDimensionRecordVo record = dimensionProjectionMapper.selectByDimensionCodeAndId(dimensionCode, id);
         if (record == null) {
-            throw new ServiceException("dimension record does not exist: " + dimensionCode + "/" + id);
+            throw new ServiceException("维度记录不存在：" + dimensionCode + "/" + id);
         }
         return record;
     }
@@ -130,17 +130,17 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private void validateDimensionCode(String dimensionCode) {
         if (StringUtils.isBlank(dimensionCode)) {
-            throw new ServiceException("dimension code cannot be blank");
+            throw new ServiceException("维度编码不能为空");
         }
         if (!ALLOWED_LOCAL_PROJECTION_CODES.contains(dimensionCode)) {
-            throw new ServiceException("Dimension code now belongs to concrete enterprise tables: " + dimensionCode);
+            throw new ServiceException("该功能已迁移到企业端业务表，请从对应业务页面打开：" + dimensionCode);
         }
     }
 
     private void validateEditableDimensionCode(String dimensionCode) {
         validateDimensionCode(dimensionCode);
         if (!ENTERPRISE_EDITABLE_DIMENSION_CODES.contains(dimensionCode)) {
-            throw new ServiceException("Dimension is read-only for enterprise users: " + dimensionCode);
+            throw new ServiceException("当前维度不允许企业端编辑：" + dimensionCode);
         }
     }
 
@@ -184,7 +184,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
             pageQuery.getPageSize()
         );
         if (vendorResponse == null || vendorResponse.getRecords() == null) {
-            throw new ServiceException("vendor dimension response is incomplete");
+            throw new ServiceException("厂商维度接口返回数据不完整");
         }
         return new TableDataInfo<>(
             vendorResponse.getRecords().stream().map(this::toDimensionRecordVo).toList(),
@@ -235,14 +235,14 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
             .orderByDesc(CeLicenseState::getLastVerifiedTime)
             .orderByDesc(CeLicenseState::getId));
         CeLicenseState license = states.stream().findFirst()
-            .orElseThrow(() -> new ServiceException("valid license state does not exist"));
+            .orElseThrow(() -> new ServiceException("未找到有效授权状态"));
         if (StringUtils.isBlank(license.getLicenseId()) || StringUtils.isBlank(license.getInstallId())) {
-            throw new ServiceException("valid license state is incomplete");
+            throw new ServiceException("有效授权状态缺少必要信息");
         }
         Date now = new Date();
         if ((license.getValidFrom() != null && license.getValidFrom().after(now))
             || (license.getValidTo() != null && license.getValidTo().before(now))) {
-            throw new ServiceException("valid license state is not currently valid");
+            throw new ServiceException("当前时间不在授权有效期内");
         }
         return license;
     }

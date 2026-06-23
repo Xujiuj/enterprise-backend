@@ -326,7 +326,6 @@ CREATE TABLE IF NOT EXISTS ce_greenhouse_gas (
 
 CREATE TABLE IF NOT EXISTS ce_emission_source (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    row_no INT DEFAULT NULL,
     company_code VARCHAR(64) NOT NULL,
     company_name VARCHAR(255) DEFAULT NULL,
     factory_name VARCHAR(255) DEFAULT NULL,
@@ -386,7 +385,6 @@ CREATE TABLE IF NOT EXISTS ce_activity_data (
 
 CREATE TABLE IF NOT EXISTS ce_green_power_certificate (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    row_no INT DEFAULT NULL,
     factory_code VARCHAR(64) NOT NULL,
     factory_name VARCHAR(255) DEFAULT NULL,
     activity_year INT DEFAULT NULL,

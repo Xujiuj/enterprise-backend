@@ -9,9 +9,11 @@ import org.dromara.carbon.enterprise.domain.activity.CeSheet656ActivityCaptureRe
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656FieldDescriptor;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656FieldValue;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ImportValidationRequest;
+import org.dromara.carbon.enterprise.domain.activity.CeSheet656ImportValidationResult;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ResolvedRow;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ValidationIssue;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ValidationRequest;
+import org.dromara.carbon.enterprise.service.ICeSheet656ActivityImportValidationService;
 import org.dromara.carbon.enterprise.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureCellMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureRowMapper;
@@ -25,14 +27,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
@@ -155,6 +164,66 @@ class CeSheet656ActivityCaptureServiceTest {
     }
 
     @Test
+    void customerActivitySampleCanBeParsedValidatedAndImportedWithoutRowNumberBusinessField() throws IOException {
+        Path sample = findWorkspaceFile("source（A）/活动数据表/3 排放活动数据表10101.xlsx");
+        ICeSheet656ActivityImportValidationService parser = new CeSheet656ActivityImportValidationServiceImpl(
+            new CeSheet656ValidationServiceImpl(fakeResolver())
+        );
+        CeSheet656ImportValidationRequest parsed = parser.parseImportFile(new MockMultipartFile(
+            "file",
+            sample.getFileName().toString(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Files.readAllBytes(sample)
+        ));
+        assertEquals(1025, parsed.getRows().size());
+        assertTrue(parsed.getRows().stream()
+            .flatMap(row -> row.getFieldValues().stream())
+            .noneMatch(field -> "rowNo".equals(field.getSourceColumnCode())
+                || "row_no".equals(field.getSourceColumnCode())
+                || "行号".equals(field.getSourceColumnName())));
+
+        ICeSheet656ActivityImportValidationService importValidation = new CeSheet656ActivityImportValidationServiceImpl(
+            new CeSheet656ValidationServiceImpl(resolverFrom(parsed))
+        );
+        CeSheet656ImportValidationResult sampleValidation = importValidation.validateImport(parsed);
+        Set<Integer> validRowNumbers = sampleValidation.getRowResults().stream()
+            .filter(row -> row.isValid())
+            .map(row -> row.getRowNumber())
+            .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+        List<CeSheet656ValidationRequest> importableRows = parsed.getRows().stream()
+            .filter(row -> validRowNumbers.contains(row.getRowNumber()))
+            .toList();
+        assertTrue(!importableRows.isEmpty(), sampleIssueSummary(sampleValidation));
+        CeSheet656ImportValidationRequest importableRequest = new CeSheet656ImportValidationRequest();
+        importableRequest.setHeaderFields(parsed.getHeaderFields());
+        importableRequest.setRows(importableRows);
+        CeSheet656ActivityCaptureServiceImpl sampleImportService = new CeSheet656ActivityCaptureServiceImpl(
+            importValidation,
+            templateSheetMapper,
+            templateFieldMapper,
+            captureBatchMapper,
+            captureRowMapper,
+            captureCellMapper
+        );
+        stubTemplateLookups();
+        stubGeneratedIds();
+
+        CeSheet656ActivityCaptureResult result = sampleImportService.importRows(importableRequest);
+
+        assertTrue(result.isPersisted());
+        assertEquals(100L, result.getBatchId());
+        assertEquals(importableRows.size(), result.getPersistedRowCount());
+        assertTrue(result.getValidationResult().isValid());
+
+        ArgumentCaptor<CeCaptureRow> rowCaptor = ArgumentCaptor.forClass(CeCaptureRow.class);
+        verify(captureRowMapper, org.mockito.Mockito.times(importableRows.size())).insert(rowCaptor.capture());
+        verify(captureCellMapper, org.mockito.Mockito.times(importableRows.size() * 18)).insert(isA(CeCaptureCell.class));
+        assertEquals(importableRows.get(0).getRowNumber(), rowCaptor.getAllValues().get(0).getSourceRowNo());
+        assertEquals(importableRows.get(importableRows.size() - 1).getRowNumber(),
+            rowCaptor.getAllValues().get(importableRows.size() - 1).getSourceRowNo());
+    }
+
+    @Test
     void yearMonthDatePersistsTypedDateAsFirstDayOfMonth() {
         stubTemplateLookups();
         stubGeneratedIds();
@@ -268,6 +337,17 @@ class CeSheet656ActivityCaptureServiceTest {
             .toList();
     }
 
+    private String sampleIssueSummary(CeSheet656ImportValidationResult result) {
+        return result.getRowResults().stream()
+            .filter(row -> !row.isValid())
+            .limit(5)
+            .map(row -> row.getRowNumber() + ":" + row.getIssues().stream()
+                .map(issue -> issue.getCode() + "/" + issue.getSourceColumnCode())
+                .toList())
+            .toList()
+            .toString();
+    }
+
     private CeSheet656ImportValidationRequest importRequest(CeSheet656ValidationRequest row) {
         return importRequest(List.of(row));
     }
@@ -356,5 +436,41 @@ class CeSheet656ActivityCaptureServiceTest {
             row.setEmissionFactorCode("EF-2026-001");
             return Optional.of(row);
         };
+    }
+
+    private ICeSheet656DerivedFieldResolver resolverFrom(CeSheet656ImportValidationRequest parsed) {
+        Map<String, CeSheet656ResolvedRow> rowsByCode = new HashMap<>();
+        for (CeSheet656ValidationRequest row : parsed.getRows()) {
+            Map<String, String> values = new LinkedHashMap<>();
+            for (CeSheet656FieldValue fieldValue : row.getFieldValues()) {
+                values.put(fieldValue.getSourceColumnCode(), fieldValue.getValue());
+            }
+            CeSheet656ResolvedRow resolved = new CeSheet656ResolvedRow();
+            resolved.setEmissionSourceCode(values.get("f001"));
+            resolved.setCompanyCode(values.get("f002"));
+            resolved.setCompanyName(values.get("f003"));
+            resolved.setFactoryName(values.get("f004"));
+            resolved.setEmissionSourceCategoryCode(values.get("f005"));
+            resolved.setScope(values.get("f006"));
+            resolved.setScopeSubcategory(values.get("f007"));
+            resolved.setEmissionSourceIdentity(values.get("f008"));
+            resolved.setEmissionSourceName(values.get("f009"));
+            resolved.setUnit(values.get("f010"));
+            resolved.setEmissionFactorCode(values.get("f018"));
+            rowsByCode.put(values.get("f001"), resolved);
+        }
+        return code -> Optional.ofNullable(rowsByCode.get(code));
+    }
+
+    private Path findWorkspaceFile(String relativePath) {
+        Path current = Path.of("").toAbsolutePath();
+        while (current != null) {
+            Path candidate = current.resolve(relativePath);
+            if (Files.exists(candidate)) {
+                return candidate;
+            }
+            current = current.getParent();
+        }
+        throw new IllegalStateException("missing workspace file: " + relativePath);
     }
 }

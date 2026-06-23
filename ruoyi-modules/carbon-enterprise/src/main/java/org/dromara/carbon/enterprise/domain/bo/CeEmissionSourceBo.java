@@ -24,8 +24,6 @@ public class CeEmissionSourceBo implements Serializable {
     @NotNull(message = "id cannot be null", groups = { EditGroup.class })
     private Long id;
 
-    private Integer rowNo;
-
     @NotBlank(message = "companyCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String companyCode;
 

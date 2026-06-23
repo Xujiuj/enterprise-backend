@@ -21,8 +21,6 @@ public class CeEmissionSource implements Serializable {
     @TableId(value = "id")
     private Long id;
 
-    private Integer rowNo;
-
     private String companyCode;
 
     private String companyName;

@@ -38,7 +38,6 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
     @Override
     public List<CeEmissionSourceVo> queryList(CeEmissionSourceBo bo) {
         return emissionSourceMapper.selectVoList(buildQueryWrapper(bo)
-            .orderByAsc(CeEmissionSource::getRowNo)
             .orderByAsc(CeEmissionSource::getSourceIdentificationCode)
             .orderByAsc(CeEmissionSource::getId));
     }
@@ -74,7 +73,6 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
 
     private LambdaQueryWrapper<CeEmissionSource> buildQueryWrapper(CeEmissionSourceBo bo) {
         return new LambdaQueryWrapper<CeEmissionSource>()
-            .eq(bo.getRowNo() != null, CeEmissionSource::getRowNo, bo.getRowNo())
             .like(StringUtils.isNotBlank(bo.getCompanyCode()), CeEmissionSource::getCompanyCode, bo.getCompanyCode())
             .like(StringUtils.isNotBlank(bo.getCompanyName()), CeEmissionSource::getCompanyName, bo.getCompanyName())
             .like(StringUtils.isNotBlank(bo.getFactoryName()), CeEmissionSource::getFactoryName, bo.getFactoryName())

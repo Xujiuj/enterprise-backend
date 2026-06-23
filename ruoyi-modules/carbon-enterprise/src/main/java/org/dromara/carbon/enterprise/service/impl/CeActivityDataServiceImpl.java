@@ -277,7 +277,6 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     private List<CeEmissionSource> listEnabledEmissionSources() {
         return emissionSourceMapper.selectList(new LambdaQueryWrapper<CeEmissionSource>()
             .eq(CeEmissionSource::getEnabledFlag, true)
-            .orderByAsc(CeEmissionSource::getRowNo)
             .orderByAsc(CeEmissionSource::getSourceIdentificationCode)
             .orderByAsc(CeEmissionSource::getId));
     }
