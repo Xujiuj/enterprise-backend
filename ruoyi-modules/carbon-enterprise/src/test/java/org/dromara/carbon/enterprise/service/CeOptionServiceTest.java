@@ -18,6 +18,7 @@ import org.dromara.carbon.enterprise.mapper.CeFactorConfirmationMapper;
 import org.dromara.carbon.enterprise.mapper.CeGreenPowerCertificateMapper;
 import org.dromara.carbon.enterprise.mapper.CeIntensityDenominatorFactMapper;
 import org.dromara.carbon.enterprise.mapper.CeIntensityMetricMapper;
+import org.dromara.carbon.enterprise.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.mapper.CeReportTemplateFileMapper;
 import org.dromara.carbon.enterprise.service.impl.CeOptionServiceImpl;
 import org.junit.jupiter.api.BeforeAll;
@@ -61,6 +62,7 @@ class CeOptionServiceTest {
             intensityMetricMapper,
             mock(CeReportTemplateFileMapper.class),
             mock(CeCaptureBatchMapper.class),
+            mock(CeLicenseStateMapper.class),
             mock(CeDimensionProjectionMapper.class)
         );
     }
