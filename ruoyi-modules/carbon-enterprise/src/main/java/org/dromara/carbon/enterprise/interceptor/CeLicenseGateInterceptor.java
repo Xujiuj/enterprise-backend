@@ -28,6 +28,9 @@ public class CeLicenseGateInterceptor implements HandlerInterceptor {
 
     private static final Map<String, String> FEATURE_BY_PATH_PREFIX = Map.of(
         "/enterprise/factor-sync/", "factor-sync",
+        "/enterprise/factor-cache-record/", "factor-sync",
+        "/enterprise/factor-cache-version/", "factor-sync",
+        "/enterprise/factor-confirmation/", "factor-confirm",
         "/enterprise/report-template-sync/", "report-template-download",
         "/enterprise/report-template-file/", "report-template-download",
         "/enterprise/data-validation/", "report-gate"
