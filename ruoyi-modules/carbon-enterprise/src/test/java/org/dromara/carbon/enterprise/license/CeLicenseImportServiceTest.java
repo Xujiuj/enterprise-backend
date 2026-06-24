@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dromara.carbon.enterprise.domain.license.CeLicenseImportResult;
 import org.dromara.carbon.enterprise.mapper.CeLicenseStateMapper;
+import org.dromara.carbon.enterprise.service.ICeDimensionSyncService;
+import org.dromara.carbon.enterprise.service.ICeFactorSyncService;
 import org.dromara.carbon.enterprise.service.impl.CeLicenseImportServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -34,7 +36,8 @@ class CeLicenseImportServiceTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        service = new CeLicenseImportServiceImpl(mock(CeLicenseStateMapper.class), objectMapper);
+        service = new CeLicenseImportServiceImpl(mock(CeLicenseStateMapper.class), objectMapper,
+                mock(ICeDimensionSyncService.class), mock(ICeFactorSyncService.class));
     }
 
     @Test
