@@ -45,7 +45,31 @@ BEGIN
     END IF;
 END//
 
+DROP PROCEDURE IF EXISTS ce_drop_fk_if_exists//
+CREATE PROCEDURE ce_drop_fk_if_exists(
+    IN p_table_name VARCHAR(128),
+    IN p_constraint_name VARCHAR(128)
+)
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = p_table_name
+          AND CONSTRAINT_NAME = p_constraint_name
+    ) THEN
+        SET @sql = CONCAT('ALTER TABLE ', p_table_name, ' DROP FOREIGN KEY ', p_constraint_name);
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END//
+
 DELIMITER ;
+
+CALL ce_drop_fk_if_exists('ce_emission_source', 'fk_ce_emission_source_factor');
+CALL ce_drop_fk_if_exists('ce_activity_data', 'fk_ce_activity_data_factor');
+CALL ce_drop_fk_if_exists('ce_green_power_certificate', 'fk_ce_green_power_factor');
 
 CALL ce_add_index_if_missing('ce_admin_division', 'uk_ce_admin_division_code', 'UNIQUE KEY uk_ce_admin_division_code (division_code)');
 CALL ce_add_index_if_missing('ce_company_factory', 'uk_ce_company_factory_factory', 'UNIQUE KEY uk_ce_company_factory_factory (factory_code)');
@@ -53,28 +77,13 @@ CALL ce_add_index_if_missing('ce_company_factory', 'idx_ce_company_factory_code_
 CALL ce_add_index_if_missing('ce_emission_source_category', 'uk_ce_emission_source_category_sk', 'UNIQUE KEY uk_ce_emission_source_category_sk (category_sk)');
 CALL ce_add_index_if_missing('ce_ef_factor', 'uk_ce_ef_factor_sk', 'UNIQUE KEY uk_ce_ef_factor_sk (factor_sk)');
 CALL ce_add_index_if_missing('ce_emission_source', 'uk_ce_emission_source_code', 'UNIQUE KEY uk_ce_emission_source_code (source_identification_code)');
+CALL ce_add_index_if_missing('ce_emission_source', 'idx_ce_emission_source_factor', 'KEY idx_ce_emission_source_factor (factor_key)');
 CALL ce_add_index_if_missing('ce_activity_data', 'idx_ce_activity_data_required_submitter', 'KEY idx_ce_activity_data_required_submitter (responsible_dept, activity_year, activity_month, data_status)');
+CALL ce_add_index_if_missing('ce_activity_data', 'idx_ce_activity_data_factor', 'KEY idx_ce_activity_data_factor (factor_key)');
 CALL ce_add_index_if_missing('ce_green_power_certificate', 'idx_ce_green_power_required_submitter', 'KEY idx_ce_green_power_required_submitter (data_source, activity_year, activity_month, proof_status)');
+CALL ce_add_index_if_missing('ce_green_power_certificate', 'idx_ce_green_power_factor', 'KEY idx_ce_green_power_factor (factor_key)');
 CALL ce_add_index_if_missing('ce_intensity_denominator_fact', 'idx_ce_denominator_fact_quality', 'KEY idx_ce_denominator_fact_quality (factory_code, fact_year, fact_month, denominator_type)');
 CALL ce_add_index_if_missing('ce_intensity_target', 'idx_ce_intensity_target_lookup', 'KEY idx_ce_intensity_target_lookup (factory_type, target_year)');
-
-CALL ce_add_fk_if_missing(
-    'ce_emission_source',
-    'fk_ce_emission_source_factor',
-    'FOREIGN KEY (factor_key) REFERENCES ce_ef_factor (factor_sk)'
-);
-
-CALL ce_add_fk_if_missing(
-    'ce_activity_data',
-    'fk_ce_activity_data_factor',
-    'FOREIGN KEY (factor_key) REFERENCES ce_ef_factor (factor_sk)'
-);
-
-CALL ce_add_fk_if_missing(
-    'ce_green_power_certificate',
-    'fk_ce_green_power_factor',
-    'FOREIGN KEY (factor_key) REFERENCES ce_ef_factor (factor_sk)'
-);
 
 CREATE OR REPLACE VIEW ce_v_emission_source_user AS
 SELECT
@@ -174,3 +183,4 @@ LEFT JOIN ce_ef_factor factor
 
 DROP PROCEDURE IF EXISTS ce_add_index_if_missing;
 DROP PROCEDURE IF EXISTS ce_add_fk_if_missing;
+DROP PROCEDURE IF EXISTS ce_drop_fk_if_exists;

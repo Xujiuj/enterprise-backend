@@ -133,45 +133,6 @@ CREATE TABLE IF NOT EXISTS ce_extension_field (
         FOREIGN KEY (sheet_id) REFERENCES ce_template_sheet (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise allowed extension fields';
 
-CREATE TABLE IF NOT EXISTS ce_dimension_record (
-    id BIGINT NOT NULL AUTO_INCREMENT,
-    dimension_code VARCHAR(128) NOT NULL,
-    record_code VARCHAR(128) NOT NULL,
-    record_name VARCHAR(255) NOT NULL,
-    parent_code VARCHAR(128) DEFAULT NULL,
-    field01 VARCHAR(512) DEFAULT NULL,
-    field02 VARCHAR(512) DEFAULT NULL,
-    field03 VARCHAR(512) DEFAULT NULL,
-    field04 VARCHAR(512) DEFAULT NULL,
-    field05 VARCHAR(512) DEFAULT NULL,
-    field06 VARCHAR(512) DEFAULT NULL,
-    field07 VARCHAR(512) DEFAULT NULL,
-    field08 VARCHAR(512) DEFAULT NULL,
-    field09 VARCHAR(512) DEFAULT NULL,
-    field10 VARCHAR(512) DEFAULT NULL,
-    field11 VARCHAR(512) DEFAULT NULL,
-    field12 VARCHAR(512) DEFAULT NULL,
-    field13 VARCHAR(512) DEFAULT NULL,
-    field14 VARCHAR(512) DEFAULT NULL,
-    field15 VARCHAR(512) DEFAULT NULL,
-    field16 VARCHAR(512) DEFAULT NULL,
-    field17 VARCHAR(512) DEFAULT NULL,
-    field18 VARCHAR(512) DEFAULT NULL,
-    field19 VARCHAR(512) DEFAULT NULL,
-    field20 VARCHAR(512) DEFAULT NULL,
-    field21 VARCHAR(512) DEFAULT NULL,
-    field22 VARCHAR(512) DEFAULT NULL,
-    sort_order INT DEFAULT 0,
-    status CHAR(1) NOT NULL DEFAULT '0',
-    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    remark VARCHAR(500) DEFAULT NULL,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_ce_dimension_record (dimension_code, record_code),
-    KEY idx_ce_dimension_record_parent (dimension_code, parent_code),
-    KEY idx_ce_dimension_record_status (dimension_code, status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise controlled dimension option records';
-
 CREATE TABLE IF NOT EXISTS ce_admin_division (
     id BIGINT NOT NULL AUTO_INCREMENT,
     division_code VARCHAR(64) NOT NULL,
@@ -247,16 +208,15 @@ CREATE TABLE IF NOT EXISTS ce_emission_source_category (
 
 CREATE TABLE IF NOT EXISTS ce_base_year (
     id BIGINT NOT NULL AUTO_INCREMENT,
-    base_year_key VARCHAR(64) DEFAULT NULL,
+    factory_code VARCHAR(64) NOT NULL,
+    factory_name VARCHAR(255) DEFAULT NULL,
     base_year INT NOT NULL,
-    current_flag CHAR(1) NOT NULL DEFAULT 'N',
     enabled_flag TINYINT(1) NOT NULL DEFAULT 1,
-    description VARCHAR(500) DEFAULT NULL,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_ce_base_year (base_year)
+    UNIQUE KEY uk_ce_base_year_factory (factory_code, base_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='106 base year dimension';
 
 CREATE TABLE IF NOT EXISTS ce_ef_factor (

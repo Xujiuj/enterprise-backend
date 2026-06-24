@@ -28,7 +28,6 @@ DROP TABLE IF EXISTS ce_base_year;
 DROP TABLE IF EXISTS ce_emission_source_category;
 DROP TABLE IF EXISTS ce_company_factory;
 DROP TABLE IF EXISTS ce_admin_division;
-DROP TABLE IF EXISTS ce_dimension_record;
 DROP TABLE IF EXISTS ce_capture_cell;
 DROP TABLE IF EXISTS ce_capture_row;
 DROP TABLE IF EXISTS ce_capture_batch;
