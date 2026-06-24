@@ -203,6 +203,10 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getActivityMonth, this::labelForMonth);
                 collectDistinct(options, denominatorFactMapper, CeIntensityDenominatorFact::getFactMonth, this::labelForMonth);
             }
+            case "intensity-rule-code" -> {
+                collectDistinct(options, intensityMetricMapper, CeIntensityMetric::getRuleCode, this::labelForRaw);
+                collectDistinct(options, denominatorFactMapper, CeIntensityDenominatorFact::getDenominatorMetricName, this::labelForRaw);
+            }
             case "electricity-type" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getElectricityType, this::labelForRaw);
             case "proof-status" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getProofStatus, this::labelForStatus);
             case "intensity-metric-status" -> collectDistinct(options, intensityMetricMapper, CeIntensityMetric::getMetricStatus, this::labelForStatus);
