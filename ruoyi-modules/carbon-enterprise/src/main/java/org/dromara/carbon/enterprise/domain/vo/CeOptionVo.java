@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Map;
 
 /**
  * Enterprise option item derived from existing business data.
@@ -21,4 +22,11 @@ public class CeOptionVo implements Serializable {
     private String label;
 
     private Object value;
+
+    private Map<String, Object> record;
+
+    public CeOptionVo(String label, Object value) {
+        this.label = label;
+        this.value = value;
+    }
 }

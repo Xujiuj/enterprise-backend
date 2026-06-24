@@ -2,6 +2,7 @@ package org.dromara.carbon.enterprise.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
+import org.dromara.carbon.enterprise.domain.bo.CeOptionQueryBo;
 import org.dromara.carbon.enterprise.domain.vo.CeOptionVo;
 import org.dromara.carbon.enterprise.service.ICeOptionService;
 import org.dromara.common.core.domain.R;
@@ -10,7 +11,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -30,9 +30,8 @@ public class CeOptionController extends BaseController {
     @GetMapping("/{optionCode}")
     public R<List<CeOptionVo>> list(
         @PathVariable String optionCode,
-        @RequestParam(required = false) String dimensionCode,
-        @RequestParam(required = false) String field
+        CeOptionQueryBo query
     ) {
-        return R.ok(optionService.listOptions(optionCode, dimensionCode, field));
+        return R.ok(optionService.listOptions(optionCode, query));
     }
 }

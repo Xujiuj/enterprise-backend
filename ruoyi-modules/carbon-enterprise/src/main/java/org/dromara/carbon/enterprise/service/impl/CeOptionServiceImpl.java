@@ -16,6 +16,7 @@ import org.dromara.carbon.enterprise.domain.CeIntensityDenominatorFact;
 import org.dromara.carbon.enterprise.domain.CeIntensityMetric;
 import org.dromara.carbon.enterprise.domain.CeLicenseState;
 import org.dromara.carbon.enterprise.domain.CeReportTemplateFile;
+import org.dromara.carbon.enterprise.domain.bo.CeOptionQueryBo;
 import org.dromara.carbon.enterprise.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.domain.vo.CeOptionVo;
 import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
@@ -119,7 +120,8 @@ public class CeOptionServiceImpl implements ICeOptionService {
     private final CeDimensionProjectionMapper dimensionProjectionMapper;
 
     @Override
-    public List<CeOptionVo> listOptions(String optionCode, String dimensionCode, String field) {
+    public List<CeOptionVo> listOptions(String optionCode, CeOptionQueryBo query) {
+        CeOptionQueryBo safeQuery = query == null ? new CeOptionQueryBo() : query;
         List<CeOptionVo> options = new ArrayList<>();
         switch (optionCode) {
             case "company-code" -> {
@@ -210,6 +212,11 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 collectDistinct(options, intensityMetricMapper, CeIntensityMetric::getRuleCode, this::labelForRaw);
                 collectDistinct(options, denominatorFactMapper, CeIntensityDenominatorFact::getDenominatorMetricName, this::labelForRaw);
             }
+            case "denominator-unit" -> {
+                collectDistinct(options, intensityMetricMapper, CeIntensityMetric::getDenominatorUnit, this::labelForRaw);
+                collectDistinct(options, denominatorFactMapper, CeIntensityDenominatorFact::getUnitName, this::labelForRaw);
+            }
+            case "intensity-target-code" -> collectIntensityTargetOptions(options);
             case "electricity-type" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getElectricityType, this::labelForRaw);
             case "proof-status" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getProofStatus, this::labelForStatus);
             case "intensity-metric-status" -> collectDistinct(options, intensityMetricMapper, CeIntensityMetric::getMetricStatus, this::labelForStatus);
@@ -222,7 +229,12 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "issuing-org" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getIssuingOrg, this::labelForRaw);
             case "confirmed-by" -> collectDistinct(options, factorConfirmationMapper, CeFactorConfirmation::getConfirmedBy, this::labelForRaw);
             case "license-id" -> collectDistinct(options, licenseStateMapper, CeLicenseState::getLicenseId, this::labelForRaw);
-            case DIMENSION_FIELD_OPTION -> collectDimensionFieldOptions(options, dimensionCode, field);
+            case "activity-entry-emission-source-name" -> collectEmissionSourceNameOptions(options, safeQuery);
+            case "activity-entry-source-company" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getCompanyName, safeQuery);
+            case "activity-entry-source-factory" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getFactoryName, safeQuery);
+            case "activity-entry-source-category" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getSourceCategoryKey, safeQuery);
+            case "activity-entry-source-leaf" -> collectEmissionSourceLeafOptions(options, safeQuery);
+            case DIMENSION_FIELD_OPTION -> collectDimensionFieldOptions(options, safeQuery.getDimensionCode(), safeQuery.getField());
             default -> throw new ServiceException("不支持的企业选项编码：" + optionCode);
         }
         return dedupeAndSort(options);
@@ -305,6 +317,111 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 addOption(target, labelForStatus(record.getStatus()), record.getStatus());
             }
         }
+    }
+
+    private void collectIntensityTargetOptions(List<CeOptionVo> target) {
+        for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode("intensity-target")) {
+            String factoryType = normalizeValue(record.getRecordCode());
+            String targetYear = normalizeValue(record.getRecordName());
+            if (StringUtils.isBlank(factoryType) || StringUtils.isBlank(targetYear)) {
+                continue;
+            }
+            String value = factoryType + ":" + targetYear;
+            String label = Stream.of(factoryType, targetYear, record.getField03(), record.getField04())
+                .map(this::normalizeValue)
+                .filter(StringUtils::isNotBlank)
+                .distinct()
+                .reduce((left, right) -> left + " / " + right)
+                .orElse(value);
+            addOption(target, label, value);
+        }
+    }
+
+    private void collectEmissionSourceFieldOptions(List<CeOptionVo> target, SFunction<CeEmissionSource, ?> valueColumn,
+                                                   CeOptionQueryBo query) {
+        for (CeEmissionSource row : selectEnabledEmissionSources(query)) {
+            addOption(target, labelForRaw(valueColumn.apply(row)), valueColumn.apply(row));
+        }
+    }
+
+    private void collectEmissionSourceNameOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
+        Map<String, CeOptionVo> optionsByLabel = new LinkedHashMap<>();
+        for (CeEmissionSource row : selectEnabledEmissionSources(query)) {
+            String label = emissionSourceLabel(row);
+            if (StringUtils.isBlank(label)) {
+                continue;
+            }
+            optionsByLabel.putIfAbsent(label, new CeOptionVo(label, label, emissionSourceRecord(row)));
+        }
+        target.addAll(optionsByLabel.values());
+    }
+
+    private void collectEmissionSourceLeafOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
+        Map<String, CeOptionVo> optionsByLabel = new LinkedHashMap<>();
+        for (CeEmissionSource row : selectEnabledEmissionSources(query)) {
+            String value = normalizeValue(row.getSourceIdentificationCode());
+            String label = emissionSourceLabel(row);
+            if (StringUtils.isBlank(value) || StringUtils.isBlank(label)) {
+                continue;
+            }
+            CeOptionVo candidate = new CeOptionVo(label, value, emissionSourceRecord(row));
+            CeOptionVo existing = optionsByLabel.get(label);
+            if (existing == null || compareOptionValue(value, normalizeValue(existing.getValue())) < 0) {
+                optionsByLabel.put(label, candidate);
+            }
+        }
+        target.addAll(optionsByLabel.values());
+    }
+
+    private List<CeEmissionSource> selectEnabledEmissionSources(CeOptionQueryBo query) {
+        LambdaQueryWrapper<CeEmissionSource> wrapper = new LambdaQueryWrapper<CeEmissionSource>()
+            .eq(CeEmissionSource::getEnabledFlag, Boolean.TRUE)
+            .orderByAsc(CeEmissionSource::getCompanyName)
+            .orderByAsc(CeEmissionSource::getFactoryName)
+            .orderByAsc(CeEmissionSource::getSourceCategoryKey)
+            .orderByAsc(CeEmissionSource::getSourceIdentificationCode);
+        applyEmissionSourceFilter(wrapper, CeEmissionSource::getCompanyName, query.getCompanyName());
+        applyEmissionSourceFilter(wrapper, CeEmissionSource::getFactoryName, query.getFactoryName());
+        applyEmissionSourceFilter(wrapper, CeEmissionSource::getSourceCategoryKey, query.getSourceCategoryKey());
+        applyEmissionSourceFilter(wrapper, CeEmissionSource::getScopeName, query.getScopeName());
+        applyEmissionSourceFilter(wrapper, CeEmissionSource::getScopeSubcategory, query.getScopeSubcategory());
+        applyEmissionSourceFilter(wrapper, CeEmissionSource::getSourceIdentificationName, query.getSourceIdentificationName());
+        return emissionSourceMapper.selectList(wrapper);
+    }
+
+    private void applyEmissionSourceFilter(LambdaQueryWrapper<CeEmissionSource> wrapper, SFunction<CeEmissionSource, ?> column,
+                                           String value) {
+        String normalized = normalizeValue(value);
+        if (StringUtils.isNotBlank(normalized)) {
+            wrapper.eq(column, normalized);
+        }
+    }
+
+    private String emissionSourceLabel(CeEmissionSource source) {
+        return Stream.of(source.getEmissionSourceName(), source.getSourceIdentificationName(), source.getSourceIdentificationCode())
+            .map(this::normalizeValue)
+            .filter(StringUtils::isNotBlank)
+            .findFirst()
+            .orElse("");
+    }
+
+    private Map<String, Object> emissionSourceRecord(CeEmissionSource source) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("id", source.getId());
+        record.put("companyCode", source.getCompanyCode());
+        record.put("companyName", source.getCompanyName());
+        record.put("factoryName", source.getFactoryName());
+        record.put("sourceCategoryKey", source.getSourceCategoryKey());
+        record.put("scopeName", source.getScopeName());
+        record.put("scopeSubcategory", source.getScopeSubcategory());
+        record.put("sourceIdentificationCode", source.getSourceIdentificationCode());
+        record.put("sourceIdentificationName", source.getSourceIdentificationName());
+        record.put("emissionSourceName", source.getEmissionSourceName());
+        record.put("responsibleDept", source.getResponsibleDept());
+        record.put("dataSource", source.getDataSource());
+        record.put("factorKey", source.getFactorKey());
+        record.put("enabledFlag", source.getEnabledFlag());
+        return record;
     }
 
     private void collectDimensionFieldOptions(List<CeOptionVo> target, String dimensionCode, String field) {
