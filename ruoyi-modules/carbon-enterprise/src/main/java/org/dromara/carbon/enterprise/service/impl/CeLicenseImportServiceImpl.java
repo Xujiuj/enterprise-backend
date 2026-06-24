@@ -3,11 +3,14 @@ package org.dromara.carbon.enterprise.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.carbon.enterprise.domain.CeLicenseState;
 import org.dromara.carbon.enterprise.domain.license.CeLicenseEnvelope;
 import org.dromara.carbon.enterprise.domain.license.CeLicenseImportResult;
 import org.dromara.carbon.enterprise.domain.license.CeLicensePayload;
 import org.dromara.carbon.enterprise.mapper.CeLicenseStateMapper;
+import org.dromara.carbon.enterprise.service.ICeDimensionSyncService;
+import org.dromara.carbon.enterprise.service.ICeFactorSyncService;
 import org.dromara.carbon.enterprise.service.ICeLicenseImportService;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Service;
@@ -29,6 +32,7 @@ import java.util.Objects;
 /**
  * Enterprise-side license import and verification service implementation.
  */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
@@ -41,6 +45,8 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
 
     private final CeLicenseStateMapper licenseStateMapper;
     private final ObjectMapper objectMapper;
+    private final ICeDimensionSyncService dimensionSyncService;
+    private final ICeFactorSyncService factorSyncService;
 
     @Override
     public CeLicenseImportResult verifyLicense(String licenseContent, String publicKeyPem, String expectedInstallId,
@@ -89,11 +95,27 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
 
     @Override
     public CeLicenseImportResult importLicense(String licenseContent, String publicKeyPem, String expectedInstallId,
-                                               Date verificationTime) {
+                                                Date verificationTime) {
         CeLicenseImportResult result = verifyLicense(licenseContent, publicKeyPem, expectedInstallId,
             verificationTime, findMaxObservedTime());
         if (result.isValid()) {
             licenseStateMapper.insert(result.getLicenseState());
+
+            // 触发维度数据同步（失败不阻断 License 导入）
+            try {
+                dimensionSyncService.syncAllVendorDimensions();
+                log.info("License import succeeded, dimension sync completed");
+            } catch (Exception e) {
+                log.warn("License import succeeded but dimension sync failed", e);
+            }
+
+            // 触发因子数据同步（失败不阻断 License 导入）
+            try {
+                factorSyncService.syncCurrentLicenseFactors();
+                log.info("License import succeeded, factor sync completed");
+            } catch (Exception e) {
+                log.warn("License import succeeded but factor sync failed", e);
+            }
         }
         return result;
     }
