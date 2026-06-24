@@ -14,6 +14,7 @@ import java.lang.reflect.Field;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -54,6 +55,19 @@ class HttpCeVendorReportTemplateOpenClientTest {
             () -> client.downloadTemplateFile("TOKEN-001"));
 
         assertEquals("report template file does not exist", exception.getMessage());
+        server.verify();
+    }
+
+    @Test
+    void sendsLicenseAsBearerTokenWhenListingTemplates() {
+        server.expect(requestTo("http://vendor.test/open/report-templates?licenseId=LIC-001&installId=INSTALL-001"))
+            .andExpect(method(HttpMethod.GET))
+            .andExpect(header("Authorization", "Bearer LIC-001"))
+            .andRespond(withSuccess("{\"code\":200,\"msg\":\"ok\",\"data\":{\"licenseId\":\"LIC-001\",\"installId\":\"INSTALL-001\",\"templates\":[]}}",
+                MediaType.APPLICATION_JSON));
+
+        client.listTemplates("LIC-001", "INSTALL-001");
+
         server.verify();
     }
 

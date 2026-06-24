@@ -54,7 +54,7 @@ public class HttpCeVendorDimensionOpenClient implements CeVendorDimensionOpenCli
         ResponseEntity<R<CeVendorDimensionListResponse>> response = restTemplate.exchange(
             url,
             HttpMethod.GET,
-            null,
+            CeVendorOpenApiRequestSupport.bearerEntity(licenseId),
             new ParameterizedTypeReference<>() {
             }
         );

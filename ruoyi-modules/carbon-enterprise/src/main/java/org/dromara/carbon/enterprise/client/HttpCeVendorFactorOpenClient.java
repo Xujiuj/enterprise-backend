@@ -37,7 +37,7 @@ public class HttpCeVendorFactorOpenClient implements CeVendorFactorOpenClient {
         ResponseEntity<R<CeVendorFactorSyncResponse>> response = restTemplate.exchange(
             url,
             HttpMethod.GET,
-            null,
+            CeVendorOpenApiRequestSupport.bearerEntity(licenseId),
             new ParameterizedTypeReference<>() {
             }
         );

@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Map;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -86,6 +87,7 @@ class CeFactorSyncServiceTest {
         verify(factorCacheRecordMapper).insert(recordCaptor.capture());
         assertEquals(7001L, recordCaptor.getValue().getCacheVersionId());
         assertEquals("EF-ELEC-ZJ", recordCaptor.getValue().getFactorCode());
+        assertEquals("{\"customRate\":\"0.123\"}", recordCaptor.getValue().getCustomFields());
     }
 
     @Test
@@ -152,6 +154,7 @@ class CeFactorSyncServiceTest {
         record.setFactorValue(new BigDecimal("0.5703000000"));
         record.setFactorUnit("kgCO2e/kWh");
         record.setSourceRef("official-source");
+        record.setCustomFields(Map.of("customRate", "0.123"));
         return record;
     }
 }

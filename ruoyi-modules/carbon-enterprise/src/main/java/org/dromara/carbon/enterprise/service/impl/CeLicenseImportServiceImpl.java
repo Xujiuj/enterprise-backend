@@ -40,6 +40,7 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
     private static final String SCHEMA_VERSION = "license.v1";
     private static final String ALGORITHM = "RS256";
     private static final String SIGNATURE_ALGORITHM = "SHA256withRSA";
+    private static final String PENDING_INSTALL_ID = "__PENDING_ENTERPRISE_ACTIVATION__";
     private static final String PEM_PUBLIC_KEY_BEGIN = "-----BEGIN PUBLIC KEY-----";
     private static final String PEM_PUBLIC_KEY_END = "-----END PUBLIC KEY-----";
 
@@ -80,14 +81,15 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
             if (checkedAt.after(validTo)) {
                 return CeLicenseImportResult.invalid("EXPIRED", "license has expired");
             }
-            if (!Objects.equals(expectedInstallId, payload.getInstallId())) {
+            String effectiveInstallId = resolveEffectiveInstallId(payload.getInstallId(), expectedInstallId);
+            if (!Objects.equals(expectedInstallId, effectiveInstallId)) {
                 return CeLicenseImportResult.invalid("INSTALL_ID_MISMATCH", "license installId does not match local installId");
             }
             if (maxObservedTime != null && checkedAt.before(maxObservedTime)) {
                 return CeLicenseImportResult.invalid("CLOCK_ROLLBACK", "system time is earlier than max observed time");
             }
 
-            return CeLicenseImportResult.valid(buildLicenseState(envelope, payload, canonicalPayload, validFrom, validTo, checkedAt, maxObservedTime));
+            return CeLicenseImportResult.valid(buildLicenseState(envelope, payload, effectiveInstallId, canonicalPayload, validFrom, validTo, checkedAt, maxObservedTime));
         } catch (Exception e) {
             return CeLicenseImportResult.invalid("MALFORMED_LICENSE", e.getMessage());
         }
@@ -175,14 +177,22 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
         }
     }
 
-    private CeLicenseState buildLicenseState(CeLicenseEnvelope envelope, CeLicensePayload payload, byte[] canonicalPayload,
-                                             Date validFrom, Date validTo, Date checkedAt, Date maxObservedTime) {
+    private String resolveEffectiveInstallId(String licenseInstallId, String expectedInstallId) {
+        if (PENDING_INSTALL_ID.equals(licenseInstallId) && StringUtils.isNotBlank(expectedInstallId)) {
+            return expectedInstallId;
+        }
+        return licenseInstallId;
+    }
+
+    private CeLicenseState buildLicenseState(CeLicenseEnvelope envelope, CeLicensePayload payload, String effectiveInstallId,
+                                             byte[] canonicalPayload, Date validFrom, Date validTo, Date checkedAt,
+                                             Date maxObservedTime) {
         CeLicenseState state = new CeLicenseState();
         state.setLicenseId(payload.getLicenseId());
         state.setCustomerId(payload.getCustomerId());
         state.setPackageId(payload.getPackageId());
         state.setPackageName(payload.getPackageName());
-        state.setInstallId(payload.getInstallId());
+        state.setInstallId(effectiveInstallId);
         state.setKeyId(envelope.getKeyId());
         state.setAlgorithm(envelope.getAlgorithm());
         state.setSchemaVersion(envelope.getSchemaVersion());

@@ -37,7 +37,7 @@ public class HttpCeVendorAnnouncementOpenClient implements CeVendorAnnouncementO
         ResponseEntity<R<CeVendorAnnouncementListResponse>> response = restTemplate.exchange(
             url,
             HttpMethod.GET,
-            null,
+            CeVendorOpenApiRequestSupport.bearerEntity(licenseId),
             new ParameterizedTypeReference<>() {
             }
         );

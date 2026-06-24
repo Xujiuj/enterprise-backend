@@ -9,6 +9,7 @@ import org.dromara.carbon.enterprise.service.CeLicensePublicKeyProvider;
 import org.dromara.carbon.enterprise.service.ICeLicenseImportService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.utils.StringUtils;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,6 +30,12 @@ public class CeLicenseImportController extends BaseController {
 
     private final ICeLicenseImportService licenseImportService;
     private final CeLicensePublicKeyProvider publicKeyProvider;
+    private final org.dromara.carbon.enterprise.service.CeLicenseInstallIdProvider installIdProvider;
+
+    @GetMapping("/install-id")
+    public R<String> currentInstallId() {
+        return R.ok(installIdProvider.getExpectedInstallId());
+    }
 
     @SaCheckPermission("enterprise:licenseImport:import")
     @PostMapping("/import")

@@ -3,6 +3,7 @@ package org.dromara.carbon.enterprise.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dromara.carbon.enterprise.domain.CeLicenseState;
 import org.dromara.carbon.enterprise.domain.license.CeLicenseImportResult;
+import org.dromara.carbon.enterprise.service.CeLicenseInstallIdProvider;
 import org.dromara.carbon.enterprise.service.CeLicensePublicKeyProvider;
 import org.dromara.carbon.enterprise.service.ICeLicenseImportService;
 import org.dromara.common.web.handler.GlobalExceptionHandler;
@@ -39,14 +40,16 @@ class CeLicenseImportControllerTest {
 
     private ICeLicenseImportService licenseImportService;
     private CeLicensePublicKeyProvider publicKeyProvider;
+    private CeLicenseInstallIdProvider installIdProvider;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         licenseImportService = mock(ICeLicenseImportService.class);
         publicKeyProvider = mock(CeLicensePublicKeyProvider.class);
+        installIdProvider = mock(CeLicenseInstallIdProvider.class);
         mockMvc = MockMvcBuilders
-            .standaloneSetup(new CeLicenseImportController(licenseImportService, publicKeyProvider))
+            .standaloneSetup(new CeLicenseImportController(licenseImportService, publicKeyProvider, installIdProvider))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
     }

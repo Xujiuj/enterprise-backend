@@ -530,8 +530,9 @@ class CeLicenseGateWebMvcConfigurerTest {
 
         @Bean
         CeLicenseImportController ceLicenseImportController(ICeLicenseImportService licenseImportService,
-                                                            CeLicensePublicKeyProvider publicKeyProvider) {
-            return new CeLicenseImportController(licenseImportService, publicKeyProvider);
+                                                            CeLicensePublicKeyProvider publicKeyProvider,
+                                                            org.dromara.carbon.enterprise.service.CeLicenseInstallIdProvider installIdProvider) {
+            return new CeLicenseImportController(licenseImportService, publicKeyProvider, installIdProvider);
         }
 
         @Bean

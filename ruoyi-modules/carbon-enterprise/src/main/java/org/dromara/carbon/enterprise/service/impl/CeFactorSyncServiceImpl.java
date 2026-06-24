@@ -15,6 +15,7 @@ import org.dromara.carbon.enterprise.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.service.ICeFactorSyncService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.json.utils.JsonUtils;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
@@ -166,6 +167,9 @@ public class CeFactorSyncServiceImpl implements ICeFactorSyncService {
         target.setGwpValue(source.getGwpValue());
         target.setConvertedFactor(source.getConvertedFactor());
         target.setSourceRef(source.getSourceRef());
+        target.setCustomFields(source.getCustomFields() == null || source.getCustomFields().isEmpty()
+            ? null
+            : JsonUtils.toJsonString(source.getCustomFields()));
         target.setEnabledFlag(Boolean.TRUE);
         target.setSyncedTime(syncedTime);
     }

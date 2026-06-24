@@ -41,7 +41,7 @@ public class HttpCeVendorReportTemplateOpenClient implements CeVendorReportTempl
         ResponseEntity<R<CeVendorReportTemplateListResponse>> response = restTemplate.exchange(
             url,
             HttpMethod.GET,
-            null,
+            CeVendorOpenApiRequestSupport.bearerEntity(licenseId),
             new ParameterizedTypeReference<>() {
             }
         );
@@ -66,7 +66,7 @@ public class HttpCeVendorReportTemplateOpenClient implements CeVendorReportTempl
         ResponseEntity<R<CeVendorReportTemplateDownloadResponse>> response = restTemplate.exchange(
             url,
             HttpMethod.GET,
-            null,
+            CeVendorOpenApiRequestSupport.bearerEntity(licenseId),
             new ParameterizedTypeReference<>() {
             }
         );
