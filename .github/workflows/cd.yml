@@ -167,8 +167,7 @@ jobs:
             echo "Deployment skipped because deploy or database secrets are incomplete."
             exit 0
           fi
-          JAR_FILE="ruoyi-admin/target/ruoyi-admin.jar"
-          REMOTE_JAR="/tmp/$DEPLOY_SERVICE-${GITHUB_RUN_ID}.jar"
+          REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
           ENTERPRISE_SCHEMA_FILE="script/sql/mysql/carbon_enterprise_schema_v1.sql"
           ENTERPRISE_TEMPLATE_SEED_FILE="script/sql/mysql/carbon_enterprise_template_seed_v1.sql"
           sudo apt-get update
@@ -194,10 +193,17 @@ jobs:
           cat > deploy-backend.sh <<'EOF'
           set -euo pipefail
           echo "$SUDO_PASSWORD" | sudo -S apt-get update
-          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jdk-headless redis-server curl
-          echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE"
-          install -m 0644 "$REMOTE_JAR" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
-          rm -f "$REMOTE_JAR"
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y openjdk-17-jdk-headless redis-server curl git maven
+          echo "$SUDO_PASSWORD" | sudo -S install -d -o "$USER" -g "$USER" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE" "$DEPLOY_PATH/logs/$DEPLOY_SERVICE" "$DEPLOY_PATH/src"
+          REMOTE_REPO_DIR="$DEPLOY_PATH/src/$DEPLOY_SERVICE"
+          if [ ! -d "$REMOTE_REPO_DIR/.git" ]; then
+            rm -rf "$REMOTE_REPO_DIR"
+            git clone --depth 1 "$REPO_URL" "$REMOTE_REPO_DIR"
+          fi
+          git -C "$REMOTE_REPO_DIR" fetch --depth 1 origin "$DEPLOY_SHA"
+          git -C "$REMOTE_REPO_DIR" checkout --force FETCH_HEAD
+          mvn -B -Pprod -DskipTests -pl ruoyi-admin -am clean package -f "$REMOTE_REPO_DIR/pom.xml"
+          install -m 0644 "$REMOTE_REPO_DIR/ruoyi-admin/target/ruoyi-admin.jar" "$DEPLOY_PATH/apps/$DEPLOY_SERVICE/app.jar"
           echo "$SUDO_PASSWORD" | sudo -S sed -i "s/^# *requirepass .*/requirepass ruoyi123/; s/^requirepass .*/requirepass ruoyi123/" /etc/redis/redis.conf
           if ! echo "$SUDO_PASSWORD" | sudo -S grep -q '^requirepass ' /etc/redis/redis.conf; then
             echo "$SUDO_PASSWORD" | sudo -S sh -c "printf '\nrequirepass ruoyi123\n' >> /etc/redis/redis.conf"
@@ -312,6 +318,5 @@ jobs:
             timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
           fi
-          timeout 900 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$JAR_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_JAR"
           timeout 900 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "REMOTE_JAR='$REMOTE_JAR' DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 840 bash -s" < deploy-backend.sh
+            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REPO_URL='$REPO_URL' DEPLOY_SHA='$GITHUB_SHA' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 840 bash -s" < deploy-backend.sh
