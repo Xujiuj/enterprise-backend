@@ -14,6 +14,7 @@ import org.dromara.carbon.enterprise.domain.CeFactorConfirmation;
 import org.dromara.carbon.enterprise.domain.CeGreenPowerCertificate;
 import org.dromara.carbon.enterprise.domain.CeIntensityDenominatorFact;
 import org.dromara.carbon.enterprise.domain.CeIntensityMetric;
+import org.dromara.carbon.enterprise.domain.CeLicenseState;
 import org.dromara.carbon.enterprise.domain.CeReportTemplateFile;
 import org.dromara.carbon.enterprise.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.domain.vo.CeOptionVo;
@@ -27,6 +28,7 @@ import org.dromara.carbon.enterprise.mapper.CeFactorCacheRecordMapper;
 import org.dromara.carbon.enterprise.mapper.CeFactorConfirmationMapper;
 import org.dromara.carbon.enterprise.mapper.CeGreenPowerCertificateMapper;
 import org.dromara.carbon.enterprise.mapper.CeIntensityDenominatorFactMapper;
+import org.dromara.carbon.enterprise.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.mapper.CeIntensityMetricMapper;
 import org.dromara.carbon.enterprise.mapper.CeReportTemplateFileMapper;
 import org.dromara.carbon.enterprise.service.ICeOptionService;
@@ -113,6 +115,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
     private final CeIntensityMetricMapper intensityMetricMapper;
     private final CeReportTemplateFileMapper reportTemplateFileMapper;
     private final CeCaptureBatchMapper captureBatchMapper;
+    private final CeLicenseStateMapper licenseStateMapper;
     private final CeDimensionProjectionMapper dimensionProjectionMapper;
 
     @Override
@@ -214,6 +217,11 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "template-type" -> collectDistinct(options, reportTemplateFileMapper, CeReportTemplateFile::getTemplateType, this::labelForTemplateType);
             case "validation-status" -> collectDistinct(options, captureBatchMapper, CeCaptureBatch::getValidationStatus, this::labelForStatus);
             case "record-status" -> collectDimensionStatusOptions(options);
+            case "power-grid-region" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getPowerGridRegion, this::labelForRaw);
+            case "offset-power-source" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getOffsetPowerSource, this::labelForRaw);
+            case "issuing-org" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getIssuingOrg, this::labelForRaw);
+            case "confirmed-by" -> collectDistinct(options, factorConfirmationMapper, CeFactorConfirmation::getConfirmedBy, this::labelForRaw);
+            case "license-id" -> collectDistinct(options, licenseStateMapper, CeLicenseState::getLicenseId, this::labelForRaw);
             case DIMENSION_FIELD_OPTION -> collectDimensionFieldOptions(options, dimensionCode, field);
             default -> throw new ServiceException("不支持的企业选项编码：" + optionCode);
         }

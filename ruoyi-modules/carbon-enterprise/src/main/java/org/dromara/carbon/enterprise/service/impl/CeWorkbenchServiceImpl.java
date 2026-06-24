@@ -30,6 +30,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -57,6 +58,9 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
     private final CeFactorConfirmationMapper factorConfirmationMapper;
     private final CeReportTemplateFileMapper reportTemplateFileMapper;
     private final CeVendorAnnouncementOpenClient vendorAnnouncementOpenClient;
+
+    private volatile List<CeWorkbenchOverviewVo.SystemNotice> announcementCache;
+    private volatile long announcementCacheExpiry;
 
     @Override
     public CeWorkbenchOverviewVo overview() {
@@ -216,13 +220,25 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
         if (licenseState == null || StringUtils.isBlank(licenseState.getLicenseId()) || StringUtils.isBlank(licenseState.getInstallId())) {
             return List.of();
         }
+        long now = System.currentTimeMillis();
+        if (announcementCache != null && now < announcementCacheExpiry) {
+            return announcementCache;
+        }
         try {
             CeVendorAnnouncementListResponse response = vendorAnnouncementOpenClient.listAnnouncements(
                 licenseState.getLicenseId(), licenseState.getInstallId(), ANNOUNCEMENT_LIMIT);
-            return response.getAnnouncements().stream().map(this::systemNotice).toList();
+            List<CeWorkbenchOverviewVo.SystemNotice> notices = response.getAnnouncements().stream().map(this::systemNotice).toList();
+            announcementCache = new ArrayList<>(notices);
+            announcementCacheExpiry = now + 30_000L;
+            return notices;
         } catch (RuntimeException e) {
             log.error("获取厂商公告失败，licenseId={}", licenseState.getLicenseId(), e);
-            return List.of(systemNoticeUnavailable());
+            List<CeWorkbenchOverviewVo.SystemNotice> fallback = List.of(systemNoticeUnavailable());
+            if (announcementCache == null) {
+                announcementCache = new ArrayList<>(fallback);
+                announcementCacheExpiry = now + 30_000L;
+            }
+            return announcementCache;
         }
     }
 

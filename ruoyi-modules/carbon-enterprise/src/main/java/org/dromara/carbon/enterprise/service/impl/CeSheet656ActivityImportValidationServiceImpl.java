@@ -353,7 +353,7 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
                 DERIVED_RESOLVER_UNAVAILABLE,
                 row == null ? null : row.getRowNumber(),
                 "f001",
-                "PK_鎺掓斁婧愯瘑鍒紪鍙?",
+                "PK_排放源识别编号",
                 "enterprise-local derived field resolver is not configured"
             )));
             results.add(result);

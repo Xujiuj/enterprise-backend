@@ -11,6 +11,11 @@ import java.util.List;
 
 /**
  * Enterprise local activity data service.
+ *
+ * <p>Note: {@code insertByBo}, {@code updateByBo}, and {@code deleteByIds} are
+ * intentionally exposed at the service layer because the sheet_656 capture
+ * pipeline delegates to them. The controller blocks direct CRUD access and
+ * routes all writes through the sheet_656 validation/import flow.</p>
  */
 public interface ICeActivityDataService {
 

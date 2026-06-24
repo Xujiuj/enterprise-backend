@@ -14,6 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Enterprise activity-data validation dashboard API.
+ *
+ * <p>All four endpoints delegate to the same service method because the frontend
+ * {@code dataValidation/index.vue} consumes the full dashboard VO for each view.
+ * If future requirements demand distinct payloads (e.g. submissions-only list,
+ * issues-only list), split the service method and update the frontend accordingly.</p>
  */
 @Validated
 @RequiredArgsConstructor
