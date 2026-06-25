@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.toolkit.LambdaUtils;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
 import org.dromara.carbon.enterprise.domain.CeEmissionSource;
+import org.dromara.carbon.enterprise.domain.CeFactorCacheRecord;
 import org.dromara.carbon.enterprise.domain.CeIntensityDenominatorFact;
 import org.dromara.carbon.enterprise.domain.CeIntensityMetric;
 import org.dromara.carbon.enterprise.domain.bo.CeOptionQueryBo;
@@ -50,6 +51,7 @@ class CeOptionServiceTest {
         initializeEntityLambdaCache(CeIntensityMetricMapper.class, CeIntensityMetric.class);
         initializeEntityLambdaCache(CeIntensityDenominatorFactMapper.class, CeIntensityDenominatorFact.class);
         initializeEntityLambdaCache(CeEmissionSourceMapper.class, CeEmissionSource.class);
+        initializeEntityLambdaCache(CeFactorCacheRecordMapper.class, CeFactorCacheRecord.class);
     }
 
     @BeforeEach
@@ -130,7 +132,7 @@ class CeOptionServiceTest {
     }
 
     @Test
-    void activityEntryLeafOptionsKeepOneStableCodeForSameSourceName() {
+    void activityEntryLeafOptionsKeepEachEmissionSourceCodeWhenNamesRepeat() {
         CeEmissionSource largerCode = emissionSource("ES-002", "柴油", "A公司", "一厂", "cat-a");
         largerCode.setResponsibleDept("生产部");
         CeEmissionSource smallerCode = emissionSource("ES-001", "柴油", "A公司", "一厂", "cat-a");
@@ -144,13 +146,16 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .containsExactly("柴油", "天然气");
+            .containsExactly("柴油", "柴油", "天然气");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .containsExactly("ES-001", "ES-003");
+            .containsExactly("ES-001", "ES-002", "ES-003");
         assertThat(options.get(0).getRecord())
             .containsEntry("sourceIdentificationCode", "ES-001")
             .containsEntry("responsibleDept", "运营部");
+        assertThat(options.get(1).getRecord())
+            .containsEntry("sourceIdentificationCode", "ES-002")
+            .containsEntry("responsibleDept", "生产部");
     }
 
     private CeEmissionSource emissionSource(String code, String name, String companyName, String factoryName, String categoryKey) {

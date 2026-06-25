@@ -364,7 +364,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
     }
 
     private void collectEmissionSourceLeafOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
-        Map<String, CeOptionVo> optionsByLabel = new LinkedHashMap<>();
+        Map<String, CeOptionVo> optionsByCode = new LinkedHashMap<>();
         List<CeEmissionSource> rows = selectEnabledEmissionSources(query);
         log.info("[Leaf选项] 查询到 {} 条排放源记录, 查询条件: company={}, factory={}, category={}",
             rows.size(), query.getCompanyName(), query.getFactoryName(), query.getSourceCategoryKey());
@@ -384,12 +384,12 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 firstRow = false;
             }
             CeOptionVo candidate = new CeOptionVo(label, value, record);
-            CeOptionVo existing = optionsByLabel.get(label);
+            CeOptionVo existing = optionsByCode.get(value);
             if (existing == null || compareOptionValue(value, normalizeValue(existing.getValue())) < 0) {
-                optionsByLabel.put(label, candidate);
+                optionsByCode.put(value, candidate);
             }
         }
-        target.addAll(optionsByLabel.values());
+        target.addAll(optionsByCode.values());
     }
 
     private List<CeEmissionSource> selectEnabledEmissionSources(CeOptionQueryBo query) {
