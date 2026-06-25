@@ -232,7 +232,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "activity-entry-emission-source-name" -> collectEmissionSourceNameOptions(options, safeQuery);
             case "activity-entry-source-company" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getCompanyName, safeQuery);
             case "activity-entry-source-factory" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getFactoryName, safeQuery);
-            case "activity-entry-source-category" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getSourceCategoryKey, safeQuery);
+            case "activity-entry-source-category" -> collectSourceCategoryOptions(options);
             case "activity-entry-source-leaf" -> collectEmissionSourceLeafOptions(options, safeQuery);
             case DIMENSION_FIELD_OPTION -> collectDimensionFieldOptions(options, safeQuery.getDimensionCode(), safeQuery.getField());
             default -> throw new ServiceException("不支持的企业选项编码：" + optionCode);
