@@ -286,7 +286,10 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 .distinct()
                 .reduce((left, right) -> left + " / " + right)
                 .orElse(normalizeValue(row.getCategorySk()));
-            addOption(target, label, row.getCategorySk());
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("scopeName", row.getGhgScope());
+            record.put("scopeSubcategory", row.getGhgScopeCategory());
+            addOption(target, label, row.getCategorySk(), record);
         }
     }
 
@@ -480,6 +483,14 @@ public class CeOptionServiceImpl implements ICeOptionService {
             return;
         }
         target.add(new CeOptionVo(StringUtils.isBlank(label) ? normalized : label, value));
+    }
+
+    private void addOption(List<CeOptionVo> target, String label, Object value, Map<String, Object> record) {
+        String normalized = normalizeValue(value);
+        if (StringUtils.isBlank(normalized)) {
+            return;
+        }
+        target.add(new CeOptionVo(StringUtils.isBlank(label) ? normalized : label, value, record));
     }
 
     private List<CeOptionVo> dedupeAndSort(List<CeOptionVo> options) {
