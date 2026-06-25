@@ -582,6 +582,26 @@ CREATE TABLE IF NOT EXISTS ce_license_state (
     UNIQUE KEY uk_ce_license_state_license (license_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local license runtime state';
 
+CREATE TABLE IF NOT EXISTS ce_factor_confirmation (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    factor_code VARCHAR(128) NOT NULL,
+    factor_name VARCHAR(255) NOT NULL,
+    factor_version_code VARCHAR(64) NOT NULL,
+    factor_unit VARCHAR(64) NOT NULL,
+    factor_value DECIMAL(28, 10) NOT NULL,
+    confirmation_status VARCHAR(32) DEFAULT NULL,
+    confirmed_by VARCHAR(128) DEFAULT NULL,
+    confirmed_time DATETIME DEFAULT NULL,
+    license_id VARCHAR(128) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    remark VARCHAR(500) DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_factor_confirmation (factor_code, factor_version_code, license_id),
+    KEY idx_ce_factor_confirmation_status (confirmation_status),
+    KEY idx_ce_factor_confirmation_license (license_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Enterprise local emission factor confirmation';
+
 CREATE TABLE IF NOT EXISTS ce_factor_cache_version (
     id BIGINT NOT NULL AUTO_INCREMENT,
     vendor_version_id VARCHAR(128) NOT NULL,

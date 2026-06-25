@@ -525,6 +525,32 @@ CREATE TABLE ce_license_state (
 );
 GO
 
+CREATE TABLE ce_factor_confirmation (
+    id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    factor_code NVARCHAR(128) NOT NULL,
+    factor_name NVARCHAR(255) NOT NULL,
+    factor_version_code NVARCHAR(64) NOT NULL,
+    factor_unit NVARCHAR(64) NOT NULL,
+    factor_value DECIMAL(28, 10) NOT NULL,
+    confirmation_status NVARCHAR(32) NULL,
+    confirmed_by NVARCHAR(128) NULL,
+    confirmed_time DATETIME2 NULL,
+    license_id NVARCHAR(128) NULL,
+    create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
+    remark NVARCHAR(500) NULL,
+    CONSTRAINT uk_ce_factor_confirmation UNIQUE (factor_code, factor_version_code, license_id)
+);
+GO
+
+CREATE INDEX idx_ce_factor_confirmation_status
+    ON ce_factor_confirmation (confirmation_status);
+GO
+
+CREATE INDEX idx_ce_factor_confirmation_license
+    ON ce_factor_confirmation (license_id);
+GO
+
 CREATE TABLE ce_factor_cache_version (
     id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     vendor_version_id NVARCHAR(128) NOT NULL,
