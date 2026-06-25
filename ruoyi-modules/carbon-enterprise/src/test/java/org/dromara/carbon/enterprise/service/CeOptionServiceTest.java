@@ -5,8 +5,11 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.core.toolkit.LambdaUtils;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
+import org.dromara.carbon.enterprise.domain.CeActivityData;
+import org.dromara.carbon.enterprise.domain.CeCompanyFactory;
 import org.dromara.carbon.enterprise.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.domain.CeFactorCacheRecord;
+import org.dromara.carbon.enterprise.domain.CeGreenPowerCertificate;
 import org.dromara.carbon.enterprise.domain.CeIntensityDenominatorFact;
 import org.dromara.carbon.enterprise.domain.CeIntensityMetric;
 import org.dromara.carbon.enterprise.domain.bo.CeOptionQueryBo;
@@ -42,30 +45,39 @@ class CeOptionServiceTest {
 
     private CeIntensityMetricMapper intensityMetricMapper;
     private CeIntensityDenominatorFactMapper denominatorFactMapper;
+    private CeActivityDataMapper activityDataMapper;
+    private CeCompanyFactoryMapper companyFactoryMapper;
     private CeEmissionSourceMapper emissionSourceMapper;
+    private CeGreenPowerCertificateMapper greenPowerCertificateMapper;
     private CeDimensionProjectionMapper dimensionProjectionMapper;
     private CeOptionServiceImpl service;
 
     @BeforeAll
     static void initializeLambdaCache() {
+        initializeEntityLambdaCache(CeActivityDataMapper.class, CeActivityData.class);
+        initializeEntityLambdaCache(CeCompanyFactoryMapper.class, CeCompanyFactory.class);
         initializeEntityLambdaCache(CeIntensityMetricMapper.class, CeIntensityMetric.class);
         initializeEntityLambdaCache(CeIntensityDenominatorFactMapper.class, CeIntensityDenominatorFact.class);
         initializeEntityLambdaCache(CeEmissionSourceMapper.class, CeEmissionSource.class);
         initializeEntityLambdaCache(CeFactorCacheRecordMapper.class, CeFactorCacheRecord.class);
+        initializeEntityLambdaCache(CeGreenPowerCertificateMapper.class, CeGreenPowerCertificate.class);
     }
 
     @BeforeEach
     void setUp() {
         intensityMetricMapper = mock(CeIntensityMetricMapper.class);
         denominatorFactMapper = mock(CeIntensityDenominatorFactMapper.class);
+        activityDataMapper = mock(CeActivityDataMapper.class);
+        companyFactoryMapper = mock(CeCompanyFactoryMapper.class);
         emissionSourceMapper = mock(CeEmissionSourceMapper.class);
+        greenPowerCertificateMapper = mock(CeGreenPowerCertificateMapper.class);
         dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
         service = new CeOptionServiceImpl(
-            mock(CeActivityDataMapper.class),
-            mock(CeCompanyFactoryMapper.class),
+            activityDataMapper,
+            companyFactoryMapper,
             emissionSourceMapper,
             mock(CeEmissionSourceCategoryMapper.class),
-            mock(CeGreenPowerCertificateMapper.class),
+            greenPowerCertificateMapper,
             denominatorFactMapper,
             mock(CeFactorCacheRecordMapper.class),
             mock(CeFactorConfirmationMapper.class),
@@ -75,6 +87,18 @@ class CeOptionServiceTest {
             mock(CeLicenseStateMapper.class),
             dimensionProjectionMapper
         );
+    }
+
+    @Test
+    void factoryCodeOptionsDoNotQueryNonPersistentEmissionSourceFactoryCode() {
+        when(companyFactoryMapper.selectList(any())).thenReturn(List.of());
+        when(activityDataMapper.selectList(any())).thenReturn(List.of());
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of());
+        when(greenPowerCertificateMapper.selectList(any())).thenReturn(List.of());
+
+        var options = service.listOptions("factory-code", null);
+
+        assertThat(options).isEmpty();
     }
 
     @Test
