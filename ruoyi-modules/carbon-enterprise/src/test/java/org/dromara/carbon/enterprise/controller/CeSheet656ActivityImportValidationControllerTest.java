@@ -6,11 +6,13 @@ import org.dromara.carbon.enterprise.domain.activity.CeSheet656FieldDescriptor;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656FieldValue;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ImportValidationRequest;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ImportValidationResult;
+import org.dromara.carbon.enterprise.domain.activity.CeSheet656ResolvedRow;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ValidationIssue;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ValidationRequest;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ValidationResult;
 import org.dromara.carbon.enterprise.service.ICeSheet656ActivityCaptureService;
 import org.dromara.carbon.enterprise.service.ICeSheet656ActivityImportValidationService;
+import org.dromara.carbon.enterprise.service.ICeSheet656DerivedFieldResolver;
 import org.dromara.common.web.handler.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -21,12 +23,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,16 +43,19 @@ class CeSheet656ActivityImportValidationControllerTest {
 
     private ICeSheet656ActivityImportValidationService activityImportValidationService;
     private ICeSheet656ActivityCaptureService activityCaptureService;
+    private ICeSheet656DerivedFieldResolver derivedFieldResolver;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         activityImportValidationService = mock(ICeSheet656ActivityImportValidationService.class);
         activityCaptureService = mock(ICeSheet656ActivityCaptureService.class);
+        derivedFieldResolver = mock(ICeSheet656DerivedFieldResolver.class);
         mockMvc = MockMvcBuilders
             .standaloneSetup(new CeSheet656ActivityImportValidationController(
                 activityImportValidationService,
-                activityCaptureService
+                activityCaptureService,
+                derivedFieldResolver
             ))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
@@ -109,6 +116,28 @@ class CeSheet656ActivityImportValidationControllerTest {
             .andExpect(jsonPath("$.data.validationResult.valid", is(true)));
 
         verify(activityCaptureService).saveManual(any());
+    }
+
+    @Test
+    void resolvesActivitySourceDerivedFields() throws Exception {
+        when(derivedFieldResolver.resolve("SRC-001")).thenReturn(Optional.of(resolvedRow()));
+
+        mockMvc.perform(get("/enterprise/activity-import/sheet-656/source/SRC-001"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code", is(200)))
+            .andExpect(jsonPath("$.data.emissionSourceCode", is("SRC-001")))
+            .andExpect(jsonPath("$.data.companyCode", is("COMP-001")))
+            .andExpect(jsonPath("$.data.companyName", is("Company One")))
+            .andExpect(jsonPath("$.data.factoryName", is("Factory One")))
+            .andExpect(jsonPath("$.data.emissionSourceCategoryCode", is("CAT-001")))
+            .andExpect(jsonPath("$.data.scope", is("Scope 1")))
+            .andExpect(jsonPath("$.data.scopeSubcategory", is("Stationary Combustion")))
+            .andExpect(jsonPath("$.data.emissionSourceIdentity", is("Natural Gas Boiler")))
+            .andExpect(jsonPath("$.data.emissionSourceName", is("Natural Gas")))
+            .andExpect(jsonPath("$.data.unit", is("Nm3")))
+            .andExpect(jsonPath("$.data.emissionFactorCode", is("EF-2026-001")));
+
+        verify(derivedFieldResolver).resolve("SRC-001");
     }
 
     @Test
@@ -192,5 +221,21 @@ class CeSheet656ActivityImportValidationControllerTest {
         request.setHeaderFields(List.of(headerField));
         request.setRows(List.of(row));
         return request;
+    }
+
+    private CeSheet656ResolvedRow resolvedRow() {
+        CeSheet656ResolvedRow row = new CeSheet656ResolvedRow();
+        row.setEmissionSourceCode("SRC-001");
+        row.setCompanyCode("COMP-001");
+        row.setCompanyName("Company One");
+        row.setFactoryName("Factory One");
+        row.setEmissionSourceCategoryCode("CAT-001");
+        row.setScope("Scope 1");
+        row.setScopeSubcategory("Stationary Combustion");
+        row.setEmissionSourceIdentity("Natural Gas Boiler");
+        row.setEmissionSourceName("Natural Gas");
+        row.setUnit("Nm3");
+        row.setEmissionFactorCode("EF-2026-001");
+        return row;
     }
 }
