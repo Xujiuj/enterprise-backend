@@ -263,7 +263,7 @@ public class CeDimensionProjectionSqlProvider {
                        update_time,
                        remark
                   from ce_electricity_factor_version_map
-                 order by effective_year desc, factor_version
+                 order by effective_year asc, factor_version asc
                 """;
             case "ef-electricity-scope" -> """
                 select id,

@@ -136,8 +136,8 @@ public class CeOptionServiceImpl implements ICeOptionService {
             }
             case "factory-code" -> {
                 collectDistinctWithLabel(options, companyFactoryMapper, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName);
-                collectDistinctWithLabel(options, activityDataMapper, CeActivityData::getCompanyCode, CeActivityData::getFactoryName);
-                collectDistinctWithLabel(options, emissionSourceMapper, CeEmissionSource::getCompanyCode, CeEmissionSource::getFactoryName);
+                collectDistinctWithLabel(options, activityDataMapper, CeActivityData::getFactoryCode, CeActivityData::getFactoryName);
+                collectDistinctWithLabel(options, emissionSourceMapper, CeEmissionSource::getFactoryCode, CeEmissionSource::getFactoryName);
                 collectDistinctWithLabel(
                     options,
                     greenPowerCertificateMapper,

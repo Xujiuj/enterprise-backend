@@ -221,7 +221,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         target.setField20(source.getField20());
         target.setField21(source.getField21());
         target.setField22(source.getField22());
-        target.setSortOrder(source.getSortOrder());
+        target.setSortOrder(source.getSortOrder() == null ? null : String.valueOf(source.getSortOrder()));
         target.setStatus(source.getStatus());
         target.setCreateTime(source.getCreateTime());
         target.setUpdateTime(source.getUpdateTime());

@@ -32,6 +32,8 @@ public class CeActivityData implements Serializable {
 
     private String companyName;
 
+    private String factoryCode;
+
     private String factoryName;
 
     private String sourceCategoryKey;
