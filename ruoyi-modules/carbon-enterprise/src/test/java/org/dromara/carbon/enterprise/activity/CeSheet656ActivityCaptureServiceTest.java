@@ -1,9 +1,15 @@
 package org.dromara.carbon.enterprise.activity;
 
+import com.baomidou.mybatisplus.core.metadata.TableInfo;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.core.toolkit.LambdaUtils;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.session.Configuration;
 import org.dromara.carbon.enterprise.domain.CeActivityData;
 import org.dromara.carbon.enterprise.domain.CeCaptureBatch;
 import org.dromara.carbon.enterprise.domain.CeCaptureCell;
 import org.dromara.carbon.enterprise.domain.CeCaptureRow;
+import org.dromara.carbon.enterprise.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.domain.CeTemplateField;
 import org.dromara.carbon.enterprise.domain.CeTemplateSheet;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ActivityCaptureResult;
@@ -19,6 +25,7 @@ import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureCellMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureRowMapper;
+import org.dromara.carbon.enterprise.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateFieldMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateSheetMapper;
 import org.dromara.carbon.enterprise.service.ICeSheet656DerivedFieldResolver;
@@ -26,6 +33,7 @@ import org.dromara.carbon.enterprise.service.impl.CeSheet656ActivityCaptureServi
 import org.dromara.carbon.enterprise.service.impl.CeSheet656ActivityImportValidationServiceImpl;
 import org.dromara.carbon.enterprise.service.impl.CeSheet656ValidationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -70,7 +78,13 @@ class CeSheet656ActivityCaptureServiceTest {
     private CeCaptureRowMapper captureRowMapper;
     private CeCaptureCellMapper captureCellMapper;
     private CeActivityDataMapper activityDataMapper;
+    private CeEmissionSourceMapper emissionSourceMapper;
     private CeSheet656ActivityCaptureServiceImpl service;
+
+    @BeforeAll
+    static void initializeLambdaCache() {
+        initializeEntityLambdaCache(CeEmissionSourceMapper.class, CeEmissionSource.class);
+    }
 
     @BeforeEach
     void setUp() {
@@ -80,6 +94,7 @@ class CeSheet656ActivityCaptureServiceTest {
         captureRowMapper = mock(CeCaptureRowMapper.class);
         captureCellMapper = mock(CeCaptureCellMapper.class);
         activityDataMapper = mock(CeActivityDataMapper.class);
+        emissionSourceMapper = mock(CeEmissionSourceMapper.class);
 
         CeSheet656ValidationServiceImpl rowValidator = new CeSheet656ValidationServiceImpl(fakeResolver());
         service = new CeSheet656ActivityCaptureServiceImpl(
@@ -89,7 +104,8 @@ class CeSheet656ActivityCaptureServiceTest {
             captureBatchMapper,
             captureRowMapper,
             captureCellMapper,
-            activityDataMapper
+            activityDataMapper,
+            emissionSourceMapper
         );
     }
 
@@ -171,6 +187,7 @@ class CeSheet656ActivityCaptureServiceTest {
 
         CeActivityData activityData = activityCaptor.getValue();
         assertEquals(100L, activityData.getBatchId());
+        assertEquals(3001L, activityData.getEmissionSourceId());
         assertEquals("sheet_656", activityData.getSourceSheetCode());
         assertEquals("SRC-001", activityData.getSourceIdentificationCode());
         assertEquals("COMP-001", activityData.getCompanyCode());
@@ -237,10 +254,12 @@ class CeSheet656ActivityCaptureServiceTest {
             captureBatchMapper,
             captureRowMapper,
             captureCellMapper,
-            activityDataMapper
+            activityDataMapper,
+            emissionSourceMapper
         );
         stubTemplateLookups();
         stubGeneratedIds();
+        stubEmissionSourceIds(importableRows);
 
         CeSheet656ActivityCaptureResult result = sampleImportService.importRows(importableRequest);
 
@@ -367,6 +386,30 @@ class CeSheet656ActivityCaptureServiceTest {
         }).when(captureRowMapper).insert(isA(CeCaptureRow.class));
         doAnswer(invocation -> 1).when(captureCellMapper).insert(isA(CeCaptureCell.class));
         doAnswer(invocation -> 1).when(activityDataMapper).insert(isA(CeActivityData.class));
+        CeEmissionSource source = new CeEmissionSource();
+        source.setId(3001L);
+        source.setSourceIdentificationCode("SRC-001");
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of(source));
+    }
+
+    private void stubEmissionSourceIds(List<CeSheet656ValidationRequest> rows) {
+        AtomicLong sourceIds = new AtomicLong(4000L);
+        List<CeEmissionSource> sources = rows.stream()
+            .map(row -> row.getFieldValues().stream()
+                .filter(field -> "f001".equals(field.getSourceColumnCode()))
+                .map(CeSheet656FieldValue::getValue)
+                .findFirst()
+                .orElse(null))
+            .filter(value -> value != null && !value.isBlank())
+            .distinct()
+            .map(code -> {
+                CeEmissionSource source = new CeEmissionSource();
+                source.setId(sourceIds.getAndIncrement());
+                source.setSourceIdentificationCode(code);
+                return source;
+            })
+            .toList();
+        when(emissionSourceMapper.selectList(any())).thenReturn(sources);
     }
 
     private List<String> rowIssueCodes(CeSheet656ActivityCaptureResult result) {
@@ -510,5 +553,17 @@ class CeSheet656ActivityCaptureServiceTest {
             current = current.getParent();
         }
         throw new IllegalStateException("missing workspace file: " + relativePath);
+    }
+
+    private static void initializeEntityLambdaCache(Class<?> mapperType, Class<?> entityType) {
+        if (TableInfoHelper.getTableInfo(entityType) != null) {
+            return;
+        }
+        Configuration configuration = new Configuration();
+        configuration.setMapUnderscoreToCamelCase(true);
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, mapperType.getName());
+        assistant.setCurrentNamespace(mapperType.getName());
+        TableInfo tableInfo = TableInfoHelper.initTableInfo(assistant, entityType);
+        LambdaUtils.installCache(tableInfo);
     }
 }

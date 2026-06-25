@@ -7,6 +7,7 @@ import org.dromara.carbon.enterprise.domain.CeActivityData;
 import org.dromara.carbon.enterprise.domain.CeCaptureBatch;
 import org.dromara.carbon.enterprise.domain.CeCaptureCell;
 import org.dromara.carbon.enterprise.domain.CeCaptureRow;
+import org.dromara.carbon.enterprise.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.domain.CeTemplateField;
 import org.dromara.carbon.enterprise.domain.CeTemplateSheet;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ActivityCaptureResult;
@@ -20,6 +21,7 @@ import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureCellMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureRowMapper;
+import org.dromara.carbon.enterprise.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateFieldMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateSheetMapper;
 import org.dromara.carbon.enterprise.service.ICeSheet656ActivityCaptureService;
@@ -70,6 +72,7 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
     private final CeCaptureRowMapper captureRowMapper;
     private final CeCaptureCellMapper captureCellMapper;
     private final CeActivityDataMapper activityDataMapper;
+    private final CeEmissionSourceMapper emissionSourceMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -202,16 +205,51 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
     private void persistActivityData(Long batchId, List<CeSheet656ValidationRequest> rows,
                                      List<CeSheet656ValidationResult> rowResults) {
         Date now = new Date();
+        List<Map<String, String>> rowValues = new ArrayList<>(rows.size());
         for (int index = 0; index < rows.size(); index++) {
-            Map<String, String> valuesByCode = mergedValues(rows.get(index), rowResultAt(rowResults, index));
-            CeActivityData activityData = toActivityData(batchId, valuesByCode, now);
+            rowValues.add(mergedValues(rows.get(index), rowResultAt(rowResults, index)));
+        }
+        Map<String, Long> sourceIdsByCode = loadEmissionSourceIds(rowValues);
+        for (int index = 0; index < rows.size(); index++) {
+            Map<String, String> valuesByCode = rowValues.get(index);
+            CeActivityData activityData = toActivityData(batchId, valuesByCode, sourceIdsByCode, now);
+            if (activityData.getEmissionSourceId() == null) {
+                throw new ServiceException("enterprise-local sheet_656 emission source is missing: "
+                    + valuesByCode.get("f001"));
+            }
             activityDataMapper.insert(activityData);
         }
     }
 
-    private CeActivityData toActivityData(Long batchId, Map<String, String> valuesByCode, Date now) {
+    private Map<String, Long> loadEmissionSourceIds(List<Map<String, String>> rowValues) {
+        List<String> sourceCodes = rowValues.stream()
+            .map(values -> normalize(values.get("f001")))
+            .filter(StringUtils::isNotBlank)
+            .distinct()
+            .toList();
+        if (sourceCodes.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<CeEmissionSource> sources = emissionSourceMapper.selectList(
+            new LambdaQueryWrapper<CeEmissionSource>()
+                .select(CeEmissionSource::getId, CeEmissionSource::getSourceIdentificationCode)
+                .in(CeEmissionSource::getSourceIdentificationCode, sourceCodes)
+        );
+        return sources == null ? Collections.emptyMap() : sources.stream()
+            .filter(source -> source.getId() != null && StringUtils.isNotBlank(source.getSourceIdentificationCode()))
+            .collect(Collectors.toMap(
+                source -> normalize(source.getSourceIdentificationCode()),
+                CeEmissionSource::getId,
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+    }
+
+    private CeActivityData toActivityData(Long batchId, Map<String, String> valuesByCode,
+                                          Map<String, Long> sourceIdsByCode, Date now) {
         CeActivityData activityData = new CeActivityData();
         activityData.setBatchId(batchId);
+        activityData.setEmissionSourceId(sourceIdsByCode.get(normalize(valuesByCode.get("f001"))));
         activityData.setSourceSheetCode(TARGET_TABLE_CODE);
         activityData.setSourceIdentificationCode(valuesByCode.get("f001"));
         activityData.setCompanyCode(valuesByCode.get("f002"));
