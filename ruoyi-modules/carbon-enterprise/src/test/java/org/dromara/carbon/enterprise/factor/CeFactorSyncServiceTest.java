@@ -125,6 +125,21 @@ class CeFactorSyncServiceTest {
         assertEquals("VALID", field.get(null));
     }
 
+    @Test
+    void reportsReadableErrorWhenVendorReturnsNullBody() {
+        when(licenseStateMapper.selectList(any())).thenReturn(List.of(validLicense()));
+        CeFactorCacheVersion currentCache = new CeFactorCacheVersion();
+        currentCache.setVersionCode("OLD");
+        when(factorCacheVersionMapper.selectOne(any(), eq(false))).thenReturn(currentCache);
+        when(vendorFactorOpenClient.syncFactors("LIC-001", "INSTALL-001", "OLD"))
+            .thenThrow(new ServiceException("厂商因子同步失败：厂商未返回数据"));
+
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.syncCurrentLicenseFactors());
+
+        assertEquals("厂商因子同步失败：厂商未返回数据", exception.getMessage());
+    }
+
     private CeLicenseState validLicense() {
         CeLicenseState license = new CeLicenseState();
         license.setLicenseId("LIC-001");

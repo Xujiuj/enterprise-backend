@@ -115,7 +115,10 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         try (Stream<Path> paths = Files.walk(root)) {
             List<Path> workbooks = paths
                 .filter(Files::isRegularFile)
-                .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".xlsx"))
+                .filter(path -> {
+                    String name = path.getFileName().toString();
+                    return name.toLowerCase(Locale.ROOT).endsWith(".xlsx") && !name.startsWith("~$");
+                })
                 .sorted(Comparator.comparing(Path::toString))
                 .toList();
             for (Path workbook : workbooks) {
@@ -167,6 +170,10 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         try (Workbook workbook = WorkbookFactory.create(inputStream)) {
             for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
                 Sheet sheet = workbook.getSheetAt(i);
+                String sheetName = sheet.getSheetName();
+                if (sheetName != null && sheetName.contains("说明")) {
+                    continue;
+                }
                 List<Map<String, Object>> rows = readSheet(sheet);
                 if (rows.isEmpty()) {
                     continue;

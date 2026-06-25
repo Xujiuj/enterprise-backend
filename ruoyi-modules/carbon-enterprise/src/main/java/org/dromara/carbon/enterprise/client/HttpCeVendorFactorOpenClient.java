@@ -34,17 +34,23 @@ public class HttpCeVendorFactorOpenClient implements CeVendorFactorOpenClient {
             .queryParam("installId", installId)
             .queryParamIfPresent("currentVersionCode", java.util.Optional.ofNullable(currentVersionCode))
             .toUriString();
-        ResponseEntity<R<CeVendorFactorSyncResponse>> response = restTemplate.exchange(
-            url,
-            HttpMethod.GET,
-            CeVendorOpenApiRequestSupport.bearerEntity(licenseId),
-            new ParameterizedTypeReference<>() {
+        try {
+            ResponseEntity<R<CeVendorFactorSyncResponse>> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                CeVendorOpenApiRequestSupport.bearerEntity(licenseId),
+                new ParameterizedTypeReference<>() {
+                }
+            );
+            R<CeVendorFactorSyncResponse> body = response.getBody();
+            if (body == null || R.isError(body) || body.getData() == null) {
+                throw new ServiceException(body == null ? "厂商因子同步失败：厂商未返回数据" : body.getMsg());
             }
-        );
-        R<CeVendorFactorSyncResponse> body = response.getBody();
-        if (body == null || R.isError(body) || body.getData() == null) {
-            throw new ServiceException(body == null ? "vendor factor sync failed" : body.getMsg());
+            return body.getData();
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ServiceException("厂商因子同步失败：" + e.getMessage());
         }
-        return body.getData();
     }
 }
