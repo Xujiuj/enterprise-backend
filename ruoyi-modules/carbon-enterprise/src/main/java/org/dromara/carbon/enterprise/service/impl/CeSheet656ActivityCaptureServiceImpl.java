@@ -3,6 +3,7 @@ package org.dromara.carbon.enterprise.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.carbon.enterprise.domain.CeActivityData;
 import org.dromara.carbon.enterprise.domain.CeCaptureBatch;
 import org.dromara.carbon.enterprise.domain.CeCaptureCell;
 import org.dromara.carbon.enterprise.domain.CeCaptureRow;
@@ -15,6 +16,7 @@ import org.dromara.carbon.enterprise.domain.activity.CeSheet656ImportValidationR
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ImportValidationResult;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ValidationRequest;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ValidationResult;
+import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureCellMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureRowMapper;
@@ -57,6 +59,7 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
     private static final String VALIDATION_STATUS_VALID = "valid";
     private static final String ROW_STATUS_ACCEPTED = "accepted";
     private static final String VALUE_STATUS_VALID = "valid";
+    private static final String DATA_STATUS_DRAFT = "draft";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
@@ -66,6 +69,7 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
     private final CeCaptureBatchMapper captureBatchMapper;
     private final CeCaptureRowMapper captureRowMapper;
     private final CeCaptureCellMapper captureCellMapper;
+    private final CeActivityDataMapper activityDataMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -84,11 +88,11 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
     }
 
     private CeSheet656ActivityCaptureResult validateAndPersist(CeSheet656ImportValidationRequest request, String sourceMode) {
-        log.info("【诊断】validateAndPersist 开始, sourceMode={}, rows={}", sourceMode,
+        log.info("sheet_656 capture persistence started, sourceMode={}, rows={}", sourceMode,
             request == null || request.getRows() == null ? 0 : request.getRows().size());
 
         CeSheet656ImportValidationResult validation = importValidationService.validateImport(request);
-        log.info("【诊断】验证结果: isValid={}, blocking={}, headerIssues={}, rowResults={}",
+        log.info("sheet_656 validation result: valid={}, blocking={}, headerIssues={}, rowResults={}",
             validation.isValid(),
             validation.isBlocking(),
             validation.getHeaderIssues() == null ? 0 : validation.getHeaderIssues().size(),
@@ -100,35 +104,36 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
         result.setPersistedRowCount(0);
 
         if (!validation.isValid()) {
-            log.warn("【诊断】验证失败，不进行持久化");
+            log.warn("sheet_656 validation failed; persistence skipped");
             return result;
         }
 
         List<CeSheet656ValidationRequest> rows = request == null ? Collections.emptyList() : request.getRows();
         if (rows == null || rows.isEmpty()) {
-            log.warn("【诊断】行数据为空，不进行持久化");
+            log.warn("sheet_656 request has no rows; persistence skipped");
             return result;
         }
 
         try {
             CeTemplateSheet sheet = resolveSheet();
-            log.info("【诊断】找到模板: sheetId={}", sheet.getId());
+            log.info("sheet_656 template resolved, sheetId={}", sheet.getId());
 
             Map<String, CeTemplateField> fieldsByCode = resolveFields(sheet.getId());
-            log.info("【诊断】找到字段数量: {}", fieldsByCode.size());
+            log.info("sheet_656 template fields resolved, count={}", fieldsByCode.size());
 
             CeCaptureBatch batch = insertBatch(sheet, sourceMode);
-            log.info("【诊断】插入批次成功: batchId={}", batch.getId());
+            log.info("sheet_656 capture batch inserted, batchId={}", batch.getId());
 
             persistRows(batch.getId(), sheet.getId(), rows, validation.getRowResults(), fieldsByCode);
-            log.info("【诊断】持久化行成功: rowCount={}", rows.size());
+            persistActivityData(batch.getId(), rows, validation.getRowResults());
+            log.info("sheet_656 rows persisted, rowCount={}", rows.size());
 
             result.setPersisted(true);
             result.setBatchId(batch.getId());
             result.setPersistedRowCount(rows.size());
             return result;
         } catch (Exception e) {
-            log.error("【诊断】持久化过程中发生异常", e);
+            log.error("sheet_656 persistence failed", e);
             throw e;
         }
     }
@@ -192,6 +197,45 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
                 insertCell(row.getId(), field, valuesByCode.get(descriptor.getSourceColumnCode()));
             }
         }
+    }
+
+    private void persistActivityData(Long batchId, List<CeSheet656ValidationRequest> rows,
+                                     List<CeSheet656ValidationResult> rowResults) {
+        Date now = new Date();
+        for (int index = 0; index < rows.size(); index++) {
+            Map<String, String> valuesByCode = mergedValues(rows.get(index), rowResultAt(rowResults, index));
+            CeActivityData activityData = toActivityData(batchId, valuesByCode, now);
+            activityDataMapper.insert(activityData);
+        }
+    }
+
+    private CeActivityData toActivityData(Long batchId, Map<String, String> valuesByCode, Date now) {
+        CeActivityData activityData = new CeActivityData();
+        activityData.setBatchId(batchId);
+        activityData.setSourceSheetCode(TARGET_TABLE_CODE);
+        activityData.setSourceIdentificationCode(valuesByCode.get("f001"));
+        activityData.setCompanyCode(valuesByCode.get("f002"));
+        activityData.setCompanyName(valuesByCode.get("f003"));
+        activityData.setFactoryName(valuesByCode.get("f004"));
+        activityData.setSourceCategoryKey(valuesByCode.get("f005"));
+        activityData.setScopeName(valuesByCode.get("f006"));
+        activityData.setScopeSubcategory(valuesByCode.get("f007"));
+        activityData.setSourceIdentificationName(valuesByCode.get("f008"));
+        activityData.setEmissionSourceName(valuesByCode.get("f009"));
+        activityData.setActivityUnit(valuesByCode.get("f010"));
+        activityData.setActivityYear(toIntegerValue(valuesByCode.get("f011")));
+        activityData.setActivityMonth(toIntegerValue(valuesByCode.get("f012")));
+        activityData.setActivityDate(toDateValue("f013", valuesByCode.get("f013")));
+        activityData.setActivityValue(toDecimalValue("f014", valuesByCode.get("f014")));
+        activityData.setResponsibleDept(valuesByCode.get("f015"));
+        activityData.setDataSource(valuesByCode.get("f016"));
+        activityData.setSourceRemark(valuesByCode.get("f017"));
+        activityData.setFactorKey(valuesByCode.get("f018"));
+        activityData.setDataStatus(DATA_STATUS_DRAFT);
+        activityData.setCreateTime(now);
+        activityData.setUpdateTime(now);
+        activityData.setRemark("sheet_656 enterprise-local activity capture");
+        return activityData;
     }
 
     private CeSheet656ValidationResult rowResultAt(List<CeSheet656ValidationResult> rowResults, int index) {
@@ -314,6 +358,13 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
                 return null;
             }
         }
+    }
+
+    private Integer toIntegerValue(String value) {
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+        return Integer.valueOf(value.trim());
     }
 
     private String normalize(String value) {

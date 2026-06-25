@@ -1,5 +1,6 @@
 package org.dromara.carbon.enterprise.activity;
 
+import org.dromara.carbon.enterprise.domain.CeActivityData;
 import org.dromara.carbon.enterprise.domain.CeCaptureBatch;
 import org.dromara.carbon.enterprise.domain.CeCaptureCell;
 import org.dromara.carbon.enterprise.domain.CeCaptureRow;
@@ -14,6 +15,7 @@ import org.dromara.carbon.enterprise.domain.activity.CeSheet656ResolvedRow;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ValidationIssue;
 import org.dromara.carbon.enterprise.domain.activity.CeSheet656ValidationRequest;
 import org.dromara.carbon.enterprise.service.ICeSheet656ActivityImportValidationService;
+import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureCellMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureRowMapper;
@@ -67,6 +69,7 @@ class CeSheet656ActivityCaptureServiceTest {
     private CeCaptureBatchMapper captureBatchMapper;
     private CeCaptureRowMapper captureRowMapper;
     private CeCaptureCellMapper captureCellMapper;
+    private CeActivityDataMapper activityDataMapper;
     private CeSheet656ActivityCaptureServiceImpl service;
 
     @BeforeEach
@@ -76,6 +79,7 @@ class CeSheet656ActivityCaptureServiceTest {
         captureBatchMapper = mock(CeCaptureBatchMapper.class);
         captureRowMapper = mock(CeCaptureRowMapper.class);
         captureCellMapper = mock(CeCaptureCellMapper.class);
+        activityDataMapper = mock(CeActivityDataMapper.class);
 
         CeSheet656ValidationServiceImpl rowValidator = new CeSheet656ValidationServiceImpl(fakeResolver());
         service = new CeSheet656ActivityCaptureServiceImpl(
@@ -84,7 +88,8 @@ class CeSheet656ActivityCaptureServiceTest {
             templateFieldMapper,
             captureBatchMapper,
             captureRowMapper,
-            captureCellMapper
+            captureCellMapper,
+            activityDataMapper
         );
     }
 
@@ -104,7 +109,7 @@ class CeSheet656ActivityCaptureServiceTest {
         assertEquals("INVALID_VALUE_DOMAIN", issue.getCode());
         assertEquals("activity value must be greater than zero", issue.getMessage());
         verifyNoInteractions(templateSheetMapper, templateFieldMapper, captureBatchMapper, captureRowMapper,
-            captureCellMapper);
+            captureCellMapper, activityDataMapper);
     }
 
     @Test
@@ -121,11 +126,11 @@ class CeSheet656ActivityCaptureServiceTest {
         assertEquals(List.of("INVALID_VALUE_DOMAIN"), rowIssueCodes(manualResult));
         assertEquals(rowIssueCodes(manualResult), rowIssueCodes(importResult));
         verifyNoInteractions(templateSheetMapper, templateFieldMapper, captureBatchMapper, captureRowMapper,
-            captureCellMapper);
+            captureCellMapper, activityDataMapper);
     }
 
     @Test
-    void validImportPersistsOnlyEnterpriseLocalCaptureTables() {
+    void validImportPersistsCaptureTablesAndActivityDataListTable() {
         stubTemplateLookups();
         stubGeneratedIds();
 
@@ -142,9 +147,11 @@ class CeSheet656ActivityCaptureServiceTest {
         ArgumentCaptor<CeCaptureBatch> batchCaptor = ArgumentCaptor.forClass(CeCaptureBatch.class);
         ArgumentCaptor<CeCaptureRow> rowCaptor = ArgumentCaptor.forClass(CeCaptureRow.class);
         ArgumentCaptor<CeCaptureCell> cellCaptor = ArgumentCaptor.forClass(CeCaptureCell.class);
+        ArgumentCaptor<CeActivityData> activityCaptor = ArgumentCaptor.forClass(CeActivityData.class);
         verify(captureBatchMapper).insert(batchCaptor.capture());
         verify(captureRowMapper).insert(rowCaptor.capture());
         verify(captureCellMapper, org.mockito.Mockito.times(18)).insert(cellCaptor.capture());
+        verify(activityDataMapper).insert(activityCaptor.capture());
         verify(templateSheetMapper).selectList(any());
         verify(templateFieldMapper).selectList(any());
 
@@ -161,6 +168,32 @@ class CeSheet656ActivityCaptureServiceTest {
         assertEquals("Company One", cellsByFieldId.get(1003L).getTextValue());
         assertEquals("EF-2026-001", cellsByFieldId.get(1018L).getTextValue());
         assertEquals(new BigDecimal("12.5"), cellsByFieldId.get(1014L).getDecimalValue());
+
+        CeActivityData activityData = activityCaptor.getValue();
+        assertEquals(100L, activityData.getBatchId());
+        assertEquals("sheet_656", activityData.getSourceSheetCode());
+        assertEquals("SRC-001", activityData.getSourceIdentificationCode());
+        assertEquals("COMP-001", activityData.getCompanyCode());
+        assertEquals("Company One", activityData.getCompanyName());
+        assertEquals("Factory One", activityData.getFactoryName());
+        assertEquals("CAT-001", activityData.getSourceCategoryKey());
+        assertEquals("Scope 1", activityData.getScopeName());
+        assertEquals("Stationary Combustion", activityData.getScopeSubcategory());
+        assertEquals("Natural Gas Boiler", activityData.getSourceIdentificationName());
+        assertEquals("Natural Gas", activityData.getEmissionSourceName());
+        assertEquals("Nm3", activityData.getActivityUnit());
+        assertEquals(2026, activityData.getActivityYear());
+        assertEquals(6, activityData.getActivityMonth());
+        assertEquals(LocalDate.of(2026, 6, 5), activityData.getActivityDate()
+            .toInstant()
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate());
+        assertEquals(new BigDecimal("12.5"), activityData.getActivityValue());
+        assertEquals("Production", activityData.getResponsibleDept());
+        assertEquals("Meter", activityData.getDataSource());
+        assertEquals("Normal record", activityData.getSourceRemark());
+        assertEquals("EF-2026-001", activityData.getFactorKey());
+        assertEquals("draft", activityData.getDataStatus());
     }
 
     @Test
@@ -203,7 +236,8 @@ class CeSheet656ActivityCaptureServiceTest {
             templateFieldMapper,
             captureBatchMapper,
             captureRowMapper,
-            captureCellMapper
+            captureCellMapper,
+            activityDataMapper
         );
         stubTemplateLookups();
         stubGeneratedIds();
@@ -218,6 +252,7 @@ class CeSheet656ActivityCaptureServiceTest {
         ArgumentCaptor<CeCaptureRow> rowCaptor = ArgumentCaptor.forClass(CeCaptureRow.class);
         verify(captureRowMapper, org.mockito.Mockito.times(importableRows.size())).insert(rowCaptor.capture());
         verify(captureCellMapper, org.mockito.Mockito.times(importableRows.size() * 18)).insert(isA(CeCaptureCell.class));
+        verify(activityDataMapper, org.mockito.Mockito.times(importableRows.size())).insert(isA(CeActivityData.class));
         assertEquals(importableRows.get(0).getRowNumber(), rowCaptor.getAllValues().get(0).getSourceRowNo());
         assertEquals(importableRows.get(importableRows.size() - 1).getRowNumber(),
             rowCaptor.getAllValues().get(importableRows.size() - 1).getSourceRowNo());
@@ -257,7 +292,7 @@ class CeSheet656ActivityCaptureServiceTest {
         assertEquals("DUPLICATE_ROW_NUMBER",
             result.getValidationResult().getRowResults().get(1).getIssues().get(0).getCode());
         verifyNoInteractions(templateSheetMapper, templateFieldMapper, captureBatchMapper, captureRowMapper,
-            captureCellMapper);
+            captureCellMapper, activityDataMapper);
     }
 
     @Test
@@ -279,6 +314,7 @@ class CeSheet656ActivityCaptureServiceTest {
         verify(captureBatchMapper).insert(isA(CeCaptureBatch.class));
         verify(captureRowMapper).insert(isA(CeCaptureRow.class));
         verify(captureCellMapper, never()).insert(isA(CeCaptureCell.class));
+        verify(activityDataMapper, never()).insert(isA(CeActivityData.class));
     }
 
     @Test
@@ -290,6 +326,7 @@ class CeSheet656ActivityCaptureServiceTest {
         verify(captureBatchMapper, never()).insert(isA(CeCaptureBatch.class));
         verify(captureRowMapper, never()).insert(isA(CeCaptureRow.class));
         verify(captureCellMapper, never()).insert(isA(CeCaptureCell.class));
+        verify(activityDataMapper, never()).insert(isA(CeActivityData.class));
     }
 
     private void stubTemplateLookups() {
@@ -329,6 +366,7 @@ class CeSheet656ActivityCaptureServiceTest {
             return 1;
         }).when(captureRowMapper).insert(isA(CeCaptureRow.class));
         doAnswer(invocation -> 1).when(captureCellMapper).insert(isA(CeCaptureCell.class));
+        doAnswer(invocation -> 1).when(activityDataMapper).insert(isA(CeActivityData.class));
     }
 
     private List<String> rowIssueCodes(CeSheet656ActivityCaptureResult result) {
