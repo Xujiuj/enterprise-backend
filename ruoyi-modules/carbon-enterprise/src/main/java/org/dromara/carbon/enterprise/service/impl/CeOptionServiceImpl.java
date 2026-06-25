@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.carbon.enterprise.domain.CeActivityData;
 import org.dromara.carbon.enterprise.domain.CeCaptureBatch;
 import org.dromara.carbon.enterprise.domain.CeCompanyFactory;
@@ -53,6 +54,7 @@ import java.util.stream.Stream;
  * rows. This avoids sys_dict coupling and prevents arbitrary table/column
  * reads from the frontend.</p>
  */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class CeOptionServiceImpl implements ICeOptionService {
@@ -349,25 +351,39 @@ public class CeOptionServiceImpl implements ICeOptionService {
 
     private void collectEmissionSourceNameOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
         Map<String, CeOptionVo> optionsByLabel = new LinkedHashMap<>();
-        for (CeEmissionSource row : selectEnabledEmissionSources(query)) {
+        List<CeEmissionSource> rows = selectEnabledEmissionSources(query);
+        Map<String, String> factorNameCache = loadFactorDisplayNameCache(rows);
+        for (CeEmissionSource row : rows) {
             String label = emissionSourceLabel(row);
             if (StringUtils.isBlank(label)) {
                 continue;
             }
-            optionsByLabel.putIfAbsent(label, new CeOptionVo(label, label, emissionSourceRecord(row)));
+            optionsByLabel.putIfAbsent(label, new CeOptionVo(label, label, emissionSourceRecord(row, factorNameCache)));
         }
         target.addAll(optionsByLabel.values());
     }
 
     private void collectEmissionSourceLeafOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
         Map<String, CeOptionVo> optionsByLabel = new LinkedHashMap<>();
-        for (CeEmissionSource row : selectEnabledEmissionSources(query)) {
+        List<CeEmissionSource> rows = selectEnabledEmissionSources(query);
+        log.info("[Leaf选项] 查询到 {} 条排放源记录, 查询条件: company={}, factory={}, category={}",
+            rows.size(), query.getCompanyName(), query.getFactoryName(), query.getSourceCategoryKey());
+        Map<String, String> factorNameCache = loadFactorDisplayNameCache(rows);
+        boolean firstRow = true;
+        for (CeEmissionSource row : rows) {
             String value = normalizeValue(row.getSourceIdentificationCode());
             String label = emissionSourceLabel(row);
             if (StringUtils.isBlank(value) || StringUtils.isBlank(label)) {
                 continue;
             }
-            CeOptionVo candidate = new CeOptionVo(label, value, emissionSourceRecord(row));
+            Map<String, Object> record = emissionSourceRecord(row, factorNameCache);
+            if (firstRow) {
+                log.info("[Leaf选项] 首条记录: code={}, name={}, scope={}, unit={}, factor={}, factorDisplay={}",
+                    value, row.getEmissionSourceName(), row.getScopeName(),
+                    row.getSourceUnit(), row.getFactorKey(), record.get("factorDisplayName"));
+                firstRow = false;
+            }
+            CeOptionVo candidate = new CeOptionVo(label, value, record);
             CeOptionVo existing = optionsByLabel.get(label);
             if (existing == null || compareOptionValue(value, normalizeValue(existing.getValue())) < 0) {
                 optionsByLabel.put(label, candidate);
@@ -408,7 +424,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             .orElse("");
     }
 
-    private Map<String, Object> emissionSourceRecord(CeEmissionSource source) {
+    private Map<String, Object> emissionSourceRecord(CeEmissionSource source, Map<String, String> factorNameCache) {
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("id", source.getId());
         record.put("companyCode", source.getCompanyCode());
@@ -423,43 +439,46 @@ public class CeOptionServiceImpl implements ICeOptionService {
         record.put("responsibleDept", source.getResponsibleDept());
         record.put("dataSource", source.getDataSource());
         record.put("factorKey", source.getFactorKey());
-        record.put("factorDisplayName", resolveFactorDisplayName(source.getFactorKey()));
+        record.put("factorDisplayName", factorNameCache.getOrDefault(normalizeValue(source.getFactorKey()), source.getFactorKey()));
         record.put("sourceUnit", source.getSourceUnit());
         record.put("enabledFlag", source.getEnabledFlag());
         return record;
     }
 
     /**
-     * 根据因子键解析因子显示名称。
-     * 优先从因子缓存记录中查找人类可读名称，未找到时返回原始键值。
+     * 批量加载因子显示名称缓存。一次查询所有因子缓存记录，避免 N+1 问题。
      *
-     * @param factorKey 因子键（如 "201-天然气" 或 "电力因子表"）
-     * @return 因子显示名称
+     * @param sources 排放源列表（用于提取 factorKey 集合）
+     * @return factorKey → 显示名称的映射
      */
-    private String resolveFactorDisplayName(String factorKey) {
-        if (StringUtils.isBlank(factorKey)) {
-            return "";
+    private Map<String, String> loadFactorDisplayNameCache(List<CeEmissionSource> sources) {
+        Set<String> factorKeys = sources.stream()
+            .map(CeEmissionSource::getFactorKey)
+            .map(this::normalizeValue)
+            .filter(StringUtils::isNotBlank)
+            .collect(java.util.stream.Collectors.toSet());
+        if (factorKeys.isEmpty()) {
+            return java.util.Collections.emptyMap();
         }
-        if ("电力因子表".equals(factorKey.trim())) {
-            return "电力因子表";
-        }
-        CeFactorCacheRecord record = factorCacheRecordMapper.selectOne(
+        Map<String, String> cache = new LinkedHashMap<>();
+        for (CeFactorCacheRecord rec : factorCacheRecordMapper.selectList(
             new LambdaQueryWrapper<CeFactorCacheRecord>()
-                .select(CeFactorCacheRecord::getFactorName, CeFactorCacheRecord::getEmissionSourceName, CeFactorCacheRecord::getFactorUnit)
-                .eq(CeFactorCacheRecord::getFactorKey, factorKey.trim())
-                .last("LIMIT 1"),
-            false
-        );
-        if (record != null) {
-            String name = Stream.of(record.getEmissionSourceName(), record.getFactorName())
+                .select(CeFactorCacheRecord::getFactorKey, CeFactorCacheRecord::getFactorName,
+                    CeFactorCacheRecord::getEmissionSourceName, CeFactorCacheRecord::getFactorUnit)
+                .in(CeFactorCacheRecord::getFactorKey, factorKeys))) {
+            String key = normalizeValue(rec.getFactorKey());
+            if (StringUtils.isBlank(key)) continue;
+            String name = Stream.of(rec.getEmissionSourceName(), rec.getFactorName())
                 .map(this::normalizeValue)
                 .filter(StringUtils::isNotBlank)
                 .findFirst()
-                .orElse(factorKey);
-            String unit = normalizeValue(record.getFactorUnit());
-            return StringUtils.isNotBlank(unit) ? name + " (" + unit + ")" : name;
+                .orElse(key);
+            String unit = normalizeValue(rec.getFactorUnit());
+            cache.put(key, StringUtils.isNotBlank(unit) ? name + " (" + unit + ")" : name);
         }
-        return factorKey;
+        // 特殊处理
+        cache.putIfAbsent("电力因子表", "电力因子表");
+        return cache;
     }
 
     private void collectDimensionFieldOptions(List<CeOptionVo> target, String dimensionCode, String field) {
