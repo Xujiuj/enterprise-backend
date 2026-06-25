@@ -1,5 +1,6 @@
 package org.dromara.carbon.enterprise.domain;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -25,6 +26,7 @@ public class CeEmissionSource implements Serializable {
 
     private String companyName;
 
+    @TableField(exist = false)
     private String factoryCode;
 
     private String factoryName;

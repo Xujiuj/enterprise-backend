@@ -423,9 +423,43 @@ public class CeOptionServiceImpl implements ICeOptionService {
         record.put("responsibleDept", source.getResponsibleDept());
         record.put("dataSource", source.getDataSource());
         record.put("factorKey", source.getFactorKey());
+        record.put("factorDisplayName", resolveFactorDisplayName(source.getFactorKey()));
         record.put("sourceUnit", source.getSourceUnit());
         record.put("enabledFlag", source.getEnabledFlag());
         return record;
+    }
+
+    /**
+     * 根据因子键解析因子显示名称。
+     * 优先从因子缓存记录中查找人类可读名称，未找到时返回原始键值。
+     *
+     * @param factorKey 因子键（如 "201-天然气" 或 "电力因子表"）
+     * @return 因子显示名称
+     */
+    private String resolveFactorDisplayName(String factorKey) {
+        if (StringUtils.isBlank(factorKey)) {
+            return "";
+        }
+        if ("电力因子表".equals(factorKey.trim())) {
+            return "电力因子表";
+        }
+        CeFactorCacheRecord record = factorCacheRecordMapper.selectOne(
+            new LambdaQueryWrapper<CeFactorCacheRecord>()
+                .select(CeFactorCacheRecord::getFactorName, CeFactorCacheRecord::getEmissionSourceName, CeFactorCacheRecord::getFactorUnit)
+                .eq(CeFactorCacheRecord::getFactorKey, factorKey.trim())
+                .last("LIMIT 1"),
+            false
+        );
+        if (record != null) {
+            String name = Stream.of(record.getEmissionSourceName(), record.getFactorName())
+                .map(this::normalizeValue)
+                .filter(StringUtils::isNotBlank)
+                .findFirst()
+                .orElse(factorKey);
+            String unit = normalizeValue(record.getFactorUnit());
+            return StringUtils.isNotBlank(unit) ? name + " (" + unit + ")" : name;
+        }
+        return factorKey;
     }
 
     private void collectDimensionFieldOptions(List<CeOptionVo> target, String dimensionCode, String field) {

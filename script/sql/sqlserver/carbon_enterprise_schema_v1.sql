@@ -329,6 +329,7 @@ CREATE TABLE ce_emission_source (
     responsible_dept NVARCHAR(255) NULL,
     data_source NVARCHAR(255) NULL,
     factor_key NVARCHAR(64) NULL,
+    source_unit NVARCHAR(64) NULL,
     enabled_flag BIT NOT NULL DEFAULT 1,
     create_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
     update_time DATETIME2 NULL DEFAULT SYSUTCDATETIME(),
