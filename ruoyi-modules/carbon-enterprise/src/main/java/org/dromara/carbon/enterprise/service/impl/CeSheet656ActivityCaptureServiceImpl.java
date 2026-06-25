@@ -2,6 +2,7 @@ package org.dromara.carbon.enterprise.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.carbon.enterprise.domain.CeCaptureBatch;
 import org.dromara.carbon.enterprise.domain.CeCaptureCell;
 import org.dromara.carbon.enterprise.domain.CeCaptureRow;
@@ -45,6 +46,7 @@ import java.util.stream.Collectors;
  * Persists validated sheet_656 activity rows into enterprise-local ce_* capture tables.
  */
 @RequiredArgsConstructor
+@Slf4j
 @Service
 public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656ActivityCaptureService {
 
@@ -82,30 +84,53 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
     }
 
     private CeSheet656ActivityCaptureResult validateAndPersist(CeSheet656ImportValidationRequest request, String sourceMode) {
+        log.info("【诊断】validateAndPersist 开始, sourceMode={}, rows={}", sourceMode,
+            request == null || request.getRows() == null ? 0 : request.getRows().size());
+
         CeSheet656ImportValidationResult validation = importValidationService.validateImport(request);
+        log.info("【诊断】验证结果: isValid={}, blocking={}, headerIssues={}, rowResults={}",
+            validation.isValid(),
+            validation.isBlocking(),
+            validation.getHeaderIssues() == null ? 0 : validation.getHeaderIssues().size(),
+            validation.getRowResults() == null ? 0 : validation.getRowResults().size());
+
         CeSheet656ActivityCaptureResult result = new CeSheet656ActivityCaptureResult();
         result.setValidationResult(validation);
         result.setPersisted(false);
         result.setPersistedRowCount(0);
 
         if (!validation.isValid()) {
+            log.warn("【诊断】验证失败，不进行持久化");
             return result;
         }
 
         List<CeSheet656ValidationRequest> rows = request == null ? Collections.emptyList() : request.getRows();
         if (rows == null || rows.isEmpty()) {
+            log.warn("【诊断】行数据为空，不进行持久化");
             return result;
         }
 
-        CeTemplateSheet sheet = resolveSheet();
-        Map<String, CeTemplateField> fieldsByCode = resolveFields(sheet.getId());
-        CeCaptureBatch batch = insertBatch(sheet, sourceMode);
-        persistRows(batch.getId(), sheet.getId(), rows, validation.getRowResults(), fieldsByCode);
+        try {
+            CeTemplateSheet sheet = resolveSheet();
+            log.info("【诊断】找到模板: sheetId={}", sheet.getId());
 
-        result.setPersisted(true);
-        result.setBatchId(batch.getId());
-        result.setPersistedRowCount(rows.size());
-        return result;
+            Map<String, CeTemplateField> fieldsByCode = resolveFields(sheet.getId());
+            log.info("【诊断】找到字段数量: {}", fieldsByCode.size());
+
+            CeCaptureBatch batch = insertBatch(sheet, sourceMode);
+            log.info("【诊断】插入批次成功: batchId={}", batch.getId());
+
+            persistRows(batch.getId(), sheet.getId(), rows, validation.getRowResults(), fieldsByCode);
+            log.info("【诊断】持久化行成功: rowCount={}", rows.size());
+
+            result.setPersisted(true);
+            result.setBatchId(batch.getId());
+            result.setPersistedRowCount(rows.size());
+            return result;
+        } catch (Exception e) {
+            log.error("【诊断】持久化过程中发生异常", e);
+            throw e;
+        }
     }
 
     private CeTemplateSheet resolveSheet() {
