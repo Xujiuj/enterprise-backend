@@ -420,6 +420,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
         record.put("responsibleDept", source.getResponsibleDept());
         record.put("dataSource", source.getDataSource());
         record.put("factorKey", source.getFactorKey());
+        record.put("sourceUnit", source.getSourceUnit());
         record.put("enabledFlag", source.getEnabledFlag());
         return record;
     }

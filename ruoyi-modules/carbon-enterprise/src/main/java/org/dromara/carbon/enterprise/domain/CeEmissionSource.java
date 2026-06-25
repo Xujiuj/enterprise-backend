@@ -47,6 +47,8 @@ public class CeEmissionSource implements Serializable {
 
     private String factorKey;
 
+    private String sourceUnit;
+
     private Boolean enabledFlag;
 
     private Date createTime;
