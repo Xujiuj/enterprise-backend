@@ -76,7 +76,7 @@ public class CeDimensionRecordBo implements Serializable {
 
     private String field22;
 
-    private Integer sortOrder;
+    private String sortOrder;
 
     private String status;
 

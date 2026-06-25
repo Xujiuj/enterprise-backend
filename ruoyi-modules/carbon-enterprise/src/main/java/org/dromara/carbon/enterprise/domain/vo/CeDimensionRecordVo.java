@@ -69,7 +69,7 @@ public class CeDimensionRecordVo implements Serializable {
 
     private String field22;
 
-    private Integer sortOrder;
+    private String sortOrder;
 
     private String status;
 
