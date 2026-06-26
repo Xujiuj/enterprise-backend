@@ -26,6 +26,8 @@ public class CeActivityData implements Serializable {
 
     private Long emissionSourceId;
 
+    private String activityPeriod;
+
     private String sourceSheetCode;
 
     private String sourceIdentificationCode;

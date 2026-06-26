@@ -79,26 +79,20 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
 
     @Override
     public TableDataInfo<CeActivityDataVo> queryPageList(CeActivityDataBo bo, PageQuery pageQuery) {
-        LambdaQueryWrapper<CeActivityData> wrapper = buildQueryWrapper(bo)
-            .orderByAsc(CeActivityData::getSourceSheetCode)
-            .orderByAsc(CeActivityData::getSourceIdentificationCode)
-            .orderByAsc(CeActivityData::getActivityYear)
-            .orderByAsc(CeActivityData::getActivityMonth)
-            .orderByAsc(CeActivityData::getActivityDate)
-            .orderByAsc(CeActivityData::getId);
+        LambdaQueryWrapper<CeActivityData> wrapper = applyDefaultListOrder(buildQueryWrapper(bo));
         IPage<CeActivityDataVo> page = activityDataMapper.selectVoPage(pageQuery.build(), wrapper);
         return TableDataInfo.build(page);
     }
 
     @Override
     public List<CeActivityDataVo> queryList(CeActivityDataBo bo) {
-        return activityDataMapper.selectVoList(buildQueryWrapper(bo)
-            .orderByAsc(CeActivityData::getSourceSheetCode)
-            .orderByAsc(CeActivityData::getSourceIdentificationCode)
-            .orderByAsc(CeActivityData::getActivityYear)
-            .orderByAsc(CeActivityData::getActivityMonth)
-            .orderByAsc(CeActivityData::getActivityDate)
-            .orderByAsc(CeActivityData::getId));
+        return activityDataMapper.selectVoList(applyDefaultListOrder(buildQueryWrapper(bo)));
+    }
+
+    private LambdaQueryWrapper<CeActivityData> applyDefaultListOrder(LambdaQueryWrapper<CeActivityData> wrapper) {
+        return wrapper
+            .orderByDesc(CeActivityData::getCreateTime)
+            .orderByDesc(CeActivityData::getId);
     }
 
     @Override
@@ -231,6 +225,17 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     @Override
     public Boolean deleteByIds(Collection<Long> ids) {
         return activityDataMapper.deleteByIds(ids) > 0;
+    }
+
+    @Override
+    public Boolean updateStatusByIds(Collection<Long> ids, String dataStatus) {
+        if (ids == null || ids.isEmpty() || StringUtils.isBlank(dataStatus)) {
+            return false;
+        }
+        CeActivityData update = new CeActivityData();
+        update.setDataStatus(dataStatus);
+        return activityDataMapper.update(update, new LambdaQueryWrapper<CeActivityData>()
+            .in(CeActivityData::getId, ids)) > 0;
     }
 
     private LambdaQueryWrapper<CeActivityData> buildQueryWrapper(CeActivityDataBo bo) {

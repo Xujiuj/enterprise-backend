@@ -37,7 +37,7 @@ class EnterprisePortalMenuContractTest {
             900200, 900201, 900202, 900203, 900204,
             900205, 900206, 900207, 900208, 900209, 900210,
             900211, 900212, 900213, 900214,
-            900215, 900216, 900217, 900218, 900219, 900220
+            900215, 900216, 900217, 900218, 900219, 900220, 900221, 900222
         );
         assertThat(sql).contains(
             "系统授权",
@@ -96,6 +96,8 @@ class EnterprisePortalMenuContractTest {
             "enterprise:activityImportValidation:validate",
             "enterprise:activity:save",
             "enterprise:activityImport:import",
+            "enterprise:activityDataRaw:edit",
+            "enterprise:activityDataRaw:remove",
             "enterprise:factorConfirmation:list",
             "enterprise:factorConfirmation:query",
             "enterprise:factorConfirmation:add",
@@ -206,8 +208,6 @@ class EnterprisePortalMenuContractTest {
         );
         assertThat(sql).doesNotContain(
             "enterprise:activityDataRaw:add",
-            "enterprise:activityDataRaw:edit",
-            "enterprise:activityDataRaw:remove",
             "enterprise:activityData:add",
             "enterprise:activityData:edit",
             "enterprise:activityData:remove",

@@ -1,11 +1,19 @@
 package org.dromara.carbon.enterprise.activity;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfo;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.core.toolkit.LambdaUtils;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.ibatis.session.Configuration;
 import org.dromara.carbon.enterprise.domain.CeActivityData;
 import org.dromara.carbon.enterprise.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.domain.CeGreenPowerCertificate;
 import org.dromara.carbon.enterprise.domain.CeIntensityDenominatorFact;
 import org.dromara.carbon.enterprise.domain.bo.CeActivityDataBo;
 import org.dromara.carbon.enterprise.domain.vo.CeActivityDataValidationDashboardVo;
+import org.dromara.carbon.enterprise.domain.vo.CeActivityDataVo;
 import org.dromara.carbon.enterprise.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.mapper.CeCaptureCellMapper;
@@ -16,9 +24,13 @@ import org.dromara.carbon.enterprise.mapper.CeIntensityDenominatorFactMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateFieldMapper;
 import org.dromara.carbon.enterprise.mapper.CeTemplateSheetMapper;
 import org.dromara.carbon.enterprise.service.impl.CeActivityDataServiceImpl;
+import org.dromara.common.mybatis.core.page.PageQuery;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,6 +38,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @Tag("dev")
@@ -38,6 +51,19 @@ class CeActivityDataValidationDashboardServiceTest {
     private CeTemplateSheetMapper templateSheetMapper;
     private CeTemplateFieldMapper templateFieldMapper;
     private CeActivityDataServiceImpl service;
+
+    @BeforeAll
+    static void initializeLambdaCache() {
+        if (TableInfoHelper.getTableInfo(CeActivityData.class) != null) {
+            return;
+        }
+        Configuration configuration = new Configuration();
+        configuration.setMapUnderscoreToCamelCase(true);
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(configuration, CeActivityDataMapper.class.getName());
+        assistant.setCurrentNamespace(CeActivityDataMapper.class.getName());
+        TableInfo tableInfo = TableInfoHelper.initTableInfo(assistant, CeActivityData.class);
+        LambdaUtils.installCache(tableInfo);
+    }
 
     @BeforeEach
     void setUp() {
@@ -104,6 +130,19 @@ class CeActivityDataValidationDashboardServiceTest {
         assertEquals("draft", dashboard.getSubmissions().get(0).getSubmissionStatus());
         assertEquals(5, dashboard.getIssues().size());
         assertEquals("UNSUBMITTED_ACTIVITY_DATA", dashboard.getIssues().get(0).getRuleCode());
+    }
+
+    @Test
+    void listsNewestActivityDataFirstWhenNoExplicitSortFieldExists() {
+        when(activityDataMapper.selectVoPage(any(), any())).thenReturn(new Page<CeActivityDataVo>(1, 10));
+
+        service.queryPageList(new CeActivityDataBo(), new PageQuery(10, 1));
+
+        ArgumentCaptor<LambdaQueryWrapper<CeActivityData>> wrapperCaptor = ArgumentCaptor.captor();
+        verify(activityDataMapper).selectVoPage(any(), wrapperCaptor.capture());
+        String orderSegment = wrapperCaptor.getValue().getExpression().getOrderBy().getSqlSegment();
+        Assertions.assertTrue(orderSegment.contains("create_time DESC"), orderSegment);
+        Assertions.assertTrue(orderSegment.contains("id DESC"), orderSegment);
     }
 
     private CeEmissionSource emissionSource(Long id, String code, String name) {

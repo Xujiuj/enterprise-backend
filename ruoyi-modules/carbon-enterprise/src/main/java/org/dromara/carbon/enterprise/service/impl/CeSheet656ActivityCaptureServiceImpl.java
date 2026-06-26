@@ -227,18 +227,26 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
             .filter(StringUtils::isNotBlank)
             .distinct()
             .toList();
-        if (sourceCodes.isEmpty()) {
+        List<String> companyCodes = rowValues.stream()
+            .map(values -> normalize(values.get("f002")))
+            .filter(StringUtils::isNotBlank)
+            .distinct()
+            .toList();
+        if (sourceCodes.isEmpty() || companyCodes.isEmpty()) {
             return Collections.emptyMap();
         }
         List<CeEmissionSource> sources = emissionSourceMapper.selectList(
             new LambdaQueryWrapper<CeEmissionSource>()
-                .select(CeEmissionSource::getId, CeEmissionSource::getSourceIdentificationCode)
+                .select(CeEmissionSource::getId, CeEmissionSource::getCompanyCode, CeEmissionSource::getSourceIdentificationCode)
+                .in(CeEmissionSource::getCompanyCode, companyCodes)
                 .in(CeEmissionSource::getSourceIdentificationCode, sourceCodes)
         );
         return sources == null ? Collections.emptyMap() : sources.stream()
-            .filter(source -> source.getId() != null && StringUtils.isNotBlank(source.getSourceIdentificationCode()))
+            .filter(source -> source.getId() != null
+                && StringUtils.isNotBlank(source.getCompanyCode())
+                && StringUtils.isNotBlank(source.getSourceIdentificationCode()))
             .collect(Collectors.toMap(
-                source -> normalize(source.getSourceIdentificationCode()),
+                source -> sourceKey(source.getCompanyCode(), source.getSourceIdentificationCode()),
                 CeEmissionSource::getId,
                 (left, right) -> left,
                 LinkedHashMap::new
@@ -249,11 +257,13 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
                                           Map<String, Long> sourceIdsByCode, Date now) {
         CeActivityData activityData = new CeActivityData();
         activityData.setBatchId(batchId);
-        activityData.setEmissionSourceId(sourceIdsByCode.get(normalize(valuesByCode.get("f001"))));
+        activityData.setEmissionSourceId(sourceIdsByCode.get(sourceKey(valuesByCode.get("f002"), valuesByCode.get("f001"))));
+        activityData.setActivityPeriod(activityPeriod(valuesByCode.get("f011"), valuesByCode.get("f012")));
         activityData.setSourceSheetCode(TARGET_TABLE_CODE);
         activityData.setSourceIdentificationCode(valuesByCode.get("f001"));
         activityData.setCompanyCode(valuesByCode.get("f002"));
         activityData.setCompanyName(valuesByCode.get("f003"));
+        activityData.setFactoryCode(valuesByCode.get("f002"));
         activityData.setFactoryName(valuesByCode.get("f004"));
         activityData.setSourceCategoryKey(valuesByCode.get("f005"));
         activityData.setScopeName(valuesByCode.get("f006"));
@@ -274,6 +284,19 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
         activityData.setUpdateTime(now);
         activityData.setRemark("sheet_656 enterprise-local activity capture");
         return activityData;
+    }
+
+    private String sourceKey(String companyCode, String sourceCode) {
+        return normalize(companyCode) + "|" + normalize(sourceCode);
+    }
+
+    private String activityPeriod(String yearValue, String monthValue) {
+        Integer year = toIntegerValue(yearValue);
+        Integer month = toIntegerValue(monthValue);
+        if (year == null || month == null) {
+            return null;
+        }
+        return YearMonth.of(year, month).format(YEAR_MONTH_FORMATTER);
     }
 
     private CeSheet656ValidationResult rowResultAt(List<CeSheet656ValidationResult> rowResults, int index) {

@@ -76,7 +76,8 @@ CALL ce_add_index_if_missing('ce_company_factory', 'uk_ce_company_factory_factor
 CALL ce_add_index_if_missing('ce_company_factory', 'idx_ce_company_factory_code_name', 'KEY idx_ce_company_factory_code_name (factory_code, factory_name)');
 CALL ce_add_index_if_missing('ce_emission_source_category', 'uk_ce_emission_source_category_sk', 'UNIQUE KEY uk_ce_emission_source_category_sk (category_sk)');
 CALL ce_add_index_if_missing('ce_ef_factor', 'uk_ce_ef_factor_sk', 'UNIQUE KEY uk_ce_ef_factor_sk (factor_sk)');
-CALL ce_add_index_if_missing('ce_emission_source', 'uk_ce_emission_source_code', 'UNIQUE KEY uk_ce_emission_source_code (source_identification_code)');
+CALL ce_add_index_if_missing('ce_emission_source', 'uk_ce_emission_source_factory_code', 'UNIQUE KEY uk_ce_emission_source_factory_code (company_code, source_identification_code)');
+CALL ce_add_index_if_missing('ce_emission_source', 'idx_ce_emission_source_code', 'KEY idx_ce_emission_source_code (source_identification_code)');
 CALL ce_add_index_if_missing('ce_emission_source', 'idx_ce_emission_source_factor', 'KEY idx_ce_emission_source_factor (factor_key)');
 CALL ce_add_index_if_missing('ce_activity_data', 'idx_ce_activity_data_required_submitter', 'KEY idx_ce_activity_data_required_submitter (responsible_dept, activity_year, activity_month, data_status)');
 CALL ce_add_index_if_missing('ce_activity_data', 'idx_ce_activity_data_factor', 'KEY idx_ce_activity_data_factor (factor_key)');

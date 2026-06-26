@@ -452,18 +452,19 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
     }
 
     private void insertEmissionRows(SourceAData data, CeSourceAImportResult result) {
-        insertRows(result, "ce_emission_source", List.of("company_code", "company_name", "factory_name", "source_category_key",
+        insertRows(result, "ce_emission_source", List.of("company_code", "company_name", "factory_code", "factory_name", "source_category_key",
                 "scope_name", "scope_subcategory", "source_identification_code", "source_identification_name", "emission_source_name",
                 "responsible_dept", "data_source", "factor_key", "enabled_flag", "remark"),
-            mapRows(data.emissionRows, row -> values(row.get("FK_公司编号"), row.get("公司名称"), row.get("工厂"), row.get("FK_排放源分类"),
+            mapRows(data.emissionRows, row -> values(row.get("FK_公司编号"), row.get("公司名称"), row.get("FK_公司编号"), row.get("工厂"), row.get("FK_排放源分类"),
                 row.get("范围"), row.get("范围子类别"), row.get("PK_排放源识别编号"), row.get("排放源识别"), row.get("排放源"),
                 row.get("负责部门"), row.get("数据来源"), row.get("FK_排放因子"), 1, MARK)));
     }
 
     private void insertActivityRows(SourceAData data, CeSourceAImportResult result) {
         Map<String, Map<String, Object>> sourceByCode = sourceByCode(data);
-        insertRows(result, "ce_activity_data", List.of("source_sheet_code", "source_identification_code", "company_code", "company_name",
-                "factory_name", "source_category_key", "scope_name", "scope_subcategory", "source_identification_name", "emission_source_name",
+        Map<String, Long> sourceIdsByCode = currentEmissionSourceIds();
+        insertRows(result, "ce_activity_data", List.of("emission_source_id", "activity_period", "source_sheet_code", "source_identification_code", "company_code", "company_name",
+                "factory_code", "factory_name", "source_category_key", "scope_name", "scope_subcategory", "source_identification_name", "emission_source_name",
                 "activity_unit", "activity_year", "activity_month", "activity_date", "activity_value", "responsible_dept", "data_source",
                 "source_remark", "factor_key", "data_status", "remark"),
             mapRows(data.activityRows, row -> {
@@ -471,14 +472,33 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
                 Map<String, Object> source = sourceByCode.getOrDefault(sourceCode, Map.of());
                 Integer year = integer(row.get("年度"));
                 Integer month = integer(row.get("月份"));
-                return values("source-a-activity", sourceCode, first(row.get("FK_公司编号"), source.get("FK_公司编号")),
-                    first(row.get("公司名称"), source.get("公司名称")), first(row.get("工厂"), source.get("工厂")),
+                String companyCode = text(first(row.get("FK_公司编号"), source.get("FK_公司编号")));
+                return values(sourceIdsByCode.get(sourceKey(companyCode, sourceCode)), activityPeriod(year, month), "source-a-activity", sourceCode, companyCode,
+                    first(row.get("公司名称"), source.get("公司名称")), companyCode, first(row.get("工厂"), source.get("工厂")),
                     first(row.get("FK_排放源分类"), source.get("FK_排放源分类")), first(row.get("范围"), source.get("范围")),
                     first(row.get("范围子类别"), source.get("范围子类别")), first(row.get("排放源识别"), source.get("排放源识别")),
                     first(row.get("排放源"), source.get("排放源")), row.get("单位"), year, month, sqlDate(first(row.get("日期"), firstDay(year, month))),
                     decimal(row.get("活动数据")), first(row.get("负责部门"), source.get("负责部门")), first(row.get("数据来源"), source.get("数据来源")),
                     row.get("备注"), activityFactorKey(row, sourceByCode, keySet(data.efFactorRows, factor -> text(factor.get("SK_排放因子")))), "submitted", MARK);
             }));
+    }
+
+    private Map<String, Long> currentEmissionSourceIds() {
+        return jdbcTemplate.query(
+            "SELECT company_code, source_identification_code, id FROM ce_emission_source WHERE company_code IS NOT NULL AND source_identification_code IS NOT NULL",
+            (rs, rowNum) -> Map.entry(sourceKey(rs.getString("company_code"), rs.getString("source_identification_code")), rs.getLong("id"))
+        ).stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (left, right) -> left, LinkedHashMap::new));
+    }
+
+    private String sourceKey(String companyCode, String sourceCode) {
+        return text(companyCode) + "|" + text(sourceCode);
+    }
+
+    private String activityPeriod(Integer year, Integer month) {
+        if (year == null || month == null) {
+            return null;
+        }
+        return YearMonth.of(year, month).toString();
     }
 
     private void insertGreenPowerRows(SourceAData data, CeSourceAImportResult result) {

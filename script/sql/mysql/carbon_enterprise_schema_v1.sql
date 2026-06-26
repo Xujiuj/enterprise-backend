@@ -202,6 +202,7 @@ CREATE TABLE IF NOT EXISTS ce_emission_source_category (
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
+    UNIQUE KEY uk_ce_emission_source_category_sk (category_sk),
     UNIQUE KEY uk_ce_emission_source_category (business_key, version_no),
     KEY idx_ce_emission_source_category_scope (ghg_scope, ghg_scope_category)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='103 emission source category';
@@ -333,6 +334,7 @@ CREATE TABLE IF NOT EXISTS ce_emission_source (
     id BIGINT NOT NULL AUTO_INCREMENT,
     company_code VARCHAR(64) NOT NULL,
     company_name VARCHAR(255) DEFAULT NULL,
+    factory_code VARCHAR(64) DEFAULT NULL,
     factory_name VARCHAR(255) DEFAULT NULL,
     source_category_key VARCHAR(64) NOT NULL,
     scope_name VARCHAR(128) DEFAULT NULL,
@@ -348,8 +350,10 @@ CREATE TABLE IF NOT EXISTS ce_emission_source (
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_ce_emission_source_code (source_identification_code),
+    UNIQUE KEY uk_ce_emission_source_factory_code (company_code, source_identification_code),
     KEY idx_ce_emission_source_company (company_code),
+    KEY idx_ce_emission_source_factory (factory_code),
+    KEY idx_ce_emission_source_code (source_identification_code),
     KEY idx_ce_emission_source_category (source_category_key),
     KEY idx_ce_emission_source_factor (factor_key),
     CONSTRAINT fk_ce_emission_source_factory
@@ -361,10 +365,13 @@ CREATE TABLE IF NOT EXISTS ce_emission_source (
 CREATE TABLE IF NOT EXISTS ce_activity_data (
     id BIGINT NOT NULL AUTO_INCREMENT,
     batch_id BIGINT DEFAULT NULL,
+    emission_source_id BIGINT DEFAULT NULL,
+    activity_period VARCHAR(32) DEFAULT NULL,
     source_sheet_code VARCHAR(64) DEFAULT NULL,
     source_identification_code VARCHAR(64) NOT NULL,
     company_code VARCHAR(64) NOT NULL,
     company_name VARCHAR(255) DEFAULT NULL,
+    factory_code VARCHAR(64) DEFAULT NULL,
     factory_name VARCHAR(255) DEFAULT NULL,
     source_category_key VARCHAR(64) DEFAULT NULL,
     scope_name VARCHAR(128) DEFAULT NULL,
@@ -386,13 +393,15 @@ CREATE TABLE IF NOT EXISTS ce_activity_data (
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     remark VARCHAR(500) DEFAULT NULL,
     PRIMARY KEY (id),
-    KEY idx_ce_activity_data_period (activity_year, activity_month, data_status),
+    UNIQUE KEY uk_ce_activity_data_source_period (company_code, source_identification_code, activity_year, activity_month),
+    KEY idx_ce_activity_data_period (activity_period, data_status),
     KEY idx_ce_activity_data_source (source_identification_code),
+    KEY idx_ce_activity_data_emission_source_id (emission_source_id),
     KEY idx_ce_activity_data_company (company_code),
     CONSTRAINT fk_ce_activity_data_batch
         FOREIGN KEY (batch_id) REFERENCES ce_capture_batch (id),
-    CONSTRAINT fk_ce_activity_data_source
-        FOREIGN KEY (source_identification_code) REFERENCES ce_emission_source (source_identification_code),
+    CONSTRAINT fk_ce_activity_data_source_id
+        FOREIGN KEY (emission_source_id) REFERENCES ce_emission_source (id),
     CONSTRAINT fk_ce_activity_data_company
         FOREIGN KEY (company_code) REFERENCES ce_company_factory (factory_code),
     CONSTRAINT fk_ce_activity_data_category
