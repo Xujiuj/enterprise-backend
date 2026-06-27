@@ -24,7 +24,7 @@ class EnterpriseSecureConfigUnitTest {
     @Test
     void encryptedConfigRoundTrips() {
         Map<String, String> properties = new LinkedHashMap<>();
-        properties.put("spring.datasource.dynamic.datasource.master.url", "jdbc:mysql://127.0.0.1:3306/enterprise");
+        properties.put("spring.datasource.dynamic.datasource.master.url", "jdbc:sqlserver://127.0.0.1:1433;DatabaseName=enterprise;encrypt=false;trustServerCertificate=true;SelectMethod=cursor");
         properties.put("spring.datasource.dynamic.datasource.master.username", "enterprise_user");
         properties.put("spring.datasource.dynamic.datasource.master.password", "secret");
 
@@ -43,7 +43,7 @@ class EnterpriseSecureConfigUnitTest {
         Path keyPath = tempDir.resolve(".master.key");
         String masterKey = EnterpriseSecureConfig.generateMasterKey();
         Map<String, String> properties = Map.of(
-            "spring.datasource.dynamic.datasource.master.url", "jdbc:mysql://127.0.0.1:3306/local"
+            "spring.datasource.dynamic.datasource.master.url", "jdbc:sqlserver://127.0.0.1:1433;DatabaseName=local;encrypt=false;trustServerCertificate=true;SelectMethod=cursor"
         );
         Files.writeString(encryptedPath, EnterpriseSecureConfig.encrypt(properties, masterKey), StandardCharsets.UTF_8);
         Files.writeString(keyPath, masterKey, StandardCharsets.UTF_8);
@@ -51,11 +51,11 @@ class EnterpriseSecureConfigUnitTest {
         MockEnvironment environment = new MockEnvironment()
             .withProperty("enterprise.secure-config.path", encryptedPath.toString())
             .withProperty("enterprise.secure-config.master-key-path", keyPath.toString())
-            .withProperty("spring.datasource.dynamic.datasource.master.url", "jdbc:mysql://127.0.0.1:3306/from-env");
+            .withProperty("spring.datasource.dynamic.datasource.master.url", "jdbc:sqlserver://127.0.0.1:1433;DatabaseName=from-env;encrypt=false;trustServerCertificate=true;SelectMethod=cursor");
 
         new EnterpriseSecureConfigEnvironmentPostProcessor().postProcessEnvironment(environment, new SpringApplication());
 
-        assertEquals("jdbc:mysql://127.0.0.1:3306/from-env",
+        assertEquals("jdbc:sqlserver://127.0.0.1:1433;DatabaseName=from-env;encrypt=false;trustServerCertificate=true;SelectMethod=cursor",
             environment.getProperty("spring.datasource.dynamic.datasource.master.url"));
     }
 
