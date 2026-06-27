@@ -172,21 +172,21 @@ jobs:
           ENTERPRISE_SCHEMA_FILE="script/sql/mysql/carbon_enterprise_schema_v1.sql"
           ENTERPRISE_TEMPLATE_SEED_FILE="script/sql/mysql/carbon_enterprise_template_seed_v1.sql"
           sudo apt-get update
-          sudo apt-get install -y sshpass
+          sudo apt-get install -y sshpass rsync
           SSH_OPTS=(
             -p "$DEPLOY_PORT"
-            -C
             -o StrictHostKeyChecking=accept-new
             -o ConnectTimeout=20
             -o ServerAliveInterval=15
-            -o ServerAliveCountMax=4
+            -o ServerAliveCountMax=8
           )
+          RSYNC_RSH="ssh -p $DEPLOY_PORT -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8"
           SCP_OPTS=(
             -P "$DEPLOY_PORT"
             -o StrictHostKeyChecking=accept-new
             -o ConnectTimeout=20
             -o ServerAliveInterval=15
-            -o ServerAliveCountMax=4
+            -o ServerAliveCountMax=8
           )
           SQL_FILE="ruoyi-modules/ruoyi-system/src/main/resources/sql/enterprise_portal_menu_sync.sql"
           REMOTE_SQL="/tmp/enterprise_portal_menu_sync-${GITHUB_RUN_ID}.sql"
@@ -302,6 +302,11 @@ jobs:
             < "$REMOTE_SQL"
           rm -f "$REMOTE_SQL"
           EOF
+          cat > install-transfer-tools.sh <<'EOF'
+          set -euo pipefail
+          echo "$SUDO_PASSWORD" | sudo -S apt-get update
+          echo "$SUDO_PASSWORD" | sudo -S apt-get install -y rsync
+          EOF
           if [ "${{ steps.sync_business_runner.outputs.status }}" != "success" ]; then
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$ENTERPRISE_SCHEMA_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_SCHEMA"
             timeout 60 sshpass -p "$DEPLOY_PASSWORD" scp "${SCP_OPTS[@]}" "$ENTERPRISE_TEMPLATE_SEED_FILE" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_TEMPLATE_SEED"
@@ -313,6 +318,16 @@ jobs:
             timeout 240 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
               "DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_SQL='$REMOTE_SQL' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 180 bash -s" < sync-menu-db.sh
           fi
-          timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cat > '$REMOTE_APP_JAR'" < "$LOCAL_APP_JAR"
+          jar_size="$(du -h "$LOCAL_APP_JAR" | cut -f1)"
+          echo "Uploading application jar ($jar_size) to $DEPLOY_HOST:$REMOTE_APP_JAR"
+          timeout 300 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 240 bash -s" < install-transfer-tools.sh
+          if timeout 1200 sshpass -p "$DEPLOY_PASSWORD" rsync -av --partial --inplace --info=progress2 \
+            -e "$RSYNC_RSH" "$LOCAL_APP_JAR" "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_APP_JAR"; then
+            echo "Application jar uploaded with rsync."
+          else
+            echo "Rsync upload failed or timed out; retrying direct SSH stream upload."
+            timeout 1800 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "cat > '$REMOTE_APP_JAR'" < "$LOCAL_APP_JAR"
+          fi
           timeout 900 sshpass -p "$DEPLOY_PASSWORD" ssh "${SSH_OPTS[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
             "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_SERVICE='$DEPLOY_SERVICE' APP_PORT='$APP_PORT' SNAIL_PORT='$SNAIL_PORT' DB_PREFIX='$DB_PREFIX' DB_NAME='$DB_NAME' DB_HOST='$DB_HOST' DB_PORT='$DB_PORT' DB_USERNAME='$DB_USERNAME' DB_PASSWORD='$DB_PASSWORD' REMOTE_APP_JAR='$REMOTE_APP_JAR' SUDO_PASSWORD='$DEPLOY_PASSWORD' timeout 840 bash -s" < deploy-backend.sh
