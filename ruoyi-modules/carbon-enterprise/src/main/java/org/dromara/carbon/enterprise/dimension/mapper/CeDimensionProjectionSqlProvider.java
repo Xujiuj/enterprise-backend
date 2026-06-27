@@ -520,7 +520,11 @@ public class CeDimensionProjectionSqlProvider {
     }
 
     public String selectByDimensionCodeAndId(Map<String, Object> params) {
-        return "select * from (" + projectionSql((String) params.get("dimensionCode")) + ") dimension_projection where id = #{id}";
+        return "select * from (" + stripTrailingOrderBy(projectionSql((String) params.get("dimensionCode"))) + ") dimension_projection where id = #{id}";
+    }
+
+    private String stripTrailingOrderBy(String sql) {
+        return sql.replaceFirst("(?is)\\s+order\\s+by\\s+[^\\n]+\\s*$", "");
     }
 
     public String insertByDimensionCode() {
