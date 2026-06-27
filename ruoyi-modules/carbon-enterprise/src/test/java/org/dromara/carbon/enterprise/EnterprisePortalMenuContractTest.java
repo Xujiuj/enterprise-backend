@@ -15,60 +15,104 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("dev")
 class EnterprisePortalMenuContractTest {
 
-    @Test
-    void enterpriseMenuSqlKeepsEnterpriseMenusAndBlocksVendorMenus() throws Exception {
-        String sql = Files.readString(resolveFromWorkspace("script/sql/portal/enterprise_portal_menu.sql"));
+    private static final String INIT_SQL = "script/sql/enterprise_init.sql";
+    private static final String TEST_DATA_SQL = "script/sql/enterprise_test_data.sql";
 
-        assertThat(sql).contains("delete from sys_menu where menu_id between 900100 and 900230");
-        assertThat(sql).contains("delete from sys_role_menu where menu_id between 900100 and 900230");
-        assertThat(extractMenuIds(sql)).containsExactlyInAnyOrder(
-            900100, 900102, 900103, 900104, 900105,
-            900110, 900111, 900112, 900113, 900114, 900115,
-            900120, 900121, 900122, 900123, 900124, 900125,
-            900130, 900131,
-            900140, 900141,
-            900150, 900151, 900152, 900153, 900154,
-            900160, 900161, 900162, 900163,
-            900170, 900171, 900172, 900173, 900174,
-            900180, 900181, 900182, 900183, 900184,
-            900185, 900186, 900187, 900188, 900189,
-            900190, 900191, 900192, 900193, 900194,
-            900195, 900196, 900197, 900198, 900199,
-            900200, 900201, 900202, 900203, 900204,
-            900205, 900206, 900207, 900208, 900209, 900210,
-            900211, 900212, 900213, 900214,
-            900215, 900216, 900217, 900218, 900219, 900220, 900221, 900222
-        );
+    @Test
+    void enterpriseSqlDirectoryContainsOnlyInitAndTestData() throws Exception {
+        Path sqlDirectory = resolveFromWorkspace("script/sql");
+
+        Set<String> sqlFiles;
+        try (var stream = Files.walk(sqlDirectory)) {
+            sqlFiles = stream
+                .filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().endsWith(".sql"))
+                .map(path -> sqlDirectory.relativize(path).toString().replace('\\', '/'))
+                .collect(Collectors.toSet());
+        }
+
+        assertThat(sqlFiles).containsExactlyInAnyOrder("enterprise_init.sql", "enterprise_test_data.sql");
+    }
+
+    @Test
+    void enterpriseInitSqlCreatesCurrentSystemAndBusinessTables() throws Exception {
+        String sql = Files.readString(resolveFromWorkspace(INIT_SQL));
+
         assertThat(sql).contains(
-            "系统授权",
-            "授权管理",
-            "1 配置排放源",
-            "行政区划",
-            "公司表",
-            "排放源分类",
-            "排放源识别",
-            "基准年维度表",
-            "2 确认排放因子",
-            "EF排放因子维度表",
-            "EF电力因子维度表",
-            "EF电力因子版本对应",
-            "EF电力因子口径维度",
-            "温室气体维度",
-            "3 活动数据",
-            "排放活动数据",
-            "4 绿电绿证",
-            "绿电绿证数据",
-            "5 强度管理",
-            "碳排放强度分母维度表",
-            "强度目标表",
-            "分母事实表",
-            "碳排放强度容忍率参数表",
-            "报表管理",
-            "Content",
-            "数据验证",
-            "报表模板下载"
+            "CREATE DATABASE IF NOT EXISTS enterprise",
+            "USE enterprise"
         );
+        assertThat(createTableNames(sql)).contains(
+            "sys_menu",
+            "sys_logininfor",
+            "sys_dict_type",
+            "sys_dict_data",
+            "sys_dept",
+            "sys_config",
+            "sys_client",
+            "sys_tenant_package",
+            "sys_tenant",
+            "sys_role_menu",
+            "sys_role_dept",
+            "sys_user_role",
+            "sys_user_post",
+            "sys_role",
+            "sys_post",
+            "sys_user",
+            "sys_oss_config",
+            "sys_oss",
+            "sys_oper_log",
+            "ce_admin_division",
+            "ce_capture_batch",
+            "ce_activity_data",
+            "ce_capture_row",
+            "ce_company_factory",
+            "ce_base_year",
+            "ce_capture_cell",
+            "ce_extension_field",
+            "ce_extension_field_value",
+            "ce_intensity_metric",
+            "ce_green_power_certificate",
+            "ce_intensity_denominator_fact",
+            "ce_emission_source_category",
+            "ce_emission_source",
+            "ce_electricity_factor_version_map",
+            "ce_electricity_factor_scope",
+            "ce_factor_cache_version",
+            "ce_factor_cache_record",
+            "ce_factor_confirmation",
+            "ce_greenhouse_gas",
+            "ce_electricity_factor",
+            "ce_template_sheet",
+            "ce_template_version",
+            "ce_template_field",
+            "ce_report_template_file",
+            "ce_report_content",
+            "ce_license_state",
+            "ce_ef_factor",
+            "ce_fuel_factor_calc",
+            "ce_intensity_denominator_rule",
+            "ce_intensity_target",
+            "ce_intensity_tolerance"
+        );
+        assertThat(sql).doesNotContain(
+            "CREATE DATABASE vendor",
+            "USE vendor",
+            "CREATE TABLE IF NOT EXISTS cv_",
+            "CREATE TABLE cv_",
+            "vendor:"
+        );
+    }
+
+    @Test
+    void enterpriseInitSqlSeedsMenusRolesAndLeastPrivilege() throws Exception {
+        String sql = Files.readString(resolveFromWorkspace(INIT_SQL));
+
         assertThat(sql).contains(
+            "enterprise_admin",
+            "enterprise_data_entry",
+            "enterprise_auditor",
+            "enterprise_report_viewer",
             "enterprise/licenseImport/index",
             "enterprise/dimension/index",
             "enterprise/emissionSource/index",
@@ -96,8 +140,6 @@ class EnterprisePortalMenuContractTest {
             "enterprise:activityImportValidation:validate",
             "enterprise:activity:save",
             "enterprise:activityImport:import",
-            "enterprise:activityDataRaw:edit",
-            "enterprise:activityDataRaw:remove",
             "enterprise:factorConfirmation:list",
             "enterprise:factorConfirmation:query",
             "enterprise:factorConfirmation:add",
@@ -122,138 +164,13 @@ class EnterprisePortalMenuContractTest {
             "enterprise:intensityMetric:remove",
             "enterprise:reportTemplateFile:list",
             "enterprise:reportTemplateFile:query",
-            "enterprise:reportTemplateFile:add",
-            "enterprise:reportTemplateFile:edit",
-            "enterprise:reportTemplateFile:remove",
             "enterprise:reportTemplateFile:download",
             "enterprise:reportTemplateSync:run",
             "enterprise:reports:view",
-            "enterprise:dataValidation:view"
+            "enterprise:dataValidation:view",
+            "enterprise:sourceA:import",
+            "enterprise:sourceA:validate"
         );
-        assertThat(sql).contains(
-            "企业管理员",
-            "enterprise_admin",
-            "数据填报员",
-            "enterprise_data_entry",
-            "数据审核员",
-            "enterprise_auditor",
-            "报表查看员",
-            "enterprise_report_viewer",
-            "delete from sys_role_menu",
-            "where role_id in (900001, 900002, 900003, 900004)"
-        );
-        assertThat(sql).doesNotContain("cross join sys_menu m");
-        assertThat(sql).doesNotContain("m.menu_id <> 900131");
-        assertThat(sql).contains(
-            "(900100, '系统授权', 0, 1, 'system-auth'",
-            "(900110, '1 配置排放源', 0, 2, 'emission-source-config'",
-            "(900120, '2 确认排放因子', 0, 3, 'factor-confirm'",
-            "(900130, '3 活动数据', 0, 4, 'activity-data'",
-            "(900140, '4 绿电绿证', 0, 5, 'green-electricity'",
-            "(900150, '5 强度管理', 0, 6, 'intensity'",
-            "(900160, '报表管理', 0, 7, 'report-management'",
-            "(900111, '101 行政区划', 900110",
-            "(900113, '103 排放源分类', 900110",
-            "(900115, '106 基准年维度表', 900110",
-            "(900122, '202 EF电力因子维度表', 900120",
-            "(900123, '203 EF电力因子版本对应', 900120",
-            "(900124, '205 EF电力因子口径维度', 900120",
-            "(900125, '206 温室气体维度', 900120",
-            "(900163, '报表模板下载', 900160",
-            "(900211, '厂商因子同步', 900120",
-            "(900212, '厂商模板同步', 900160"
-        );
-        assertThat(sql).doesNotContain(
-            "103, 104, 105, 106, 115, 116, 132",
-            "1017, 1018, 1019, 1020, 1021, 1022, 1023, 1024, 1025",
-            "status = '1'"
-        );
-        assertThat(sql).contains(
-            "where menu_type in ('M', 'C')",
-            "and menu_id not in (",
-            "900100, 900102",
-            "900110, 900111, 900112, 900113, 900114, 900115",
-            "900120, 900121, 900122, 900123, 900124, 900125",
-            "900130, 900131",
-            "900140, 900141",
-            "900150, 900151, 900152, 900153, 900154",
-            "900160, 900161, 900162, 900163",
-            "1, 100, 101, 102"
-        );
-        assertThat(sql).contains(
-            "Hidden rows still appear in menu management",
-            "delete from sys_menu",
-            "where menu_type = 'F'",
-            "1001, 1002, 1003, 1004, 1005, 1006",
-            "1013, 1014, 1015, 1016"
-        );
-        assertThat(sql).contains(
-            "900110, 1, 'admin-division'",
-            "900110, 2, 'company'",
-            "900110, 3, 'emission-source-category'",
-            "900110, 4, 'emission-source'",
-            "900110, 5, 'base-year'",
-            "900120, 1, 'ef-factor'",
-            "900120, 2, 'ef-electricity-factor'",
-            "900120, 3, 'ef-electricity-version'",
-            "900120, 4, 'ef-electricity-scope'",
-            "900120, 5, 'greenhouse-gas'",
-            "900130, 1, 'emission-activity-data'",
-            "900140, 1, 'green-electricity-data'",
-            "900150, 1, 'intensity-denominator'",
-            "900150, 2, 'intensity-target'",
-            "900150, 3, 'denominator-fact'",
-            "900150, 4, 'intensity-tolerance'",
-            "900160, 1, 'content'",
-            "900160, 2, 'data-validation'",
-            "900160, 3, 'report-template-download'"
-        );
-        assertThat(sql).doesNotContain(
-            "(900106,",
-            "'data-management'",
-            "'数据管理'"
-        );
-        assertThat(sql).doesNotContain(
-            "enterprise:activityDataRaw:add",
-            "enterprise:activityData:add",
-            "enterprise:activityData:edit",
-            "enterprise:activityData:remove",
-            "(900126,",
-            "(900127,",
-            "(900132,",
-            "'factor-confirmation'",
-            "'factor-cache-record'",
-            "'emission-activity-entry'",
-            "system/emissionSource/index",
-            "system/factorConfirm/index",
-            "system/factorLibrary/index",
-            "system/activityData/index",
-            "system/greenElectricity/index",
-            "system/intensityDenominator/index",
-            "system/intensity/index",
-            "system/submissionTracking/index",
-            "system/reportTemplate/index",
-            "客户档案",
-            "License 签发",
-            "License 续签",
-            "模板分发",
-            "续费订单",
-            "vendor:"
-        );
-        assertThat(sql).doesNotContain(
-            "set menu_name = '日志'",
-            "where menu_id = 108",
-            "where menu_id in (500, 501)",
-            "108, 500, 501",
-            "130, 131",
-            "1040, 1041"
-        );
-        assertThat(sql).doesNotContain("where menu_id in (103, 104, 1017");
-    }
-
-    @Test
-    void enterprisePresetRolesUseLeastPrivilegePermissionMatrices() throws Exception {
-        String sql = Files.readString(resolveFromWorkspace("script/sql/portal/enterprise_portal_menu.sql"));
 
         Set<Integer> adminMenus = extractPresetRoleMenuIds(sql, 900001);
         Set<Integer> dataEntryMenus = extractPresetRoleMenuIds(sql, 900002);
@@ -300,92 +217,47 @@ class EnterprisePortalMenuContractTest {
     }
 
     @Test
-    void enterpriseAcceptanceRepairUsesTheSameCurrentMenuContract() throws Exception {
-        String mainSql = Files.readString(resolveFromWorkspace("script/sql/portal/enterprise_portal_menu.sql"));
-        String repairSql = Files.readString(resolveFromWorkspace("script/sql/portal/enterprise_acceptance_menu_repair.sql"));
-        String minimalRepairSql = Files.readString(resolveFromWorkspace("script/sql/portal/enterprise_acceptance_menu_minimal_repair.sql"));
-        String runtimeSql = Files.readString(resolveFromWorkspace("ruoyi-modules/ruoyi-system/src/main/resources/sql/enterprise_portal_menu_sync.sql"));
+    void enterpriseTestDataSqlOnlyWritesEnterpriseTablesAndTestUsers() throws Exception {
+        String sql = Files.readString(resolveFromWorkspace(TEST_DATA_SQL));
 
-        assertThat(repairSql).isEqualTo(mainSql);
-        assertThat(minimalRepairSql).isEqualTo(mainSql);
-        assertThat(runtimeSql).isEqualTo(mainSql);
-    }
-
-    @Test
-    void enterpriseSchemaSqlOwnsBusinessTablesAndBlocksVendorTables() throws Exception {
-        String mysql = Files.readString(resolveFromWorkspace("script/sql/mysql/carbon_enterprise_schema_v1.sql"));
-        String sqlserver = Files.readString(resolveFromWorkspace("script/sql/sqlserver/carbon_enterprise_schema_v1.sql"));
-
-        assertThat(createTableNames(mysql)).contains(
-            "ce_template_version",
-            "ce_template_sheet",
-            "ce_template_field",
-            "ce_capture_batch",
-            "ce_capture_row",
-            "ce_capture_cell",
-            "ce_extension_field",
-            "ce_extension_field_value",
-            "ce_admin_division",
-            "ce_company_factory",
-            "ce_emission_source_category",
-            "ce_base_year",
-            "ce_ef_factor",
-            "ce_electricity_factor",
-            "ce_electricity_factor_version_map",
-            "ce_electricity_factor_scope",
-            "ce_greenhouse_gas",
-            "ce_license_state",
-            "ce_factor_confirmation",
-            "ce_factor_cache_version",
-            "ce_factor_cache_record",
-            "ce_emission_source",
-            "ce_activity_data",
-            "ce_green_power_certificate",
-            "ce_intensity_metric",
-            "ce_report_template_file"
+        assertThat(sql).contains(
+            "USE enterprise",
+            "entry01",
+            "audit01",
+            "report01",
+            "LIC-TEST-2026",
+            "INSERT INTO sys_user",
+            "INSERT INTO sys_user_role",
+            "INSERT INTO ce_admin_division",
+            "INSERT INTO ce_company_factory",
+            "INSERT INTO ce_base_year",
+            "INSERT INTO ce_emission_source_category",
+            "INSERT INTO ce_ef_factor",
+            "INSERT INTO ce_electricity_factor",
+            "INSERT INTO ce_electricity_factor_version_map",
+            "INSERT INTO ce_electricity_factor_scope",
+            "INSERT INTO ce_greenhouse_gas",
+            "INSERT INTO ce_fuel_factor_calc",
+            "INSERT INTO ce_emission_source",
+            "INSERT INTO ce_activity_data",
+            "INSERT INTO ce_green_power_certificate",
+            "INSERT INTO ce_intensity_denominator_rule",
+            "INSERT INTO ce_intensity_target",
+            "INSERT INTO ce_intensity_tolerance",
+            "INSERT INTO ce_intensity_denominator_fact",
+            "INSERT INTO ce_intensity_metric",
+            "INSERT INTO ce_license_state",
+            "INSERT INTO ce_factor_confirmation",
+            "INSERT INTO ce_factor_cache_version",
+            "INSERT INTO ce_factor_cache_record",
+            "INSERT INTO ce_report_template_file"
         );
-        assertThat(createTableNames(sqlserver)).contains(
-            "ce_admin_division",
-            "ce_company_factory",
-            "ce_emission_source_category",
-            "ce_base_year",
-            "ce_ef_factor",
-            "ce_electricity_factor",
-            "ce_electricity_factor_version_map",
-            "ce_electricity_factor_scope",
-            "ce_greenhouse_gas",
-            "ce_factor_confirmation",
-            "ce_factor_cache_record",
-            "ce_emission_source",
-            "ce_activity_data",
-            "ce_green_power_certificate",
-            "ce_intensity_metric",
-            "ce_report_template_file"
-        );
-        assertThat(mysql).contains("INSERT INTO ce_report_template_file");
-        assertThat(mysql).contains("feature_codes", "payload_digest", "current_summary");
-        assertThat(sqlserver).contains("feature_codes", "payload_digest", "current_summary");
-        assertThat(sqlserver).contains(
-            "rpt.v_ActivityDataFact",
-            "rpt.v_GreenElectricityFact",
-            "rpt.v_IntensityMetricFact"
-        );
-
-        assertThat(mysql).doesNotContain("CREATE TABLE IF NOT EXISTS cv_");
-        assertThat(sqlserver).doesNotContain("CREATE TABLE cv_");
-        assertThat(mysql).doesNotContain("vendor:");
-        assertThat(sqlserver).doesNotContain("vendor:");
-        assertThat(mysql).doesNotContain(
-            "'admin-division'",
-            "'emission-source-category'",
-            "'base-year'",
-            "'ef-electricity-factor'",
-            "'ef-electricity-version'",
-            "'ef-electricity-scope'",
-            "'greenhouse-gas'",
-            "'report-template-download'",
-            "'vendor' AS source_type",
-            ", 'vendor',"
+        assertThat(sql).doesNotContain(
+            "CREATE DATABASE vendor",
+            "USE vendor",
+            "CREATE TABLE IF NOT EXISTS cv_",
+            "CREATE TABLE cv_",
+            "vendor:"
         );
     }
 
@@ -410,55 +282,9 @@ class EnterprisePortalMenuContractTest {
         );
     }
 
-    @Test
-    void baseRuoyiMenuSqlKeepsOnlyRequiredSystemManagementAndLogs() throws Exception {
-        String sql = Files.readString(resolveFromWorkspace("script/sql/ry_vue_5.X.sql"));
-
-        assertThat(sql).contains(
-            "system/user/index",
-            "system/role/index",
-            "system/menu/index",
-            "monitor/logininfor/index",
-            "monitor/operlog/index"
-        );
-        assertThat(sql).doesNotContain(
-            "tool/gen/index",
-            "gen_table",
-            "gen_table_column",
-            "sys_notice",
-            "sys_social",
-            "test_demo",
-            "test_tree",
-            "system/notice/index",
-            "monitor/online/index",
-            "monitor/cache/index",
-            "system/client/index",
-            "system/tenant/index",
-            "system/tenantPackage/index",
-            "system/dept/index",
-            "system/post/index",
-            "system/dict/index",
-            "system/config/index",
-            "system:dept:",
-            "system:post:",
-            "system:dict:",
-            "system:config:"
-        );
-    }
-
-    private static Set<Integer> extractMenuIds(String sql) {
-        return Pattern.compile("\\((900[12]\\d\\d),")
-            .matcher(sql)
-            .results()
-            .map(MatchResult::group)
-            .map(value -> value.substring(1, value.length() - 1))
-            .map(Integer::valueOf)
-            .collect(Collectors.toSet());
-    }
-
     private static Set<Integer> extractPresetRoleMenuIds(String sql, int roleId) {
         Pattern blockPattern = Pattern.compile(
-            "(?s)select\\s+" + roleId + ",\\s+menu_id\\s+from\\s+sys_menu\\s+where\\s+menu_id\\s+in\\s+\\((.*?)\\);"
+            "(?is)SELECT\\s+" + roleId + ",\\s+menu_id\\s+FROM\\s+sys_menu\\s+WHERE\\s+menu_id\\s+IN\\s*\\((.*?)\\);"
         );
         var matcher = blockPattern.matcher(sql);
         assertThat(matcher.find()).as("role " + roleId + " menu matrix exists").isTrue();

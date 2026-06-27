@@ -1,16 +1,12 @@
-Enterprise SQL Server migration scripts
-=======================================
+Enterprise SQL Server scripts
+=============================
 
-Use this directory for enterprise-side SQL Server migration and acceptance
-scripts.
+SQL Server initialization scripts have been removed from the enterprise backend.
+The supported initialization path is now the local MySQL `enterprise` database
+through:
 
-Current status:
-- `carbon_enterprise_schema_v1.sql` mirrors the MySQL development foundation
-  and creates the initial `rpt` schema views. It includes the enterprise-local
-  business tables for emission sources, factor confirmation, activity data,
-  green electricity certificates, intensity metrics, and report template
-  download metadata.
-- `carbon_enterprise_permissions_v1.sql` reserves the read-only `pbi_user`
-  permission shape for Power BI access.
-- Enterprise business data remains local to this backend. Vendor access is not
-  granted to capture rows, cells, green-power proof details, or intensity facts.
+- `../enterprise_init.sql`
+- `../enterprise_test_data.sql`
+
+Do not recreate SQL Server or vendor-database scripts here unless the target
+database support policy changes.

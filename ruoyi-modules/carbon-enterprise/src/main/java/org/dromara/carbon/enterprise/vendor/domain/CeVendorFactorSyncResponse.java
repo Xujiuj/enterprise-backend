@@ -35,7 +35,5 @@ public class CeVendorFactorSyncResponse implements Serializable {
 
     private boolean changed;
 
-    private List<CeVendorTableFieldDefinition> fieldDefinitions = new ArrayList<>();
-
     private List<CeVendorFactorRecord> records = new ArrayList<>();
 }

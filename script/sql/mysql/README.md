@@ -1,19 +1,15 @@
-Enterprise backend MySQL development scripts
-============================================
+Enterprise backend MySQL scripts
+================================
 
-Use this directory for enterprise-side local development DDL and seed data.
-Business data in this project must remain local to the enterprise backend and
-must not be mirrored into the vendor backend.
+Enterprise initialization SQL has been consolidated into the root `script/sql`
+directory.
 
-Current status:
-- The copied RuoYi base scripts remain in `script/sql/` for framework setup.
-- `carbon_enterprise_schema_v1.sql` is the first development DDL slice. It
-  records Excel template versions, sheets, original fields, local capture
-  batches/rows/cells, extension-field metadata, local license runtime state,
-  factor cache versions, emission source configuration, factor confirmation,
-  activity data, green electricity certificates, intensity metrics, and report
-  template download metadata.
-- The schema is metadata-first so the full Excel field inventory can be loaded
-  before generated CRUD tables are finalized.
-- Keep SQL Server migration compatibility in mind when adding MySQL types,
-  indexes, views, or pagination assumptions.
+Current files:
+- `../enterprise_init.sql`: creates the local MySQL `enterprise` database,
+  recreates RuoYi core tables and enterprise `ce_*` business tables, and seeds
+  enterprise menus, preset roles, role-menu permissions, config, client, OSS,
+  and report metadata.
+- `../enterprise_test_data.sql`: inserts repeatable local test users and
+  enterprise business sample data. Run it only after `enterprise_init.sql`.
+
+Do not write enterprise business data into the vendor database.
