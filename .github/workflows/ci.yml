@@ -35,8 +35,11 @@ jobs:
           java-version: "17"
           cache: maven
 
+      - name: Test carbon enterprise
+        run: mvn -B -pl ruoyi-modules/carbon-enterprise -am -DskipTests=false -Dmaven.test.skip=false test
+
       - name: Package
-        run: mvn -B -Pprod clean package -DskipTests
+        run: mvn -B -Pprod -pl ruoyi-admin -am clean package -DskipTests
 
       - name: Upload jar
         uses: actions/upload-artifact@v4
