@@ -228,6 +228,10 @@ jobs:
           ExecStart=/usr/bin/java -Dserver.port=$APP_PORT -Dsnail-job.port=$SNAIL_PORT -jar app.jar
           Restart=always
           RestartSec=10
+          TimeoutStopSec=30
+          KillMode=mixed
+          KillSignal=SIGTERM
+          SuccessExitStatus=143
           User=$USER
 
           [Install]
