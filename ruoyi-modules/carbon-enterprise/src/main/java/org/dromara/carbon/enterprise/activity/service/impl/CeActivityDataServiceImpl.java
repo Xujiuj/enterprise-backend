@@ -267,7 +267,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
                 .isNotNull(CeActivityData::getActivityYear)
                 .orderByDesc(CeActivityData::getActivityYear)
                 .orderByDesc(CeActivityData::getActivityMonth)
-                .last("limit 1"))
+                .orderByDesc(CeActivityData::getId))
             .stream()
             .findFirst()
             .map(activity -> new ActivityPeriod(activity.getActivityYear(), activity.getActivityMonth()))
@@ -613,8 +613,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         return templateSheetMapper.selectList(new LambdaQueryWrapper<CeTemplateSheet>()
                 .eq(CeTemplateSheet::getTargetTableCode, TARGET_TABLE_CODE)
                 .orderByDesc(CeTemplateSheet::getTemplateVersionId)
-                .orderByDesc(CeTemplateSheet::getId)
-                .last("limit 1"))
+                .orderByDesc(CeTemplateSheet::getId))
             .stream()
             .findFirst()
             .orElse(null);

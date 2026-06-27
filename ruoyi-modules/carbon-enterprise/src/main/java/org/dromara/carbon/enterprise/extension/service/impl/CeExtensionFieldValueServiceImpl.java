@@ -132,7 +132,7 @@ public class CeExtensionFieldValueServiceImpl implements ICeExtensionFieldValueS
             .eq(CeExtensionFieldValue::getOwnerTableCode, bo.getOwnerTableCode())
             .eq(CeExtensionFieldValue::getOwnerRecordId, bo.getOwnerRecordId())
             .eq(CeExtensionFieldValue::getExtensionFieldId, bo.getExtensionFieldId())
-            .last("limit 1"));
+            .orderByDesc(CeExtensionFieldValue::getId), false);
     }
 
     private void validateExtensionFieldOwner(Long extensionFieldId, String ownerTableCode) {

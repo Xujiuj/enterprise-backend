@@ -28,13 +28,12 @@ public class CeEmissionActivityDerivedFieldResolverImpl implements ICeEmissionAc
             return Optional.empty();
         }
 
-        CeEmissionSource source = emissionSourceMapper.selectOne(
+        CeEmissionSource source = emissionSourceMapper.selectList(
             Wrappers.<CeEmissionSource>lambdaQuery()
                 .eq(CeEmissionSource::getSourceIdentificationCode, emissionSourceCode)
                 .eq(CeEmissionSource::getEnabledFlag, Boolean.TRUE)
-                .last("LIMIT 1"),
-            false
-        );
+                .orderByAsc(CeEmissionSource::getId)
+        ).stream().findFirst().orElse(null);
 
         if (source == null) {
             return Optional.empty();
