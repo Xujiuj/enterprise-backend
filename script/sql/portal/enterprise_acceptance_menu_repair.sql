@@ -222,30 +222,138 @@ where srm.role_id <> 1
     1013, 1014, 1015, 1016
   );
 
+-- Preset enterprise roles. Use fixed ids so startup reconciliation can be idempotent.
+insert into sys_role
+(role_id, tenant_id, role_name, role_key, role_sort, data_scope, menu_check_strictly, dept_check_strictly, status, del_flag, create_dept, create_by, create_time, remark)
+select 900001, '000000', '企业管理员', 'enterprise_admin', 10, '1', 1, 1, '0', '0', 103, 1, sysdate(), '企业端预置管理员角色'
+where not exists (select 1 from sys_role where role_id = 900001);
+
+insert into sys_role
+(role_id, tenant_id, role_name, role_key, role_sort, data_scope, menu_check_strictly, dept_check_strictly, status, del_flag, create_dept, create_by, create_time, remark)
+select 900002, '000000', '数据填报员', 'enterprise_data_entry', 11, '6', 1, 1, '0', '0', 103, 1, sysdate(), '企业端预置数据填报角色'
+where not exists (select 1 from sys_role where role_id = 900002);
+
+insert into sys_role
+(role_id, tenant_id, role_name, role_key, role_sort, data_scope, menu_check_strictly, dept_check_strictly, status, del_flag, create_dept, create_by, create_time, remark)
+select 900003, '000000', '数据审核员', 'enterprise_auditor', 12, '3', 1, 1, '0', '0', 103, 1, sysdate(), '企业端预置审核与验证角色'
+where not exists (select 1 from sys_role where role_id = 900003);
+
+insert into sys_role
+(role_id, tenant_id, role_name, role_key, role_sort, data_scope, menu_check_strictly, dept_check_strictly, status, del_flag, create_dept, create_by, create_time, remark)
+select 900004, '000000', '报表查看员', 'enterprise_report_viewer', 13, '1', 1, 1, '0', '0', 103, 1, sysdate(), '企业端预置报表只读角色'
+where not exists (select 1 from sys_role where role_id = 900004);
+
+update sys_role
+set tenant_id = '000000',
+    role_name = case role_id
+        when 900001 then '企业管理员'
+        when 900002 then '数据填报员'
+        when 900003 then '数据审核员'
+        when 900004 then '报表查看员'
+        else role_name
+    end,
+    role_key = case role_id
+        when 900001 then 'enterprise_admin'
+        when 900002 then 'enterprise_data_entry'
+        when 900003 then 'enterprise_auditor'
+        when 900004 then 'enterprise_report_viewer'
+        else role_key
+    end,
+    role_sort = case role_id
+        when 900001 then 10
+        when 900002 then 11
+        when 900003 then 12
+        when 900004 then 13
+        else role_sort
+    end,
+    data_scope = case role_id
+        when 900001 then '1'
+        when 900002 then '6'
+        when 900003 then '3'
+        when 900004 then '1'
+        else data_scope
+    end,
+    menu_check_strictly = 1,
+    dept_check_strictly = 1,
+    status = '0',
+    del_flag = '0',
+    update_by = 1,
+    update_time = sysdate()
+where role_id in (900001, 900002, 900003, 900004);
+
+delete from sys_role_menu
+where role_id in (900001, 900002, 900003, 900004);
+
+-- enterprise_admin: enterprise business, local user/role/menu administration, and all enterprise actions.
 insert ignore into sys_role_menu (role_id, menu_id)
-select r.role_id, m.menu_id
-from sys_role r
-cross join sys_menu m
-where r.status = '0'
-  and r.del_flag = '0'
-  and m.menu_id in (
-    900100, 900102, 900103, 900104, 900105,
-    900110, 900111, 900112, 900113, 900114, 900115,
-    900120, 900121, 900122, 900123, 900124, 900125,
-    900130, 900131,
-    900140, 900141,
-    900150, 900151, 900152, 900153, 900154,
-    900160, 900161, 900162, 900163,
-    900170, 900171, 900172, 900173, 900174,
-    900180, 900181, 900182, 900183, 900184, 900185, 900186, 900187, 900188, 900189,
-    900190, 900191, 900192, 900193, 900194, 900195, 900196, 900197, 900198, 900199,
-    900200, 900201, 900202, 900203, 900204, 900205, 900206, 900207, 900208, 900209, 900210,
-    900211, 900212, 900213, 900214, 900215, 900216, 900217, 900218, 900219, 900220, 900221, 900222,
-    1, 100, 101, 102,
-    1001, 1002, 1003, 1004, 1005, 1006,
-    1007, 1008, 1009, 1010, 1011, 1012,
-    1013, 1014, 1015, 1016
-  );
+select 900001, menu_id
+from sys_menu
+where menu_id in (
+  900100, 900102, 900103, 900104, 900105,
+  900110, 900111, 900112, 900113, 900114, 900115,
+  900120, 900121, 900122, 900123, 900124, 900125,
+  900130, 900131,
+  900140, 900141,
+  900150, 900151, 900152, 900153, 900154,
+  900160, 900161, 900162, 900163,
+  900170, 900171, 900172, 900173, 900174,
+  900180, 900181, 900182, 900183, 900184, 900185, 900186, 900187, 900188, 900189,
+  900190, 900191, 900192, 900193, 900194, 900195, 900196, 900197, 900198, 900199,
+  900200, 900201, 900202, 900203, 900204, 900205, 900206, 900207, 900208, 900209, 900210,
+  900211, 900212, 900213, 900214, 900215, 900216, 900217, 900218, 900219, 900220, 900221, 900222,
+  1, 100, 101, 102,
+  1001, 1002, 1003, 1004, 1005, 1006,
+  1007, 1008, 1009, 1010, 1011, 1012,
+  1013, 1014, 1015, 1016
+);
+
+-- enterprise_data_entry: fill and maintain enterprise-side source data; no system management or vendor sync.
+insert ignore into sys_role_menu (role_id, menu_id)
+select 900002, menu_id
+from sys_menu
+where menu_id in (
+  900105,
+  900110, 900111, 900112, 900113, 900114, 900115,
+  900120, 900121, 900122, 900123, 900124, 900125,
+  900130, 900131,
+  900140, 900141,
+  900150, 900151, 900152, 900153, 900154,
+  900160, 900162,
+  900170, 900171,
+  900180, 900181, 900185, 900186, 900187, 900188, 900189,
+  900190, 900191, 900195, 900196, 900197, 900198,
+  900200, 900201, 900202, 900203,
+  900213, 900214, 900215, 900216, 900217, 900218, 900219, 900220, 900221
+);
+
+-- enterprise_auditor: validation and review only; no add/edit/remove/import/sync permissions.
+insert ignore into sys_role_menu (role_id, menu_id)
+select 900003, menu_id
+from sys_menu
+where menu_id in (
+  900105,
+  900110, 900111, 900112, 900113, 900114, 900115,
+  900120, 900121, 900122, 900123, 900124, 900125,
+  900130, 900131,
+  900140, 900141,
+  900150, 900151, 900152, 900153, 900154,
+  900160, 900161, 900162, 900163,
+  900170, 900171,
+  900180, 900181, 900185, 900186, 900187,
+  900190, 900191, 900195, 900196,
+  900200, 900201, 900205, 900206, 900210,
+  900213, 900214, 900215, 900216, 900220
+);
+
+-- enterprise_report_viewer: read reports, validation status, and downloaded report templates only.
+insert ignore into sys_role_menu (role_id, menu_id)
+select 900004, menu_id
+from sys_menu
+where menu_id in (
+  900105,
+  900160, 900161, 900162, 900163,
+  900205, 900206, 900210
+);
 
 insert ignore into sys_role_menu (role_id, menu_id)
 select 1, menu_id

@@ -189,6 +189,7 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
         }
 
         List<String> missingHeaders = expectedHeaderFields.stream()
+            .filter(descriptor -> !descriptor.isDerivedField())
             .filter(descriptor -> !bindingsByCode.containsKey(descriptor.getSourceColumnCode()))
             .map(CeSheet656FieldDescriptor::getSourceColumnName)
             .toList();
@@ -206,7 +207,7 @@ public class CeSheet656ActivityImportValidationServiceImpl implements ICeSheet65
 
         for (CeSheet656FieldDescriptor descriptor : expectedHeaderFields) {
             HeaderBinding binding = bindingsByCode.get(descriptor.getSourceColumnCode());
-            String value = binding == null ? null : normalize(rowValues.get(binding.columnIndex()));
+            String value = binding == null ? "" : normalize(rowValues.get(binding.columnIndex()));
             if (StringUtils.isNotBlank(value)) {
                 blankRow = false;
             }

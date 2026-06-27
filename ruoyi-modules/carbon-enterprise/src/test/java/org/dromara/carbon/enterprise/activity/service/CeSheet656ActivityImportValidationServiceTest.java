@@ -100,6 +100,45 @@ class CeSheet656ActivityImportValidationServiceTest {
     }
 
     @Test
+    void parsesCompactEntryTemplateAndLeavesDerivedFieldsForResolver() {
+        CeSheet656ActivityImportValidationServiceImpl service = new CeSheet656ActivityImportValidationServiceImpl(
+            new CeSheet656ValidationServiceImpl(fakeResolver())
+        );
+
+        List<CeSheet656FieldDescriptor> entryHeader = frozenHeader().stream()
+            .filter(field -> !field.isDerivedField())
+            .toList();
+
+        CeSheet656ImportValidationRequest request = service.parseImportFile(xlsxFile(
+            entryHeader.stream().map(CeSheet656FieldDescriptor::getSourceColumnName).toList(),
+            List.of(rowValues(
+                "SRC-001",
+                "2026",
+                "6",
+                "2026-06-05",
+                "12.5",
+                "Production",
+                "Meter",
+                "Normal record"
+            ))
+        ));
+
+        assertEquals(18, request.getHeaderFields().size());
+        assertEquals(18, request.getRows().get(0).getFieldValues().size());
+        assertEquals("SRC-001", fieldValue(request.getRows().get(0), "f001"));
+        assertEquals("12.5", fieldValue(request.getRows().get(0), "f014"));
+        assertEquals("", fieldValue(request.getRows().get(0), "f002"));
+        assertEquals("", fieldValue(request.getRows().get(0), "f018"));
+
+        CeSheet656ImportValidationResult result = service.validateImport(request);
+
+        assertTrue(result.isHeaderValid());
+        assertFalse(result.isBlocking());
+        assertEquals("COMP-001", fieldValueFromResolved(result, "f002"));
+        assertEquals("EF-2026-001", fieldValueFromResolved(result, "f018"));
+    }
+
+    @Test
     void rejectsEmptyUploadFile() {
         CeSheet656ActivityImportValidationServiceImpl service = new CeSheet656ActivityImportValidationServiceImpl(
             new CeSheet656ValidationServiceImpl(fakeResolver())
@@ -131,18 +170,19 @@ class CeSheet656ActivityImportValidationServiceTest {
         );
 
         List<String> headers = frozenHeader().stream()
+            .filter(field -> !"f001".equals(field.getSourceColumnCode()))
             .map(CeSheet656FieldDescriptor::getSourceColumnName)
             .toList();
 
         ServiceException exception = assertThrows(ServiceException.class,
-            () -> service.parseImportFile(xlsxFile(headers.subList(0, headers.size() - 1), List.of(
-                rowValues("SRC-001", "COMP-001", "Company One", "Factory One", "CAT-001", "Scope 1",
+            () -> service.parseImportFile(xlsxFile(headers, List.of(
+                rowValues("COMP-001", "Company One", "Factory One", "CAT-001", "Scope 1",
                     "Stationary Combustion", "Natural Gas Boiler", "Natural Gas", "Nm3",
                     "2026", "6", "2026-06-05", "12.5", "Production", "Meter", "Normal record")
             ))));
 
         assertTrue(exception.getMessage().contains("缺少必要表头"));
-        assertTrue(exception.getMessage().contains("FK_排放因子"));
+        assertTrue(exception.getMessage().contains("PK_排放源识别编号"));
     }
 
     @Test
@@ -377,6 +417,14 @@ class CeSheet656ActivityImportValidationServiceTest {
 
     private String fieldValue(CeSheet656ValidationRequest row, String code) {
         return row.getFieldValues().stream()
+            .filter(fieldValue -> code.equals(fieldValue.getSourceColumnCode()))
+            .findFirst()
+            .map(CeSheet656FieldValue::getValue)
+            .orElse(null);
+    }
+
+    private String fieldValueFromResolved(CeSheet656ImportValidationResult result, String code) {
+        return result.getRowResults().get(0).getResolvedDerivedFieldValues().stream()
             .filter(fieldValue -> code.equals(fieldValue.getSourceColumnCode()))
             .findFirst()
             .map(CeSheet656FieldValue::getValue)
