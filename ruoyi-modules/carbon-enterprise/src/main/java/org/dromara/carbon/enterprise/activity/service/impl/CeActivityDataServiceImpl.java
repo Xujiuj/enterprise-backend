@@ -64,7 +64,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     private static final String FIELD_YEAR = "activityYear";
     private static final String FIELD_MONTH = "activityMonth";
     private static final String FIELD_DEPARTMENT = "responsibleDept";
-    private static final String MODULE_ACTIVITY = "Activity data";
+    private static final String MODULE_ACTIVITY = "活动数据";
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
     private final CeActivityDataMapper activityDataMapper;
@@ -352,25 +352,25 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
                                                                                   ActivityPeriod period) {
         List<CeActivityDataValidationDashboardVo.ValidationIssue> issues = new ArrayList<>();
         if (activity == null) {
-            issues.add(issue("MISSING_ACTIVITY_DATA", "Activity data missing", "ERROR", source, period,
-                "Enabled emission source has no activity data for the selected period.", "Record activity data for the period.", "missing"));
+            issues.add(issue("MISSING_ACTIVITY_DATA", "活动数据缺失", "ERROR", source, period,
+                "已启用的排放源在所选核算期间没有活动数据。", "请补充该期间的活动数据。", "missing"));
             return issues;
         }
         if (!isSubmitted(activity)) {
-            issues.add(issue("UNSUBMITTED_ACTIVITY_DATA", "Activity data not submitted", "WARNING", source, period,
-                "Activity data is still draft.", "Submit or review the draft data.", "pending"));
+            issues.add(issue("UNSUBMITTED_ACTIVITY_DATA", "活动数据未提交", "WARNING", source, period,
+                "活动数据仍处于草稿状态。", "请复核草稿数据并提交。", "pending"));
         }
         if (activity.getActivityValue() == null || BigDecimal.ZERO.compareTo(activity.getActivityValue()) >= 0) {
-            issues.add(issue("INVALID_ACTIVITY_VALUE", "Invalid activity value", "ERROR", source, period,
-                "Activity value is empty or less than or equal to 0.", "Check the original reading and save again.", "abnormal"));
+            issues.add(issue("INVALID_ACTIVITY_VALUE", "活动数据值无效", "ERROR", source, period,
+                "活动数据值为空，或小于等于 0。", "请核对原始读数后重新保存。", "abnormal"));
         }
         if (StringUtils.isBlank(activity.getActivityUnit())) {
-            issues.add(issue("MISSING_ACTIVITY_UNIT", "Activity unit missing", "ERROR", source, period,
-                "Activity data is missing a unit.", "Check the emission source unit and save again.", "abnormal"));
+            issues.add(issue("MISSING_ACTIVITY_UNIT", "活动数据单位缺失", "ERROR", source, period,
+                "活动数据缺少计量单位。", "请核对排放源单位后重新保存。", "abnormal"));
         }
         if (isSubmitted(activity) && StringUtils.isBlank(activity.getFactorKey())) {
-            issues.add(issue("MISSING_FACTOR_CONFIRMATION", "Factor not confirmed", "WARNING", source, period,
-                "Submitted activity data is not linked to a confirmed emission factor.", "Confirm the factor and recalculate.", "pending"));
+            issues.add(issue("MISSING_FACTOR_CONFIRMATION", "排放因子未确认", "WARNING", source, period,
+                "已提交的活动数据未关联已确认的排放因子。", "请确认排放因子并重新计算。", "pending"));
         }
         return issues;
     }
@@ -399,15 +399,15 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         for (CeGreenPowerCertificate certificate : certificates) {
             String objectName = certificate.getCertificateCode() + " / " + certificate.getElectricityType();
             if (certificate.getQuantityKwh() == null || BigDecimal.ZERO.compareTo(certificate.getQuantityKwh()) >= 0) {
-                issues.add(issueForObject("INVALID_GREEN_POWER_AMOUNT", "Invalid green power quantity", "ERROR", objectName, period,
-                    "Green power certificate quantity is empty or less than or equal to 0.", "Check certificate quantity and save again.", "abnormal"));
+                issues.add(issueForObject("INVALID_GREEN_POWER_AMOUNT", "绿电绿证数量无效", "ERROR", objectName, period,
+                    "绿电绿证数量为空，或小于等于 0。", "请核对证书数量后重新保存。", "abnormal"));
             }
             if ("voided".equals(certificate.getProofStatus())) {
-                issues.add(issueForObject("VOIDED_GREEN_POWER_PROOF", "Green power proof voided", "ERROR", objectName, period,
-                    "Green power certificate proof status is voided.", "Replace the certificate or remove the offset.", "abnormal"));
+                issues.add(issueForObject("VOIDED_GREEN_POWER_PROOF", "绿电绿证凭证已作废", "ERROR", objectName, period,
+                    "绿电绿证凭证状态为已作废。", "请更换有效证书或移除对应抵扣。", "abnormal"));
             } else if (!"verified".equals(certificate.getProofStatus())) {
-                issues.add(issueForObject("PENDING_GREEN_POWER_PROOF", "Green power proof pending", "WARNING", objectName, period,
-                    "Green power certificate proof is not verified.", "Complete certificate verification.", "pending"));
+                issues.add(issueForObject("PENDING_GREEN_POWER_PROOF", "绿电绿证凭证待核验", "WARNING", objectName, period,
+                    "绿电绿证凭证尚未完成核验。", "请完成证书核验。", "pending"));
             }
         }
         return issues;
@@ -427,12 +427,12 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         for (CeIntensityDenominatorFact fact : facts) {
             String objectName = fact.getFactoryCode() + " / " + fact.getDenominatorMetricName();
             if (StringUtils.isBlank(fact.getDenominatorType())) {
-                issues.add(issueForObject("MISSING_DENOMINATOR_CODE", "Denominator type missing", "WARNING", objectName, period,
-                    "Denominator fact is missing a denominator type.", "Complete denominator type.", "pending"));
+                issues.add(issueForObject("MISSING_DENOMINATOR_CODE", "分母类型缺失", "WARNING", objectName, period,
+                    "强度分母事实缺少分母类型。", "请补充分母类型。", "pending"));
             }
             if (fact.getDenominatorValue() == null || BigDecimal.ZERO.compareTo(fact.getDenominatorValue()) >= 0) {
-                issues.add(issueForObject("INVALID_DENOMINATOR_VALUE", "Invalid denominator value", "ERROR", objectName, period,
-                    "Denominator value is empty or less than or equal to 0.", "Check denominator source data.", "abnormal"));
+                issues.add(issueForObject("INVALID_DENOMINATOR_VALUE", "分母数值无效", "ERROR", objectName, period,
+                    "分母数值为空，或小于等于 0。", "请核对分母来源数据。", "abnormal"));
             }
         }
         return issues;
@@ -505,7 +505,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     }
 
     private String resolveDepartment(CaptureSubmissionMeta captureMeta) {
-        return captureMeta == null || StringUtils.isBlank(captureMeta.department()) ? "Unassigned department" : captureMeta.department();
+        return captureMeta == null || StringUtils.isBlank(captureMeta.department()) ? "未分配部门" : captureMeta.department();
     }
 
     private String resolveResponsiblePerson(CaptureSubmissionMeta captureMeta) {

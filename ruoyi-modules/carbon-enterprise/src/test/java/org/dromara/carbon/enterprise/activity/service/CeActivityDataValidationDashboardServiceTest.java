@@ -130,6 +130,9 @@ class CeActivityDataValidationDashboardServiceTest {
         assertEquals("draft", dashboard.getSubmissions().get(0).getSubmissionStatus());
         assertEquals(5, dashboard.getIssues().size());
         assertEquals("UNSUBMITTED_ACTIVITY_DATA", dashboard.getIssues().get(0).getRuleCode());
+        assertEquals("活动数据未提交", dashboard.getIssues().get(0).getRuleName());
+        assertEquals("活动数据仍处于草稿状态。", dashboard.getIssues().get(0).getDescription());
+        assertEquals("请复核草稿数据并提交。", dashboard.getIssues().get(0).getSuggestion());
     }
 
     @Test

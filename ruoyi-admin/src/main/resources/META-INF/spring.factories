@@ -1,0 +1,3 @@
+org.springframework.boot.env.EnvironmentPostProcessor=\
+org.dromara.enterprise.config.EnterpriseSecureConfigEnvironmentPostProcessor,\
+org.dromara.enterprise.config.EnterpriseDeploymentConfigValidator
