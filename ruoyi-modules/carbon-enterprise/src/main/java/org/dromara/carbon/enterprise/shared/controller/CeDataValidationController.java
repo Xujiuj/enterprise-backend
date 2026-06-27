@@ -1,0 +1,54 @@
+package org.dromara.carbon.enterprise.shared.controller;
+
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import lombok.RequiredArgsConstructor;
+import org.dromara.carbon.enterprise.activity.domain.bo.CeActivityDataBo;
+import org.dromara.carbon.enterprise.activity.domain.vo.CeActivityDataValidationDashboardVo;
+import org.dromara.carbon.enterprise.shared.service.ICeActivityDataService;
+import org.dromara.common.core.domain.R;
+import org.dromara.common.web.core.BaseController;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Enterprise activity-data validation dashboard API.
+ *
+ * <p>All four endpoints delegate to the same service method because the frontend
+ * {@code dataValidation/index.vue} consumes the full dashboard VO for each view.
+ * If future requirements demand distinct payloads (e.g. submissions-only list,
+ * issues-only list), split the service method and update the frontend accordingly.</p>
+ */
+@Validated
+@RequiredArgsConstructor
+@RestController
+@RequestMapping("/enterprise/data-validation")
+public class CeDataValidationController extends BaseController {
+
+    private final ICeActivityDataService activityDataService;
+
+    @SaCheckPermission("enterprise:dataValidation:view")
+    @GetMapping("/dashboard")
+    public R<CeActivityDataValidationDashboardVo> dashboard(CeActivityDataBo bo) {
+        return R.ok(activityDataService.queryValidationDashboard(bo));
+    }
+
+    @SaCheckPermission("enterprise:dataValidation:view")
+    @GetMapping("/summary")
+    public R<CeActivityDataValidationDashboardVo> summary(CeActivityDataBo bo) {
+        return R.ok(activityDataService.queryValidationDashboard(bo));
+    }
+
+    @SaCheckPermission("enterprise:dataValidation:view")
+    @GetMapping("/submissions")
+    public R<CeActivityDataValidationDashboardVo> submissions(CeActivityDataBo bo) {
+        return R.ok(activityDataService.queryValidationDashboard(bo));
+    }
+
+    @SaCheckPermission("enterprise:dataValidation:view")
+    @GetMapping("/issues")
+    public R<CeActivityDataValidationDashboardVo> issues(CeActivityDataBo bo) {
+        return R.ok(activityDataService.queryValidationDashboard(bo));
+    }
+}

@@ -1,0 +1,14 @@
+package org.dromara.carbon.enterprise.template.mapper;
+
+import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
+
+import org.dromara.carbon.enterprise.template.domain.CeTemplateField;
+import org.dromara.carbon.enterprise.template.domain.vo.CeTemplateFieldVo;
+import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
+
+/**
+ * Enterprise original field preservation inventory mapper.
+ */
+@InterceptorIgnore(dataPermission = "true", tenantLine = "true")
+public interface CeTemplateFieldMapper extends BaseMapperPlus<CeTemplateField, CeTemplateFieldVo> {
+}

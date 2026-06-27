@@ -52,11 +52,6 @@
 
         <dependency>
             <groupId>org.dromara</groupId>
-            <artifactId>ruoyi-common-social</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.dromara</groupId>
             <artifactId>ruoyi-common-ratelimiter</artifactId>
         </dependency>
 
@@ -74,12 +69,6 @@
             <groupId>org.dromara</groupId>
             <artifactId>carbon-enterprise</artifactId>
             <version>${revision}</version>
-        </dependency>
-
-        <!-- 代码生成-->
-        <dependency>
-            <groupId>org.dromara</groupId>
-            <artifactId>ruoyi-generator</artifactId>
         </dependency>
 
         <dependency>

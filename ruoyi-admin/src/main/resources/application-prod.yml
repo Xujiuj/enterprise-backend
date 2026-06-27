@@ -1,9 +1,9 @@
---- # 临时文件存储位置 避免临时文件被系统清理报错
+﻿--- # 涓存椂鏂囦欢瀛樺偍浣嶇疆 閬垮厤涓存椂鏂囦欢琚郴缁熸竻鐞嗘姤閿?
 spring.servlet.multipart.location: /ruoyi/server/temp
 
---- # 监控中心配置
+--- # 鐩戞帶涓績閰嶇疆
 spring.boot.admin.client:
-  # 增加客户端开关
+  # 澧炲姞瀹㈡埛绔紑鍏?
   enabled: true
   url: http://localhost:9090/admin
   instance:
@@ -14,46 +14,46 @@ spring.boot.admin.client:
   username: @monitor.username@
   password: @monitor.password@
 
---- # snail-job 配置
+--- # snail-job 閰嶇疆
 snail-job:
   enabled: true
-  # 需要在 SnailJob 后台组管理创建对应名称的组,然后创建任务的时候选择对应的组,才能正确分派任务
+  # 闇€瑕佸湪 SnailJob 鍚庡彴缁勭鐞嗗垱寤哄搴斿悕绉扮殑缁?鐒跺悗鍒涘缓浠诲姟鐨勬椂鍊欓€夋嫨瀵瑰簲鐨勭粍,鎵嶈兘姝ｇ‘鍒嗘淳浠诲姟
   group: "ruoyi_group"
-  # SnailJob 接入验证令牌 详见 script/sql/ry_job.sql `sj_group_config`表
+  # SnailJob 鎺ュ叆楠岃瘉浠ょ墝 璇﹁ script/sql/ry_job.sql `sj_group_config`琛?
   token: "SJ_cKqBTPzCsWA3VyuCfFoccmuIEGXjr5KT"
   server:
     host: 127.0.0.1
     port: 17888
-  # 命名空间UUID 详见 script/sql/ry_job.sql `sj_namespace`表`unique_id`字段
+  # 鍛藉悕绌洪棿UUID 璇﹁ script/sql/ry_job.sql `sj_namespace`琛╜unique_id`瀛楁
   namespace: ${spring.profiles.active}
-  # 随主应用端口漂移
+  # 闅忎富搴旂敤绔彛婕傜Щ
   port: 2${server.port}
-  # 客户端ip指定
+  # 瀹㈡埛绔痠p鎸囧畾
   host:
 
---- # 数据源配置
+--- # 鏁版嵁婧愰厤缃?
 spring:
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
-    # 动态数据源文档 https://www.kancloud.cn/tracy5546/dynamic-datasource/content
+    # 鍔ㄦ€佹暟鎹簮鏂囨。 https://www.kancloud.cn/tracy5546/dynamic-datasource/content
     dynamic:
-      # 性能分析插件(有性能损耗 不建议生产环境使用)
+      # 鎬ц兘鍒嗘瀽鎻掍欢(鏈夋€ц兘鎹熻€?涓嶅缓璁敓浜х幆澧冧娇鐢?
       p6spy: false
-      # 设置默认的数据源或者数据源组,默认值即为 master
+      # 璁剧疆榛樿鐨勬暟鎹簮鎴栬€呮暟鎹簮缁?榛樿鍊煎嵆涓?master
       primary: master
-      # 严格模式 匹配不到数据源则报错
+      # 涓ユ牸妯″紡 鍖归厤涓嶅埌鏁版嵁婧愬垯鎶ラ敊
       strict: true
       datasource:
-        # 主库数据源
+        # 涓诲簱鏁版嵁婧?
         master:
           type: ${spring.datasource.type}
           driverClassName: com.mysql.cj.jdbc.Driver
-          # jdbc 所有参数配置参考 https://lionli.blog.csdn.net/article/details/122018562
-          # rewriteBatchedStatements=true 批处理优化 大幅提升批量插入更新删除性能(对数据库有性能损耗 使用批量操作应考虑性能问题)
+          # jdbc 鎵€鏈夊弬鏁伴厤缃弬鑰?https://lionli.blog.csdn.net/article/details/122018562
+          # rewriteBatchedStatements=true 鎵瑰鐞嗕紭鍖?澶у箙鎻愬崌鎵归噺鎻掑叆鏇存柊鍒犻櫎鎬ц兘(瀵规暟鎹簱鏈夋€ц兘鎹熻€?浣跨敤鎵归噺鎿嶄綔搴旇€冭檻鎬ц兘闂)
           url: jdbc:mysql://${ENTERPRISE_DB_HOST:124.221.155.102}:${ENTERPRISE_DB_PORT:3306}/${ENTERPRISE_DB_NAME:enterprise}?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&autoReconnect=true&rewriteBatchedStatements=true&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true
           username: ${ENTERPRISE_DB_USERNAME:root}
           password: ${ENTERPRISE_DB_PASSWORD:010430}
-#        # 从库数据源
+#        # 浠庡簱鏁版嵁婧?
 #        slave:
 #          lazy: true
 #          type: ${spring.datasource.type}
@@ -80,58 +80,58 @@ spring:
 #          username: SA
 #          password: root
       hikari:
-        # 最大连接池数量
+        # 鏈€澶ц繛鎺ユ睜鏁伴噺
         maxPoolSize: 20
-        # 最小空闲线程数量
+        # 鏈€灏忕┖闂茬嚎绋嬫暟閲?
         minIdle: 10
-        # 配置获取连接等待超时的时间
+        # 閰嶇疆鑾峰彇杩炴帴绛夊緟瓒呮椂鐨勬椂闂?
         connectionTimeout: 30000
-        # 校验超时时间
+        # 鏍￠獙瓒呮椂鏃堕棿
         validationTimeout: 5000
-        # 空闲连接存活最大时间，默认10分钟
+        # 绌洪棽杩炴帴瀛樻椿鏈€澶ф椂闂达紝榛樿10鍒嗛挓
         idleTimeout: 600000
-        # 此属性控制池中连接的最长生命周期，值0表示无限生命周期，默认30分钟
+        # 姝ゅ睘鎬ф帶鍒舵睜涓繛鎺ョ殑鏈€闀跨敓鍛藉懆鏈燂紝鍊?琛ㄧず鏃犻檺鐢熷懡鍛ㄦ湡锛岄粯璁?0鍒嗛挓
         maxLifetime: 1800000
-        # 多久检查一次连接的活性
+        # 澶氫箙妫€鏌ヤ竴娆¤繛鎺ョ殑娲绘€?
         keepaliveTime: 30000
 
---- # redis 单机配置(单机与集群只能开启一个另一个需要注释掉)
+--- # redis 鍗曟満閰嶇疆(鍗曟満涓庨泦缇ゅ彧鑳藉紑鍚竴涓彟涓€涓渶瑕佹敞閲婃帀)
 spring.data:
   redis:
-    # 地址
+    # 鍦板潃
     host: ${REDIS_HOST:124.221.155.102}
-    # 端口，默认为6379
+    # 绔彛锛岄粯璁や负6379
     port: 6379
-    # 数据库索引
+    # 鏁版嵁搴撶储寮?
     database: 0
-    # redis 密码必须配置
+    # redis 瀵嗙爜蹇呴』閰嶇疆
     password: ruoyi123
-    # 连接超时时间
+    # 杩炴帴瓒呮椂鏃堕棿
     timeout: 10s
-    # 是否开启ssl
+    # 鏄惁寮€鍚痵sl
     ssl.enabled: false
 
-# redisson 配置
+# redisson 閰嶇疆
 redisson:
-  # redis key前缀
+  # redis key鍓嶇紑
   keyPrefix:
-  # 线程池数量
+  # 绾跨▼姹犳暟閲?
   threads: 16
-  # Netty线程池数量
+  # Netty绾跨▼姹犳暟閲?
   nettyThreads: 32
-  # 单节点配置
+  # 鍗曡妭鐐归厤缃?
   singleServerConfig:
-    # 客户端名称 不能用中文
+    # 瀹㈡埛绔悕绉?涓嶈兘鐢ㄤ腑鏂?
     clientName: Enterprise-Carbon-Data
-    # 最小空闲连接数
+    # 鏈€灏忕┖闂茶繛鎺ユ暟
     connectionMinimumIdleSize: 32
-    # 连接池大小
+    # 杩炴帴姹犲ぇ灏?
     connectionPoolSize: 64
-    # 连接空闲超时，单位：毫秒
+    # 杩炴帴绌洪棽瓒呮椂锛屽崟浣嶏細姣
     idleConnectionTimeout: 10000
-    # 命令等待超时，单位：毫秒
+    # 鍛戒护绛夊緟瓒呮椂锛屽崟浣嶏細姣
     timeout: 3000
-    # 发布和订阅连接池大小
+    # 鍙戝竷鍜岃闃呰繛鎺ユ睜澶у皬
     subscriptionConnectionPoolSize: 50
 
 --- # enterprise vendor open API configuration
@@ -141,139 +141,55 @@ carbon:
   license:
     install-id: ${ENTERPRISE_INSTALL_ID:INSTALL-ENTERPRISE-LOCAL-001}
 
---- # mail 邮件发送
-mail:
+--- # mail 閭欢鍙戦€?mail:
   enabled: false
   host: smtp.163.com
   port: 465
-  # 是否需要用户名密码验证
+  # 鏄惁闇€瑕佺敤鎴峰悕瀵嗙爜楠岃瘉
   auth: true
-  # 发送方，遵循RFC-822标准
+  # 鍙戦€佹柟锛岄伒寰猂FC-822鏍囧噯
   from: xxx@163.com
-  # 用户名（注意：如果使用foxmail邮箱，此处user为qq号）
+  # 鐢ㄦ埛鍚嶏紙娉ㄦ剰锛氬鏋滀娇鐢╢oxmail閭锛屾澶剈ser涓簈q鍙凤級
   user: xxx@163.com
-  # 密码（注意，某些邮箱需要为SMTP服务单独设置密码，详情查看相关帮助）
+  # 瀵嗙爜锛堟敞鎰忥紝鏌愪簺閭闇€瑕佷负SMTP鏈嶅姟鍗曠嫭璁剧疆瀵嗙爜锛岃鎯呮煡鐪嬬浉鍏冲府鍔╋級
   pass: xxxxxxxxxx
-  # 使用 STARTTLS安全连接，STARTTLS是对纯文本通信协议的扩展。
+  # 浣跨敤 STARTTLS瀹夊叏杩炴帴锛孲TARTTLS鏄绾枃鏈€氫俊鍗忚鐨勬墿灞曘€?
   starttlsEnable: true
-  # 使用SSL安全连接
+  # 浣跨敤SSL瀹夊叏杩炴帴
   sslEnable: true
-  # SMTP超时时长，单位毫秒，缺省值不超时
+  # SMTP瓒呮椂鏃堕暱锛屽崟浣嶆绉掞紝缂虹渷鍊间笉瓒呮椂
   timeout: 0
-  # Socket连接超时值，单位毫秒，缺省值不超时
+  # Socket杩炴帴瓒呮椂鍊硷紝鍗曚綅姣锛岀己鐪佸€间笉瓒呮椂
   connectionTimeout: 0
 
---- # sms 短信 支持 阿里云 腾讯云 云片 等等各式各样的短信服务商
-# https://sms4j.com/doc3/ 差异配置文档地址 支持单厂商多配置，可以配置多个同时使用
+--- # sms 鐭俊 鏀寔 闃块噷浜?鑵捐浜?浜戠墖 绛夌瓑鍚勫紡鍚勬牱鐨勭煭淇℃湇鍔″晢
+# https://sms4j.com/doc3/ 宸紓閰嶇疆鏂囨。鍦板潃 鏀寔鍗曞巶鍟嗗閰嶇疆锛屽彲浠ラ厤缃涓悓鏃朵娇鐢?
 sms:
-  # 配置源类型用于标定配置来源(interface,yaml)
+  # 閰嶇疆婧愮被鍨嬬敤浜庢爣瀹氶厤缃潵婧?interface,yaml)
   config-type: yaml
-  # 用于标定yml中的配置是否开启短信拦截，接口配置不受此限制
+  # 鐢ㄤ簬鏍囧畾yml涓殑閰嶇疆鏄惁寮€鍚煭淇℃嫤鎴紝鎺ュ彛閰嶇疆涓嶅彈姝ら檺鍒?
   restricted: true
-  # 短信拦截限制单手机号每分钟最大发送，只对开启了拦截的配置有效
+  # 鐭俊鎷︽埅闄愬埗鍗曟墜鏈哄彿姣忓垎閽熸渶澶у彂閫侊紝鍙寮€鍚簡鎷︽埅鐨勯厤缃湁鏁?
   minute-max: 1
-  # 短信拦截限制单手机号每日最大发送量，只对开启了拦截的配置有效
+  # 鐭俊鎷︽埅闄愬埗鍗曟墜鏈哄彿姣忔棩鏈€澶у彂閫侀噺锛屽彧瀵瑰紑鍚簡鎷︽埅鐨勯厤缃湁鏁?
   account-max: 30
-  # 以下配置来自于 org.dromara.sms4j.provider.config.BaseConfig类中
+  # 浠ヤ笅閰嶇疆鏉ヨ嚜浜?org.dromara.sms4j.provider.config.BaseConfig绫讳腑
   blends:
-    # 唯一ID 用于发送短信寻找具体配置 随便定义别用中文即可
-    # 可以同时存在两个相同厂商 例如: ali1 ali2 两个不同的阿里短信账号 也可用于区分租户
+    # 鍞竴ID 鐢ㄤ簬鍙戦€佺煭淇″鎵惧叿浣撻厤缃?闅忎究瀹氫箟鍒敤涓枃鍗冲彲
+    # 鍙互鍚屾椂瀛樺湪涓や釜鐩稿悓鍘傚晢 渚嬪: ali1 ali2 涓や釜涓嶅悓鐨勯樋閲岀煭淇¤处鍙?涔熷彲鐢ㄤ簬鍖哄垎绉熸埛
     config1:
-      # 框架定义的厂商名称标识，标定此配置是哪个厂商，详细请看厂商标识介绍部分
+      # 妗嗘灦瀹氫箟鐨勫巶鍟嗗悕绉版爣璇嗭紝鏍囧畾姝ら厤缃槸鍝釜鍘傚晢锛岃缁嗚鐪嬪巶鍟嗘爣璇嗕粙缁嶉儴鍒?
       supplier: alibaba
-      # 有些称为accessKey有些称之为apiKey，也有称为sdkKey或者appId。
-      access-key-id: 您的accessKey
-      # 称为accessSecret有些称之为apiSecret
-      access-key-secret: 您的accessKeySecret
-      signature: 您的短信签名
-      sdk-app-id: 您的sdkAppId
+      # 鏈変簺绉颁负accessKey鏈変簺绉颁箣涓篴piKey锛屼篃鏈夌О涓簊dkKey鎴栬€卆ppId銆?
+      access-key-id: 鎮ㄧ殑accessKey
+      # 绉颁负accessSecret鏈変簺绉颁箣涓篴piSecret
+      access-key-secret: 鎮ㄧ殑accessKeySecret
+      signature: 鎮ㄧ殑鐭俊绛惧悕
+      sdk-app-id: 鎮ㄧ殑sdkAppId
     config2:
-      # 厂商标识，标定此配置是哪个厂商，详细请看厂商标识介绍部分
+      # 鍘傚晢鏍囪瘑锛屾爣瀹氭閰嶇疆鏄摢涓巶鍟嗭紝璇︾粏璇风湅鍘傚晢鏍囪瘑浠嬬粛閮ㄥ垎
       supplier: tencent
-      access-key-id: 您的accessKey
-      access-key-secret: 您的accessKeySecret
-      signature: 您的短信签名
-      sdk-app-id: 您的sdkAppId
-
---- # 三方授权
-justauth:
-  # 前端外网访问地址
-  address: http://localhost:80
-  type:
-    maxkey:
-      # maxkey 服务器地址
-      # 注意 如下均配置均不需要修改 maxkey 已经内置好了数据
-      server-url: http://sso.maxkey.top
-      client-id: 876892492581044224
-      client-secret: x1Y5MTMwNzIwMjMxNTM4NDc3Mzche8
-      redirect-uri: ${justauth.address}/social-callback?source=maxkey
-    topiam:
-      # topiam 服务器地址
-      server-url: http://127.0.0.1:1989/api/v1/authorize/y0q************spq***********8ol
-      client-id: 449c4*********937************759
-      client-secret: ac7***********1e0************28d
-      redirect-uri: ${justauth.address}/social-callback?source=topiam
-      scopes: [ openid, email, phone, profile ]
-    qq:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=qq
-      union-id: false
-    weibo:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=weibo
-    gitee:
-      client-id: 91436b7940090d09c72c7daf85b959cfd5f215d67eea73acbf61b6b590751a98
-      client-secret: 02c6fcfd70342980cd8dd2f2c06c1a350645d76c754d7a264c4e125f9ba915ac
-      redirect-uri: ${justauth.address}/social-callback?source=gitee
-    dingtalk:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=dingtalk
-    baidu:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=baidu
-    csdn:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=csdn
-    coding:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=coding
-      coding-group-name: xx
-    oschina:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=oschina
-    alipay_wallet:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=alipay_wallet
-      alipay-public-key: MIIB**************DAQAB
-    wechat_open:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=wechat_open
-    wechat_mp:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=wechat_mp
-    wechat_enterprise:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=wechat_enterprise
-      agent-id: 1000002
-    gitlab:
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=gitlab
-    gitea:
-      # 前端改动 https://gitee.com/JavaLionLi/plus-ui/pulls/204
-      # gitea 服务器地址
-      server-url: https://demo.gitea.com
-      client-id: 10**********6
-      client-secret: 1f7d08**********5b7**********29e
-      redirect-uri: ${justauth.address}/social-callback?source=gitea
+      access-key-id: 鎮ㄧ殑accessKey
+      access-key-secret: 鎮ㄧ殑accessKeySecret
+      signature: 鎮ㄧ殑鐭俊绛惧悕
+      sdk-app-id: 鎮ㄧ殑sdkAppId

@@ -337,7 +337,7 @@ class EnterprisePortalMenuContractTest {
     @Test
     void enterpriseWorkbenchLinksUseCurrentPortalRoutes() throws Exception {
         String source = Files.readString(resolveFromWorkspace(
-            "ruoyi-modules/carbon-enterprise/src/main/java/org/dromara/carbon/enterprise/service/impl/CeWorkbenchServiceImpl.java"
+            "ruoyi-modules/carbon-enterprise/src/main/java/org/dromara/carbon/enterprise/workbench/service/impl/CeWorkbenchServiceImpl.java"
         ));
 
         assertThat(source).contains(
@@ -356,21 +356,38 @@ class EnterprisePortalMenuContractTest {
     }
 
     @Test
-    void baseRuoyiMenuSqlKeepsSystemManagementLogsAndCodeGeneration() throws Exception {
+    void baseRuoyiMenuSqlKeepsOnlyRequiredSystemManagementAndLogs() throws Exception {
         String sql = Files.readString(resolveFromWorkspace("script/sql/ry_vue_5.X.sql"));
 
         assertThat(sql).contains(
             "system/user/index",
             "system/role/index",
             "system/menu/index",
+            "monitor/logininfor/index",
+            "monitor/operlog/index"
+        );
+        assertThat(sql).doesNotContain(
+            "tool/gen/index",
+            "gen_table",
+            "gen_table_column",
+            "sys_notice",
+            "sys_social",
+            "test_demo",
+            "test_tree",
+            "system/notice/index",
+            "monitor/online/index",
+            "monitor/cache/index",
+            "system/client/index",
+            "system/tenant/index",
+            "system/tenantPackage/index",
             "system/dept/index",
             "system/post/index",
             "system/dict/index",
             "system/config/index",
-            "system/notice/index",
-            "monitor/logininfor/index",
-            "monitor/operlog/index",
-            "tool/gen/index"
+            "system:dept:",
+            "system:post:",
+            "system:dict:",
+            "system:config:"
         );
     }
 
