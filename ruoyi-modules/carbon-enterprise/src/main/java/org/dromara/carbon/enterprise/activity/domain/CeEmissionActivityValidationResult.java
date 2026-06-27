@@ -5,10 +5,10 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * Validation result for one sheet_656 row.
+ * Validation result for one emission_activity row.
  */
 @Data
-public class CeSheet656ValidationResult {
+public class CeEmissionActivityValidationResult {
 
     private Integer rowNumber;
 
@@ -18,7 +18,7 @@ public class CeSheet656ValidationResult {
 
     private boolean draftSavable;
 
-    private List<CeSheet656ValidationIssue> issues;
+    private List<CeEmissionActivityValidationIssue> issues;
 
-    private List<CeSheet656FieldValue> resolvedDerivedFieldValues;
+    private List<CeEmissionActivityFieldValue> resolvedDerivedFieldValues;
 }

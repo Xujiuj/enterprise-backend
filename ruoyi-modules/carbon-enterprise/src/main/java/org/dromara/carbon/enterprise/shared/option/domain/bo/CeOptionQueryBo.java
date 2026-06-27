@@ -23,4 +23,6 @@ public class CeOptionQueryBo {
     private String scopeSubcategory;
 
     private String sourceIdentificationName;
+
+    private String emissionSourceName;
 }

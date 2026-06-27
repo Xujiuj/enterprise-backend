@@ -231,9 +231,11 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "issuing-org" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getIssuingOrg, this::labelForRaw);
             case "confirmed-by" -> collectDistinct(options, factorConfirmationMapper, CeFactorConfirmation::getConfirmedBy, this::labelForRaw);
             case "license-id" -> collectDistinct(options, licenseStateMapper, CeLicenseState::getLicenseId, this::labelForRaw);
-            case "activity-entry-emission-source-name" -> collectEmissionSourceNameOptions(options, safeQuery);
+            case "activity-entry-emission-source-name" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getEmissionSourceName, safeQuery);
             case "activity-entry-source-company" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getCompanyName, safeQuery);
             case "activity-entry-source-factory" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getFactoryName, safeQuery);
+            case "activity-entry-source-scope" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getScopeName, safeQuery);
+            case "activity-entry-source-subcategory" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getScopeSubcategory, safeQuery);
             case "activity-entry-source-category" -> collectSourceCategoryOptions(options);
             case "activity-entry-source-leaf" -> collectEmissionSourceLeafOptions(options, safeQuery);
             case DIMENSION_FIELD_OPTION -> collectDimensionFieldOptions(options, safeQuery.getDimensionCode(), safeQuery.getField());
@@ -405,6 +407,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
         applyEmissionSourceFilter(wrapper, CeEmissionSource::getScopeName, query.getScopeName());
         applyEmissionSourceFilter(wrapper, CeEmissionSource::getScopeSubcategory, query.getScopeSubcategory());
         applyEmissionSourceFilter(wrapper, CeEmissionSource::getSourceIdentificationName, query.getSourceIdentificationName());
+        applyEmissionSourceFilter(wrapper, CeEmissionSource::getEmissionSourceName, query.getEmissionSourceName());
         return emissionSourceMapper.selectList(wrapper);
     }
 

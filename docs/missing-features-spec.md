@@ -78,33 +78,33 @@ Requirements:
 - Return stable business error codes suitable for enterprise-ui display.
 - Keep system/admin bootstrap paths explicitly documented if any path is exempt.
 
-### EB-2: Activity Template Validation for `sheet_656`
+### EB-2: Activity Entry Validation for `emission_activity`
 
-The first activity template mapping is frozen for module `03-活动数据`, sheet `天然气`, target table code `sheet_656`.
+The activity entry contract is `emission_activity`. Users provide only business entry fields; backend services resolve emission-source identity, company code, unit, factor key, and period-derived year/month from enterprise-local master data.
 
 Requirements:
 
-- Preserve all 18 source columns and their order.
-- Treat `f001` as the primary selected emission-source dimension.
-- Recalculate or derive `f002-f010` and `f018` from enterprise master data and current factor version; do not trust client-provided values for these fields.
+- Entry fields are company, factory, scope, scope subcategory, emission source name, activity period, date, activity data, responsible department, and data source.
+- Do not expose derived fields in online entry or downloaded Excel templates.
+- Resolve derived fields from enterprise master data and current factor version; do not trust client-provided derived values if present.
 - Strong validation blocks save/import:
   - missing required fields
   - invalid type
   - missing master-data match
   - inconsistent derived fields
   - invalid value domain
-  - `f014 <= 0`
+  - activity data <= 0
 - Weak validation returns warnings but allows draft save.
 - Error responses must include row number and source column name for import flows.
 
 ### EB-3: Activity Import API
 
-The backend does not yet expose an import flow that consumes the `sheet_656` Excel shape.
+The backend exposes an import flow that consumes the compact `emission_activity` entry-field Excel shape.
 
 Requirements:
 
-- Accept only the frozen 18-column header shape for the first slice.
-- Reject renamed, deleted, or extra required columns unless a future spec explicitly adds an extension path.
+- Accept only the entry-field header shape for the first slice.
+- Reject renamed, deleted, or extra columns unless a future spec explicitly adds an extension path.
 - Return structured row-level errors and warnings.
 - Persist only validated enterprise-local data.
 - Do not call vendor services during import.
@@ -187,7 +187,7 @@ Conventions:
 ## Success Criteria
 
 - Protected enterprise operations are denied when License gate is closed.
-- `sheet_656` backend validation blocks strong errors and returns weak warnings.
+- `emission_activity` backend validation blocks strong errors and returns weak warnings.
 - Import API reports row and column names for validation failures.
 - First approved `rpt` business view exists and is gated by License state.
 - Targeted tests and boundary checks pass.

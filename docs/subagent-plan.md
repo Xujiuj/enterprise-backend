@@ -9,7 +9,7 @@ This plan breaks the enterprise backend missing features into bounded subagent t
 ## Architecture Decisions
 
 - License enforcement consumes `ICeLicenseGateService`; no task may duplicate import verification or signature checks.
-- `sheet_656` is the first activity-data validation target.
+- `emission_activity` is the activity-data validation target.
 - Reporting data must stay in enterprise SQL Server and expose only approved `rpt` views to Power BI.
 - Shared parent-workspace scripts are not owned by ordinary implementers.
 
@@ -56,15 +56,16 @@ This plan breaks the enterprise backend missing features into bounded subagent t
 
 ## Phase 2: Activity Validation
 
-### Task EB-3: Implement `sheet_656` Validation Service
+### Task EB-3: Implement `emission_activity` Validation Service
 
-**Description:** Implement a service-level validator for the frozen `天然气` activity template.
+**Description:** Implement a service-level validator for the semantic emission activity entry contract.
 
 **Acceptance criteria:**
 - [ ] Valid row passes with derived-field checks.
 - [ ] Missing/invalid required fields produce blocking errors.
 - [ ] Weak warnings do not block draft save.
-- [ ] Client-provided `f002-f010` and `f018` are not trusted.
+- [ ] Online entry and Excel import expose only entry fields.
+- [ ] Client-provided derived fields are not trusted.
 
 **Verification:**
 - [ ] `rtk mvn -pl ruoyi-modules/carbon-enterprise -am "-DskipTests=false" "-Dtest=*Activity*Validation*Test" "-Dsurefire.failIfNoSpecifiedTests=false" test`
@@ -79,7 +80,7 @@ This plan breaks the enterprise backend missing features into bounded subagent t
 
 ### Task EB-4: Add Activity Import Validation API
 
-**Description:** Add an API slice that accepts `sheet_656` rows and returns row/column-level validation results.
+**Description:** Add an API slice that accepts `emission_activity` entry rows and returns row/column-level validation results.
 
 **Acceptance criteria:**
 - [ ] Header shape is validated.

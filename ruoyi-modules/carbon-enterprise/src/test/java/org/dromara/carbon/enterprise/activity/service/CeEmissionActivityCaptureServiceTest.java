@@ -12,15 +12,15 @@ import org.dromara.carbon.enterprise.activity.domain.CeCaptureRow;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.template.domain.CeTemplateField;
 import org.dromara.carbon.enterprise.template.domain.CeTemplateSheet;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ActivityCaptureResult;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656FieldDescriptor;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656FieldValue;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ImportValidationRequest;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ImportValidationResult;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ResolvedRow;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ValidationIssue;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ValidationRequest;
-import org.dromara.carbon.enterprise.shared.service.ICeSheet656ActivityImportValidationService;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityCaptureResult;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityFieldDescriptor;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityFieldValue;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityImportValidationRequest;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityImportValidationResult;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityResolvedRow;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityValidationIssue;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityValidationRequest;
+import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityImportValidationService;
 import org.dromara.carbon.enterprise.activity.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.activity.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.activity.mapper.CeCaptureCellMapper;
@@ -28,10 +28,10 @@ import org.dromara.carbon.enterprise.activity.mapper.CeCaptureRowMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.template.mapper.CeTemplateFieldMapper;
 import org.dromara.carbon.enterprise.template.mapper.CeTemplateSheetMapper;
-import org.dromara.carbon.enterprise.shared.service.ICeSheet656DerivedFieldResolver;
-import org.dromara.carbon.enterprise.activity.service.impl.CeSheet656ActivityCaptureServiceImpl;
-import org.dromara.carbon.enterprise.activity.service.impl.CeSheet656ActivityImportValidationServiceImpl;
-import org.dromara.carbon.enterprise.activity.service.impl.CeSheet656ValidationServiceImpl;
+import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityDerivedFieldResolver;
+import org.dromara.carbon.enterprise.activity.service.impl.CeEmissionActivityCaptureServiceImpl;
+import org.dromara.carbon.enterprise.activity.service.impl.CeEmissionActivityImportValidationServiceImpl;
+import org.dromara.carbon.enterprise.activity.service.impl.CeEmissionActivityValidationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -71,7 +71,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @Tag("dev")
-class CeSheet656ActivityCaptureServiceTest {
+class CeEmissionActivityCaptureServiceTest {
 
     private CeTemplateSheetMapper templateSheetMapper;
     private CeTemplateFieldMapper templateFieldMapper;
@@ -80,7 +80,7 @@ class CeSheet656ActivityCaptureServiceTest {
     private CeCaptureCellMapper captureCellMapper;
     private CeActivityDataMapper activityDataMapper;
     private CeEmissionSourceMapper emissionSourceMapper;
-    private CeSheet656ActivityCaptureServiceImpl service;
+    private CeEmissionActivityCaptureServiceImpl service;
 
     @BeforeAll
     static void initializeLambdaCache() {
@@ -97,9 +97,9 @@ class CeSheet656ActivityCaptureServiceTest {
         activityDataMapper = mock(CeActivityDataMapper.class);
         emissionSourceMapper = mock(CeEmissionSourceMapper.class);
 
-        CeSheet656ValidationServiceImpl rowValidator = new CeSheet656ValidationServiceImpl(fakeResolver());
-        service = new CeSheet656ActivityCaptureServiceImpl(
-            new CeSheet656ActivityImportValidationServiceImpl(rowValidator),
+        CeEmissionActivityValidationServiceImpl rowValidator = new CeEmissionActivityValidationServiceImpl(fakeResolver());
+        service = new CeEmissionActivityCaptureServiceImpl(
+            new CeEmissionActivityImportValidationServiceImpl(rowValidator),
             templateSheetMapper,
             templateFieldMapper,
             captureBatchMapper,
@@ -112,17 +112,17 @@ class CeSheet656ActivityCaptureServiceTest {
 
     @Test
     void failedImportReturnsRowFieldReasonAndDoesNotPersistPartialBusinessData() {
-        CeSheet656ActivityCaptureResult result = service.importRows(importRequest(row(values -> {
-            values.put("f014", "0");
+        CeEmissionActivityCaptureResult result = service.importRows(importRequest(row(values -> {
+            values.put("activityValue", "0");
         })));
 
         assertFalse(result.isPersisted());
         assertNull(result.getBatchId());
         assertEquals(0, result.getPersistedRowCount());
         assertFalse(result.getValidationResult().isValid());
-        CeSheet656ValidationIssue issue = result.getValidationResult().getRowResults().get(0).getIssues().get(0);
+        CeEmissionActivityValidationIssue issue = result.getValidationResult().getRowResults().get(0).getIssues().get(0);
         assertEquals(9, issue.getRowNumber());
-        assertEquals("f014", issue.getSourceColumnCode());
+        assertEquals("activityValue", issue.getFieldCode());
         assertEquals("INVALID_VALUE_DOMAIN", issue.getCode());
         assertEquals("activity value must be greater than zero", issue.getMessage());
         verifyNoInteractions(templateSheetMapper, templateFieldMapper, captureBatchMapper, captureRowMapper,
@@ -131,16 +131,16 @@ class CeSheet656ActivityCaptureServiceTest {
 
     @Test
     void manualSaveAndImportShareTheSameFieldValidation() {
-        CeSheet656ValidationRequest invalidRow = row(values -> {
-            values.put("f012", "13");
+        CeEmissionActivityValidationRequest invalidRow = row(values -> {
+            values.put("activityPeriod", "2026-13");
         });
 
-        CeSheet656ActivityCaptureResult manualResult = service.saveManual(invalidRow);
-        CeSheet656ActivityCaptureResult importResult = service.importRows(importRequest(invalidRow));
+        CeEmissionActivityCaptureResult manualResult = service.saveManual(invalidRow);
+        CeEmissionActivityCaptureResult importResult = service.importRows(importRequest(invalidRow));
 
         assertFalse(manualResult.isPersisted());
         assertFalse(importResult.isPersisted());
-        assertEquals(List.of("INVALID_VALUE_DOMAIN"), rowIssueCodes(manualResult));
+        assertEquals(List.of("INVALID_TYPE"), rowIssueCodes(manualResult));
         assertEquals(rowIssueCodes(manualResult), rowIssueCodes(importResult));
         verifyNoInteractions(templateSheetMapper, templateFieldMapper, captureBatchMapper, captureRowMapper,
             captureCellMapper, activityDataMapper);
@@ -151,10 +151,7 @@ class CeSheet656ActivityCaptureServiceTest {
         stubTemplateLookups();
         stubGeneratedIds();
 
-        CeSheet656ActivityCaptureResult result = service.importRows(importRequest(row(values -> {
-            values.put("f003", "");
-            values.put("f018", "");
-        })));
+        CeEmissionActivityCaptureResult result = service.importRows(importRequest(row(values -> values.put("factorKey", ""))));
 
         assertTrue(result.isPersisted());
         assertEquals(100L, result.getBatchId());
@@ -167,7 +164,7 @@ class CeSheet656ActivityCaptureServiceTest {
         ArgumentCaptor<CeActivityData> activityCaptor = ArgumentCaptor.forClass(CeActivityData.class);
         verify(captureBatchMapper).insert(batchCaptor.capture());
         verify(captureRowMapper).insert(rowCaptor.capture());
-        verify(captureCellMapper, org.mockito.Mockito.times(18)).insert(cellCaptor.capture());
+        verify(captureCellMapper, org.mockito.Mockito.times(19)).insert(cellCaptor.capture());
         verify(activityDataMapper).insert(activityCaptor.capture());
         verify(templateSheetMapper).selectList(any());
         verify(templateFieldMapper).selectList(any());
@@ -183,13 +180,13 @@ class CeSheet656ActivityCaptureServiceTest {
         Map<Long, CeCaptureCell> cellsByFieldId = cellCaptor.getAllValues().stream()
             .collect(java.util.stream.Collectors.toMap(CeCaptureCell::getFieldId, cell -> cell));
         assertEquals("Company One", cellsByFieldId.get(1003L).getTextValue());
-        assertEquals("EF-2026-001", cellsByFieldId.get(1018L).getTextValue());
-        assertEquals(new BigDecimal("12.5"), cellsByFieldId.get(1014L).getDecimalValue());
+        assertEquals("EF-2026-001", cellsByFieldId.get(1019L).getTextValue());
+        assertEquals(new BigDecimal("12.5"), cellsByFieldId.get(1015L).getDecimalValue());
 
         CeActivityData activityData = activityCaptor.getValue();
         assertEquals(100L, activityData.getBatchId());
         assertEquals(3001L, activityData.getEmissionSourceId());
-        assertEquals("sheet_656", activityData.getSourceSheetCode());
+        assertEquals("emission_activity", activityData.getSourceSheetCode());
         assertEquals("SRC-001", activityData.getSourceIdentificationCode());
         assertEquals("COMP-001", activityData.getCompanyCode());
         assertEquals("Company One", activityData.getCompanyName());
@@ -200,6 +197,7 @@ class CeSheet656ActivityCaptureServiceTest {
         assertEquals("Natural Gas Boiler", activityData.getSourceIdentificationName());
         assertEquals("Natural Gas", activityData.getEmissionSourceName());
         assertEquals("Nm3", activityData.getActivityUnit());
+        assertEquals("2026-06", activityData.getActivityPeriod());
         assertEquals(2026, activityData.getActivityYear());
         assertEquals(6, activityData.getActivityMonth());
         assertEquals(LocalDate.of(2026, 6, 5), activityData.getActivityDate()
@@ -215,67 +213,24 @@ class CeSheet656ActivityCaptureServiceTest {
     }
 
     @Test
-    void customerActivitySampleCanBeParsedValidatedAndImportedWithoutRowNumberBusinessField() throws IOException {
+    void legacyCustomerActivitySampleIsRejectedBeforeImportBecauseSemanticHeadersAreMissing() throws IOException {
         Path sample = findWorkspaceFile("source（A）/活动数据表/3 排放活动数据表10101.xlsx");
-        ICeSheet656ActivityImportValidationService parser = new CeSheet656ActivityImportValidationServiceImpl(
-            new CeSheet656ValidationServiceImpl(fakeResolver())
+        ICeEmissionActivityImportValidationService parser = new CeEmissionActivityImportValidationServiceImpl(
+            new CeEmissionActivityValidationServiceImpl(fakeResolver())
         );
-        CeSheet656ImportValidationRequest parsed = parser.parseImportFile(new MockMultipartFile(
+
+        org.dromara.common.core.exception.ServiceException exception = assertThrows(
+            org.dromara.common.core.exception.ServiceException.class,
+            () -> parser.parseImportFile(new MockMultipartFile(
             "file",
             sample.getFileName().toString(),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             Files.readAllBytes(sample)
-        ));
-        assertEquals(1025, parsed.getRows().size());
-        assertTrue(parsed.getRows().stream()
-            .flatMap(row -> row.getFieldValues().stream())
-            .noneMatch(field -> "rowNo".equals(field.getSourceColumnCode())
-                || "row_no".equals(field.getSourceColumnCode())
-                || "行号".equals(field.getSourceColumnName())));
+        )));
 
-        ICeSheet656ActivityImportValidationService importValidation = new CeSheet656ActivityImportValidationServiceImpl(
-            new CeSheet656ValidationServiceImpl(resolverFrom(parsed))
-        );
-        CeSheet656ImportValidationResult sampleValidation = importValidation.validateImport(parsed);
-        Set<Integer> validRowNumbers = sampleValidation.getRowResults().stream()
-            .filter(row -> row.isValid())
-            .map(row -> row.getRowNumber())
-            .collect(java.util.stream.Collectors.toCollection(HashSet::new));
-        List<CeSheet656ValidationRequest> importableRows = parsed.getRows().stream()
-            .filter(row -> validRowNumbers.contains(row.getRowNumber()))
-            .toList();
-        assertTrue(!importableRows.isEmpty(), sampleIssueSummary(sampleValidation));
-        CeSheet656ImportValidationRequest importableRequest = new CeSheet656ImportValidationRequest();
-        importableRequest.setHeaderFields(parsed.getHeaderFields());
-        importableRequest.setRows(importableRows);
-        CeSheet656ActivityCaptureServiceImpl sampleImportService = new CeSheet656ActivityCaptureServiceImpl(
-            importValidation,
-            templateSheetMapper,
-            templateFieldMapper,
-            captureBatchMapper,
-            captureRowMapper,
-            captureCellMapper,
-            activityDataMapper,
-            emissionSourceMapper
-        );
-        stubTemplateLookups();
-        stubGeneratedIds();
-        stubEmissionSourceIds(importableRows);
-
-        CeSheet656ActivityCaptureResult result = sampleImportService.importRows(importableRequest);
-
-        assertTrue(result.isPersisted());
-        assertEquals(100L, result.getBatchId());
-        assertEquals(importableRows.size(), result.getPersistedRowCount());
-        assertTrue(result.getValidationResult().isValid());
-
-        ArgumentCaptor<CeCaptureRow> rowCaptor = ArgumentCaptor.forClass(CeCaptureRow.class);
-        verify(captureRowMapper, org.mockito.Mockito.times(importableRows.size())).insert(rowCaptor.capture());
-        verify(captureCellMapper, org.mockito.Mockito.times(importableRows.size() * 18)).insert(isA(CeCaptureCell.class));
-        verify(activityDataMapper, org.mockito.Mockito.times(importableRows.size())).insert(isA(CeActivityData.class));
-        assertEquals(importableRows.get(0).getRowNumber(), rowCaptor.getAllValues().get(0).getSourceRowNo());
-        assertEquals(importableRows.get(importableRows.size() - 1).getRowNumber(),
-            rowCaptor.getAllValues().get(importableRows.size() - 1).getSourceRowNo());
+        assertTrue(exception.getMessage().contains("缺少必要表头"));
+        assertTrue(exception.getMessage().contains("排放源名称"));
+        assertTrue(exception.getMessage().contains("活动期间"));
     }
 
     @Test
@@ -284,16 +239,16 @@ class CeSheet656ActivityCaptureServiceTest {
         stubGeneratedIds();
 
         service.importRows(importRequest(row(values -> {
-            values.put("f013", "2026-06");
+            values.put("activityDate", "2026-06");
         })));
 
         ArgumentCaptor<CeCaptureCell> cellCaptor = ArgumentCaptor.forClass(CeCaptureCell.class);
-        verify(captureCellMapper, org.mockito.Mockito.times(18)).insert(cellCaptor.capture());
+        verify(captureCellMapper, org.mockito.Mockito.times(19)).insert(cellCaptor.capture());
 
         Map<Long, CeCaptureCell> cellsByFieldId = cellCaptor.getAllValues().stream()
             .collect(java.util.stream.Collectors.toMap(CeCaptureCell::getFieldId, cell -> cell));
-        assertEquals("2026-06", cellsByFieldId.get(1013L).getTextValue());
-        assertEquals(LocalDate.of(2026, 6, 1), cellsByFieldId.get(1013L).getDateValue()
+        assertEquals("2026-06", cellsByFieldId.get(1014L).getTextValue());
+        assertEquals(LocalDate.of(2026, 6, 1), cellsByFieldId.get(1014L).getDateValue()
             .toInstant()
             .atZone(ZoneId.systemDefault())
             .toLocalDate());
@@ -301,12 +256,12 @@ class CeSheet656ActivityCaptureServiceTest {
 
     @Test
     void duplicateRowNumbersAreRejectedBeforeAnyPersistence() {
-        CeSheet656ValidationRequest first = row(values -> {
+        CeEmissionActivityValidationRequest first = row(values -> {
         });
-        CeSheet656ValidationRequest second = row(values -> {
+        CeEmissionActivityValidationRequest second = row(values -> {
         });
 
-        CeSheet656ActivityCaptureResult result = service.importRows(importRequest(List.of(first, second)));
+        CeEmissionActivityCaptureResult result = service.importRows(importRequest(List.of(first, second)));
 
         assertFalse(result.isPersisted());
         assertEquals("DUPLICATE_ROW_NUMBER",
@@ -340,7 +295,7 @@ class CeSheet656ActivityCaptureServiceTest {
     @Test
     void invalidImportNeverCreatesABatchBeforeReturningValidationResult() {
         service.importRows(importRequest(row(values -> {
-            values.put("f001", "UNKNOWN");
+            values.put("sourceIdentificationCode", "UNKNOWN");
         })));
 
         verify(captureBatchMapper, never()).insert(isA(CeCaptureBatch.class));
@@ -354,21 +309,21 @@ class CeSheet656ActivityCaptureServiceTest {
         sheet.setId(50L);
         sheet.setTemplateVersionId(1L);
         sheet.setModuleCode("03-activity");
-        sheet.setTargetTableCode("sheet_656");
+        sheet.setTargetTableCode("emission_activity");
         when(templateSheetMapper.selectList(any())).thenReturn(List.of(sheet));
 
-        when(templateFieldMapper.selectList(any())).thenReturn(CeSheet656ValidationServiceImpl.frozenFieldDescriptors().stream()
+        when(templateFieldMapper.selectList(any())).thenReturn(CeEmissionActivityValidationServiceImpl.allFieldDescriptors().stream()
             .map(this::templateField)
             .toList());
     }
 
-    private CeTemplateField templateField(CeSheet656FieldDescriptor descriptor) {
+    private CeTemplateField templateField(CeEmissionActivityFieldDescriptor descriptor) {
         CeTemplateField field = new CeTemplateField();
         field.setId(1000L + descriptor.getFieldOrder());
         field.setSheetId(50L);
         field.setFieldOrder(descriptor.getFieldOrder());
-        field.setOriginalFieldName(descriptor.getSourceColumnName());
-        field.setTargetColumnCode(descriptor.getSourceColumnCode());
+        field.setOriginalFieldName(descriptor.getFieldName());
+        field.setTargetColumnCode(descriptor.getFieldCode());
         field.setValueType("text");
         return field;
     }
@@ -394,12 +349,12 @@ class CeSheet656ActivityCaptureServiceTest {
         when(emissionSourceMapper.selectList(any())).thenReturn(List.of(source));
     }
 
-    private void stubEmissionSourceIds(List<CeSheet656ValidationRequest> rows) {
+    private void stubEmissionSourceIds(List<CeEmissionActivityValidationRequest> rows) {
         AtomicLong sourceIds = new AtomicLong(4000L);
         List<CeEmissionSource> sources = rows.stream()
             .map(row -> row.getFieldValues().stream()
-                .filter(field -> "f001".equals(field.getSourceColumnCode()))
-                .map(CeSheet656FieldValue::getValue)
+                .filter(field -> "sourceIdentificationCode".equals(field.getFieldCode()))
+                .map(CeEmissionActivityFieldValue::getValue)
                 .findFirst()
                 .orElse(null))
             .filter(value -> value != null && !value.isBlank())
@@ -415,14 +370,14 @@ class CeSheet656ActivityCaptureServiceTest {
         when(emissionSourceMapper.selectList(any())).thenReturn(sources);
     }
 
-    private String companyCodeFor(List<CeSheet656ValidationRequest> rows, String sourceCode) {
-        for (CeSheet656ValidationRequest row : rows) {
+    private String companyCodeFor(List<CeEmissionActivityValidationRequest> rows, String sourceCode) {
+        for (CeEmissionActivityValidationRequest row : rows) {
             String rowSourceCode = null;
             String companyCode = null;
-            for (CeSheet656FieldValue field : row.getFieldValues()) {
-                if ("f001".equals(field.getSourceColumnCode())) {
+            for (CeEmissionActivityFieldValue field : row.getFieldValues()) {
+                if ("sourceIdentificationCode".equals(field.getFieldCode())) {
                     rowSourceCode = field.getValue();
-                } else if ("f002".equals(field.getSourceColumnCode())) {
+                } else if ("companyCode".equals(field.getFieldCode())) {
                     companyCode = field.getValue();
                 }
             }
@@ -433,55 +388,55 @@ class CeSheet656ActivityCaptureServiceTest {
         return null;
     }
 
-    private List<String> rowIssueCodes(CeSheet656ActivityCaptureResult result) {
+    private List<String> rowIssueCodes(CeEmissionActivityCaptureResult result) {
         return result.getValidationResult().getRowResults().get(0).getIssues().stream()
-            .map(CeSheet656ValidationIssue::getCode)
+            .map(CeEmissionActivityValidationIssue::getCode)
             .toList();
     }
 
-    private String sampleIssueSummary(CeSheet656ImportValidationResult result) {
+    private String sampleIssueSummary(CeEmissionActivityImportValidationResult result) {
         return result.getRowResults().stream()
             .filter(row -> !row.isValid())
             .limit(5)
             .map(row -> row.getRowNumber() + ":" + row.getIssues().stream()
-                .map(issue -> issue.getCode() + "/" + issue.getSourceColumnCode())
+                .map(issue -> issue.getCode() + "/" + issue.getFieldCode())
                 .toList())
             .toList()
             .toString();
     }
 
-    private CeSheet656ImportValidationRequest importRequest(CeSheet656ValidationRequest row) {
+    private CeEmissionActivityImportValidationRequest importRequest(CeEmissionActivityValidationRequest row) {
         return importRequest(List.of(row));
     }
 
-    private CeSheet656ImportValidationRequest importRequest(List<CeSheet656ValidationRequest> rows) {
-        CeSheet656ImportValidationRequest request = new CeSheet656ImportValidationRequest();
-        request.setHeaderFields(frozenHeader());
+    private CeEmissionActivityImportValidationRequest importRequest(List<CeEmissionActivityValidationRequest> rows) {
+        CeEmissionActivityImportValidationRequest request = new CeEmissionActivityImportValidationRequest();
+        request.setHeaderFields(entryHeader());
         request.setRows(rows);
         return request;
     }
 
-    private List<CeSheet656FieldDescriptor> frozenHeader() {
-        return CeSheet656ValidationServiceImpl.frozenFieldDescriptors().stream()
+    private List<CeEmissionActivityFieldDescriptor> entryHeader() {
+        return CeEmissionActivityValidationServiceImpl.entryFieldDescriptors().stream()
             .map(this::copyHeader)
             .toList();
     }
 
-    private CeSheet656FieldDescriptor copyHeader(CeSheet656FieldDescriptor source) {
-        CeSheet656FieldDescriptor descriptor = new CeSheet656FieldDescriptor();
+    private CeEmissionActivityFieldDescriptor copyHeader(CeEmissionActivityFieldDescriptor source) {
+        CeEmissionActivityFieldDescriptor descriptor = new CeEmissionActivityFieldDescriptor();
         descriptor.setFieldOrder(source.getFieldOrder());
-        descriptor.setSourceColumnCode(source.getSourceColumnCode());
-        descriptor.setSourceColumnName(source.getSourceColumnName());
+        descriptor.setFieldCode(source.getFieldCode());
+        descriptor.setFieldName(source.getFieldName());
         descriptor.setSourceRequired(source.isSourceRequired());
         descriptor.setRowValueRequired(source.isRowValueRequired());
         descriptor.setDerivedField(source.isDerivedField());
         return descriptor;
     }
 
-    private CeSheet656ValidationRequest row(Consumer<Map<String, String>> customizer) {
+    private CeEmissionActivityValidationRequest row(Consumer<Map<String, String>> customizer) {
         Map<String, String> values = baseValues();
         customizer.accept(values);
-        CeSheet656ValidationRequest request = new CeSheet656ValidationRequest();
+        CeEmissionActivityValidationRequest request = new CeEmissionActivityValidationRequest();
         request.setRowNumber(9);
         request.setFieldValues(values.entrySet().stream()
             .map(entry -> field(entry.getKey(), entry.getValue()))
@@ -491,40 +446,39 @@ class CeSheet656ActivityCaptureServiceTest {
 
     private Map<String, String> baseValues() {
         Map<String, String> values = new LinkedHashMap<>();
-        values.put("f001", "SRC-001");
-        values.put("f002", "COMP-001");
-        values.put("f003", "Company One");
-        values.put("f004", "Factory One");
-        values.put("f005", "CAT-001");
-        values.put("f006", "Scope 1");
-        values.put("f007", "Stationary Combustion");
-        values.put("f008", "Natural Gas Boiler");
-        values.put("f009", "Natural Gas");
-        values.put("f010", "Nm3");
-        values.put("f011", "2026");
-        values.put("f012", "6");
-        values.put("f013", "2026-06-05");
-        values.put("f014", "12.5");
-        values.put("f015", "Production");
-        values.put("f016", "Meter");
-        values.put("f017", "Normal record");
-        values.put("f018", "EF-2026-001");
+        values.put("sourceIdentificationCode", "SRC-001");
+        values.put("companyCode", "COMP-001");
+        values.put("companyName", "Company One");
+        values.put("factoryName", "Factory One");
+        values.put("sourceCategoryKey", "CAT-001");
+        values.put("scopeName", "Scope 1");
+        values.put("scopeSubcategory", "Stationary Combustion");
+        values.put("sourceIdentificationName", "Natural Gas Boiler");
+        values.put("emissionSourceName", "Natural Gas");
+        values.put("activityUnit", "Nm3");
+        values.put("activityPeriod", "2026-06");
+        values.put("activityDate", "2026-06-05");
+        values.put("activityValue", "12.5");
+        values.put("responsibleDept", "Production");
+        values.put("dataSource", "Meter");
+        values.put("sourceRemark", "Normal record");
+        values.put("factorKey", "EF-2026-001");
         return values;
     }
 
-    private CeSheet656FieldValue field(String code, String value) {
-        CeSheet656FieldValue fieldValue = new CeSheet656FieldValue();
-        fieldValue.setSourceColumnCode(code);
+    private CeEmissionActivityFieldValue field(String code, String value) {
+        CeEmissionActivityFieldValue fieldValue = new CeEmissionActivityFieldValue();
+        fieldValue.setFieldCode(code);
         fieldValue.setValue(value);
         return fieldValue;
     }
 
-    private ICeSheet656DerivedFieldResolver fakeResolver() {
+    private ICeEmissionActivityDerivedFieldResolver fakeResolver() {
         return code -> {
             if (!"SRC-001".equals(code)) {
                 return Optional.empty();
             }
-            CeSheet656ResolvedRow row = new CeSheet656ResolvedRow();
+            CeEmissionActivityResolvedRow row = new CeEmissionActivityResolvedRow();
             row.setEmissionSourceCode("SRC-001");
             row.setCompanyCode("COMP-001");
             row.setCompanyName("Company One");
@@ -540,26 +494,26 @@ class CeSheet656ActivityCaptureServiceTest {
         };
     }
 
-    private ICeSheet656DerivedFieldResolver resolverFrom(CeSheet656ImportValidationRequest parsed) {
-        Map<String, CeSheet656ResolvedRow> rowsByCode = new HashMap<>();
-        for (CeSheet656ValidationRequest row : parsed.getRows()) {
+    private ICeEmissionActivityDerivedFieldResolver resolverFrom(CeEmissionActivityImportValidationRequest parsed) {
+        Map<String, CeEmissionActivityResolvedRow> rowsByCode = new HashMap<>();
+        for (CeEmissionActivityValidationRequest row : parsed.getRows()) {
             Map<String, String> values = new LinkedHashMap<>();
-            for (CeSheet656FieldValue fieldValue : row.getFieldValues()) {
-                values.put(fieldValue.getSourceColumnCode(), fieldValue.getValue());
+            for (CeEmissionActivityFieldValue fieldValue : row.getFieldValues()) {
+                values.put(fieldValue.getFieldCode(), fieldValue.getValue());
             }
-            CeSheet656ResolvedRow resolved = new CeSheet656ResolvedRow();
-            resolved.setEmissionSourceCode(values.get("f001"));
-            resolved.setCompanyCode(values.get("f002"));
-            resolved.setCompanyName(values.get("f003"));
-            resolved.setFactoryName(values.get("f004"));
-            resolved.setEmissionSourceCategoryCode(values.get("f005"));
-            resolved.setScope(values.get("f006"));
-            resolved.setScopeSubcategory(values.get("f007"));
-            resolved.setEmissionSourceIdentity(values.get("f008"));
-            resolved.setEmissionSourceName(values.get("f009"));
-            resolved.setUnit(values.get("f010"));
-            resolved.setEmissionFactorCode(values.get("f018"));
-            rowsByCode.put(values.get("f001"), resolved);
+            CeEmissionActivityResolvedRow resolved = new CeEmissionActivityResolvedRow();
+            resolved.setEmissionSourceCode(values.get("sourceIdentificationCode"));
+            resolved.setCompanyCode(values.get("companyCode"));
+            resolved.setCompanyName(values.get("companyName"));
+            resolved.setFactoryName(values.get("factoryName"));
+            resolved.setEmissionSourceCategoryCode(values.get("sourceCategoryKey"));
+            resolved.setScope(values.get("scopeName"));
+            resolved.setScopeSubcategory(values.get("scopeSubcategory"));
+            resolved.setEmissionSourceIdentity(values.get("sourceIdentificationName"));
+            resolved.setEmissionSourceName(values.get("emissionSourceName"));
+            resolved.setUnit(values.get("activityUnit"));
+            resolved.setEmissionFactorCode(values.get("factorKey"));
+            rowsByCode.put(values.get("sourceIdentificationCode"), resolved);
         }
         return code -> Optional.ofNullable(rowsByCode.get(code));
     }

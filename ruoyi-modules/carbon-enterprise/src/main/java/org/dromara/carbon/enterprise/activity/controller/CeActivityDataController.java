@@ -35,7 +35,7 @@ import java.util.Set;
 @RequestMapping("/enterprise/activity-data")
 public class CeActivityDataController extends BaseController {
 
-    private static final String RAW_WRITE_DISABLED_MESSAGE = "活动数据写入必须通过 sheet_656 校验录入或导入接口";
+    private static final String RAW_WRITE_DISABLED_MESSAGE = "活动数据写入必须通过 emission_activity 校验录入或导入接口";
     private static final Set<String> ALLOWED_DATA_STATUSES = Set.of("draft", "submitted", "locked");
 
     private final ICeActivityDataService activityDataService;

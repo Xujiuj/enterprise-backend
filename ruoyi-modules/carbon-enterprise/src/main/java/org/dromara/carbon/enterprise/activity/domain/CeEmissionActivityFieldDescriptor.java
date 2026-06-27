@@ -3,16 +3,16 @@ package org.dromara.carbon.enterprise.activity.domain;
 import lombok.Data;
 
 /**
- * Frozen row-level field contract for sheet_656.
+ * Frozen row-level field contract for emission_activity.
  */
 @Data
-public class CeSheet656FieldDescriptor {
+public class CeEmissionActivityFieldDescriptor {
 
     private Integer fieldOrder;
 
-    private String sourceColumnCode;
+    private String fieldCode;
 
-    private String sourceColumnName;
+    private String fieldName;
 
     private boolean sourceRequired;
 

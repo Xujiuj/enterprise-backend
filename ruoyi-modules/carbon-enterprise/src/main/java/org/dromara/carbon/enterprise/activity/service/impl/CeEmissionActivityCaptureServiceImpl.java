@@ -10,13 +10,13 @@ import org.dromara.carbon.enterprise.activity.domain.CeCaptureRow;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.template.domain.CeTemplateField;
 import org.dromara.carbon.enterprise.template.domain.CeTemplateSheet;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ActivityCaptureResult;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656FieldDescriptor;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656FieldValue;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ImportValidationRequest;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ImportValidationResult;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ValidationRequest;
-import org.dromara.carbon.enterprise.activity.domain.CeSheet656ValidationResult;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityCaptureResult;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityFieldDescriptor;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityFieldValue;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityImportValidationRequest;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityImportValidationResult;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityValidationRequest;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityValidationResult;
 import org.dromara.carbon.enterprise.activity.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.activity.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.activity.mapper.CeCaptureCellMapper;
@@ -24,8 +24,8 @@ import org.dromara.carbon.enterprise.activity.mapper.CeCaptureRowMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.template.mapper.CeTemplateFieldMapper;
 import org.dromara.carbon.enterprise.template.mapper.CeTemplateSheetMapper;
-import org.dromara.carbon.enterprise.shared.service.ICeSheet656ActivityCaptureService;
-import org.dromara.carbon.enterprise.shared.service.ICeSheet656ActivityImportValidationService;
+import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityCaptureService;
+import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityImportValidationService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Service;
@@ -47,14 +47,14 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Persists validated sheet_656 activity rows into enterprise-local ce_* capture tables.
+ * Persists validated emission_activity activity rows into enterprise-local ce_* capture tables.
  */
 @RequiredArgsConstructor
 @Slf4j
 @Service
-public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656ActivityCaptureService {
+public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivityCaptureService {
 
-    private static final String TARGET_TABLE_CODE = "sheet_656";
+    private static final String TARGET_TABLE_CODE = "emission_activity";
     private static final String SOURCE_MODE_MANUAL = "manual";
     private static final String SOURCE_MODE_EXCEL_IMPORT = "excel_import";
     private static final String BATCH_STATUS_COMPLETED = "completed";
@@ -65,7 +65,7 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final DateTimeFormatter YEAR_MONTH_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    private final ICeSheet656ActivityImportValidationService importValidationService;
+    private final ICeEmissionActivityImportValidationService importValidationService;
     private final CeTemplateSheetMapper templateSheetMapper;
     private final CeTemplateFieldMapper templateFieldMapper;
     private final CeCaptureBatchMapper captureBatchMapper;
@@ -76,67 +76,67 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public CeSheet656ActivityCaptureResult saveManual(CeSheet656ValidationRequest request) {
-        CeSheet656ValidationRequest row = copyRowWithDefaultRowNumber(request);
-        CeSheet656ImportValidationRequest importRequest = new CeSheet656ImportValidationRequest();
-        importRequest.setHeaderFields(copyFrozenHeader());
+    public CeEmissionActivityCaptureResult saveManual(CeEmissionActivityValidationRequest request) {
+        CeEmissionActivityValidationRequest row = copyRowWithDefaultRowNumber(request);
+        CeEmissionActivityImportValidationRequest importRequest = new CeEmissionActivityImportValidationRequest();
+        importRequest.setHeaderFields(copyEntryHeader());
         importRequest.setRows(List.of(row));
         return validateAndPersist(importRequest, SOURCE_MODE_MANUAL);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public CeSheet656ActivityCaptureResult importRows(CeSheet656ImportValidationRequest request) {
+    public CeEmissionActivityCaptureResult importRows(CeEmissionActivityImportValidationRequest request) {
         return validateAndPersist(request, SOURCE_MODE_EXCEL_IMPORT);
     }
 
-    private CeSheet656ActivityCaptureResult validateAndPersist(CeSheet656ImportValidationRequest request, String sourceMode) {
-        log.info("sheet_656 capture persistence started, sourceMode={}, rows={}", sourceMode,
+    private CeEmissionActivityCaptureResult validateAndPersist(CeEmissionActivityImportValidationRequest request, String sourceMode) {
+        log.info("emission_activity capture persistence started, sourceMode={}, rows={}", sourceMode,
             request == null || request.getRows() == null ? 0 : request.getRows().size());
 
-        CeSheet656ImportValidationResult validation = importValidationService.validateImport(request);
-        log.info("sheet_656 validation result: valid={}, blocking={}, headerIssues={}, rowResults={}",
+        CeEmissionActivityImportValidationResult validation = importValidationService.validateImport(request);
+        log.info("emission_activity validation result: valid={}, blocking={}, headerIssues={}, rowResults={}",
             validation.isValid(),
             validation.isBlocking(),
             validation.getHeaderIssues() == null ? 0 : validation.getHeaderIssues().size(),
             validation.getRowResults() == null ? 0 : validation.getRowResults().size());
 
-        CeSheet656ActivityCaptureResult result = new CeSheet656ActivityCaptureResult();
+        CeEmissionActivityCaptureResult result = new CeEmissionActivityCaptureResult();
         result.setValidationResult(validation);
         result.setPersisted(false);
         result.setPersistedRowCount(0);
 
         if (!validation.isValid()) {
-            log.warn("sheet_656 validation failed; persistence skipped");
+            log.warn("emission_activity validation failed; persistence skipped");
             return result;
         }
 
-        List<CeSheet656ValidationRequest> rows = request == null ? Collections.emptyList() : request.getRows();
+        List<CeEmissionActivityValidationRequest> rows = request == null ? Collections.emptyList() : request.getRows();
         if (rows == null || rows.isEmpty()) {
-            log.warn("sheet_656 request has no rows; persistence skipped");
+            log.warn("emission_activity request has no rows; persistence skipped");
             return result;
         }
 
         try {
             CeTemplateSheet sheet = resolveSheet();
-            log.info("sheet_656 template resolved, sheetId={}", sheet.getId());
+            log.info("emission_activity template resolved, sheetId={}", sheet.getId());
 
             Map<String, CeTemplateField> fieldsByCode = resolveFields(sheet.getId());
-            log.info("sheet_656 template fields resolved, count={}", fieldsByCode.size());
+            log.info("emission_activity template fields resolved, count={}", fieldsByCode.size());
 
             CeCaptureBatch batch = insertBatch(sheet, sourceMode);
-            log.info("sheet_656 capture batch inserted, batchId={}", batch.getId());
+            log.info("emission_activity capture batch inserted, batchId={}", batch.getId());
 
             persistRows(batch.getId(), sheet.getId(), rows, validation.getRowResults(), fieldsByCode);
             persistActivityData(batch.getId(), rows, validation.getRowResults());
-            log.info("sheet_656 rows persisted, rowCount={}", rows.size());
+            log.info("emission_activity rows persisted, rowCount={}", rows.size());
 
             result.setPersisted(true);
             result.setBatchId(batch.getId());
             result.setPersistedRowCount(rows.size());
             return result;
         } catch (Exception e) {
-            log.error("sheet_656 persistence failed", e);
+            log.error("emission_activity persistence failed", e);
             throw e;
         }
     }
@@ -149,7 +149,7 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
                 .orderByDesc(CeTemplateSheet::getId)
         );
         if (sheets == null || sheets.isEmpty()) {
-            throw new ServiceException("enterprise-local sheet_656 template sheet is not configured");
+            throw new ServiceException("enterprise-local emission_activity template sheet is not configured");
         }
         return sheets.get(0);
     }
@@ -164,10 +164,10 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
             .collect(Collectors.toMap(CeTemplateField::getTargetColumnCode, Function.identity(), (left, right) -> left,
                 LinkedHashMap::new));
 
-        for (CeSheet656FieldDescriptor descriptor : frozenFieldDescriptors()) {
-            if (!byCode.containsKey(descriptor.getSourceColumnCode())) {
-                throw new ServiceException("enterprise-local sheet_656 template field is missing: "
-                    + descriptor.getSourceColumnCode());
+        for (CeEmissionActivityFieldDescriptor descriptor : allFieldDescriptors()) {
+            if (!byCode.containsKey(descriptor.getFieldCode())) {
+                throw new ServiceException("enterprise-local emission_activity template field is missing: "
+                    + descriptor.getFieldCode());
             }
         }
         return byCode;
@@ -184,26 +184,26 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
         batch.setSubmittedTime(now);
         batch.setCreateTime(now);
         batch.setUpdateTime(now);
-        batch.setRemark("sheet_656 enterprise-local activity capture");
+        batch.setRemark("emission_activity enterprise-local activity capture");
         captureBatchMapper.insert(batch);
         return batch;
     }
 
-    private void persistRows(Long batchId, Long sheetId, List<CeSheet656ValidationRequest> rows,
-                             List<CeSheet656ValidationResult> rowResults, Map<String, CeTemplateField> fieldsByCode) {
+    private void persistRows(Long batchId, Long sheetId, List<CeEmissionActivityValidationRequest> rows,
+                             List<CeEmissionActivityValidationResult> rowResults, Map<String, CeTemplateField> fieldsByCode) {
         for (int index = 0; index < rows.size(); index++) {
-            CeSheet656ValidationRequest rowRequest = rows.get(index);
+            CeEmissionActivityValidationRequest rowRequest = rows.get(index);
             CeCaptureRow row = insertRow(batchId, sheetId, rowRequest.getRowNumber());
             Map<String, String> valuesByCode = mergedValues(rowRequest, rowResultAt(rowResults, index));
-            for (CeSheet656FieldDescriptor descriptor : frozenFieldDescriptors()) {
-                CeTemplateField field = fieldsByCode.get(descriptor.getSourceColumnCode());
-                insertCell(row.getId(), field, valuesByCode.get(descriptor.getSourceColumnCode()));
+            for (CeEmissionActivityFieldDescriptor descriptor : allFieldDescriptors()) {
+                CeTemplateField field = fieldsByCode.get(descriptor.getFieldCode());
+                insertCell(row.getId(), field, valuesByCode.get(descriptor.getFieldCode()));
             }
         }
     }
 
-    private void persistActivityData(Long batchId, List<CeSheet656ValidationRequest> rows,
-                                     List<CeSheet656ValidationResult> rowResults) {
+    private void persistActivityData(Long batchId, List<CeEmissionActivityValidationRequest> rows,
+                                     List<CeEmissionActivityValidationResult> rowResults) {
         Date now = new Date();
         List<Map<String, String>> rowValues = new ArrayList<>(rows.size());
         for (int index = 0; index < rows.size(); index++) {
@@ -214,8 +214,8 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
             Map<String, String> valuesByCode = rowValues.get(index);
             CeActivityData activityData = toActivityData(batchId, valuesByCode, sourceIdsByCode, now);
             if (activityData.getEmissionSourceId() == null) {
-                throw new ServiceException("enterprise-local sheet_656 emission source is missing: "
-                    + valuesByCode.get("f001"));
+                throw new ServiceException("enterprise-local emission_activity emission source is missing: "
+                    + valuesByCode.get("sourceIdentificationCode"));
             }
             activityDataMapper.insert(activityData);
         }
@@ -223,12 +223,12 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
 
     private Map<String, Long> loadEmissionSourceIds(List<Map<String, String>> rowValues) {
         List<String> sourceCodes = rowValues.stream()
-            .map(values -> normalize(values.get("f001")))
+            .map(values -> normalize(values.get("sourceIdentificationCode")))
             .filter(StringUtils::isNotBlank)
             .distinct()
             .toList();
         List<String> companyCodes = rowValues.stream()
-            .map(values -> normalize(values.get("f002")))
+            .map(values -> normalize(values.get("companyCode")))
             .filter(StringUtils::isNotBlank)
             .distinct()
             .toList();
@@ -257,32 +257,32 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
                                           Map<String, Long> sourceIdsByCode, Date now) {
         CeActivityData activityData = new CeActivityData();
         activityData.setBatchId(batchId);
-        activityData.setEmissionSourceId(sourceIdsByCode.get(sourceKey(valuesByCode.get("f002"), valuesByCode.get("f001"))));
-        activityData.setActivityPeriod(activityPeriod(valuesByCode.get("f011"), valuesByCode.get("f012")));
+        activityData.setEmissionSourceId(sourceIdsByCode.get(sourceKey(valuesByCode.get("companyCode"), valuesByCode.get("sourceIdentificationCode"))));
+        activityData.setActivityPeriod(valuesByCode.get("activityPeriod"));
         activityData.setSourceSheetCode(TARGET_TABLE_CODE);
-        activityData.setSourceIdentificationCode(valuesByCode.get("f001"));
-        activityData.setCompanyCode(valuesByCode.get("f002"));
-        activityData.setCompanyName(valuesByCode.get("f003"));
-        activityData.setFactoryCode(valuesByCode.get("f002"));
-        activityData.setFactoryName(valuesByCode.get("f004"));
-        activityData.setSourceCategoryKey(valuesByCode.get("f005"));
-        activityData.setScopeName(valuesByCode.get("f006"));
-        activityData.setScopeSubcategory(valuesByCode.get("f007"));
-        activityData.setSourceIdentificationName(valuesByCode.get("f008"));
-        activityData.setEmissionSourceName(valuesByCode.get("f009"));
-        activityData.setActivityUnit(valuesByCode.get("f010"));
-        activityData.setActivityYear(toIntegerValue(valuesByCode.get("f011")));
-        activityData.setActivityMonth(toIntegerValue(valuesByCode.get("f012")));
-        activityData.setActivityDate(toDateValue("f013", valuesByCode.get("f013")));
-        activityData.setActivityValue(toDecimalValue("f014", valuesByCode.get("f014")));
-        activityData.setResponsibleDept(valuesByCode.get("f015"));
-        activityData.setDataSource(valuesByCode.get("f016"));
-        activityData.setSourceRemark(valuesByCode.get("f017"));
-        activityData.setFactorKey(valuesByCode.get("f018"));
+        activityData.setSourceIdentificationCode(valuesByCode.get("sourceIdentificationCode"));
+        activityData.setCompanyCode(valuesByCode.get("companyCode"));
+        activityData.setCompanyName(valuesByCode.get("companyName"));
+        activityData.setFactoryCode(valuesByCode.get("companyCode"));
+        activityData.setFactoryName(valuesByCode.get("factoryName"));
+        activityData.setSourceCategoryKey(valuesByCode.get("sourceCategoryKey"));
+        activityData.setScopeName(valuesByCode.get("scopeName"));
+        activityData.setScopeSubcategory(valuesByCode.get("scopeSubcategory"));
+        activityData.setSourceIdentificationName(valuesByCode.get("sourceIdentificationName"));
+        activityData.setEmissionSourceName(valuesByCode.get("emissionSourceName"));
+        activityData.setActivityUnit(valuesByCode.get("activityUnit"));
+        activityData.setActivityYear(toIntegerValue(valuesByCode.get("activityYear")));
+        activityData.setActivityMonth(toIntegerValue(valuesByCode.get("activityMonth")));
+        activityData.setActivityDate(toDateValue("activityDate", valuesByCode.get("activityDate")));
+        activityData.setActivityValue(toDecimalValue("activityValue", valuesByCode.get("activityValue")));
+        activityData.setResponsibleDept(valuesByCode.get("responsibleDept"));
+        activityData.setDataSource(valuesByCode.get("dataSource"));
+        activityData.setSourceRemark(valuesByCode.get("sourceRemark"));
+        activityData.setFactorKey(valuesByCode.get("factorKey"));
         activityData.setDataStatus(DATA_STATUS_DRAFT);
         activityData.setCreateTime(now);
         activityData.setUpdateTime(now);
-        activityData.setRemark("sheet_656 enterprise-local activity capture");
+        activityData.setRemark("emission_activity enterprise-local activity capture");
         return activityData;
     }
 
@@ -290,16 +290,7 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
         return normalize(companyCode) + "|" + normalize(sourceCode);
     }
 
-    private String activityPeriod(String yearValue, String monthValue) {
-        Integer year = toIntegerValue(yearValue);
-        Integer month = toIntegerValue(monthValue);
-        if (year == null || month == null) {
-            return null;
-        }
-        return YearMonth.of(year, month).format(YEAR_MONTH_FORMATTER);
-    }
-
-    private CeSheet656ValidationResult rowResultAt(List<CeSheet656ValidationResult> rowResults, int index) {
+    private CeEmissionActivityValidationResult rowResultAt(List<CeEmissionActivityValidationResult> rowResults, int index) {
         return rowResults == null || index >= rowResults.size() ? null : rowResults.get(index);
     }
 
@@ -331,81 +322,81 @@ public class CeSheet656ActivityCaptureServiceImpl implements ICeSheet656Activity
         captureCellMapper.insert(cell);
     }
 
-    private Map<String, String> mergedValues(CeSheet656ValidationRequest rowRequest, CeSheet656ValidationResult rowResult) {
+    private Map<String, String> mergedValues(CeEmissionActivityValidationRequest rowRequest, CeEmissionActivityValidationResult rowResult) {
         Map<String, String> values = new LinkedHashMap<>();
         if (rowRequest != null && rowRequest.getFieldValues() != null) {
-            for (CeSheet656FieldValue fieldValue : rowRequest.getFieldValues()) {
-                if (fieldValue != null && StringUtils.isNotBlank(fieldValue.getSourceColumnCode())) {
-                    values.put(fieldValue.getSourceColumnCode().trim(), normalize(fieldValue.getValue()));
+            for (CeEmissionActivityFieldValue fieldValue : rowRequest.getFieldValues()) {
+                if (fieldValue != null && StringUtils.isNotBlank(fieldValue.getFieldCode())) {
+                    values.put(fieldValue.getFieldCode().trim(), normalize(fieldValue.getValue()));
                 }
             }
         }
         if (rowResult != null && rowResult.getResolvedDerivedFieldValues() != null) {
-            for (CeSheet656FieldValue resolvedValue : rowResult.getResolvedDerivedFieldValues()) {
-                if (resolvedValue != null && StringUtils.isNotBlank(resolvedValue.getSourceColumnCode())) {
-                    values.put(resolvedValue.getSourceColumnCode().trim(), normalize(resolvedValue.getValue()));
+            for (CeEmissionActivityFieldValue resolvedValue : rowResult.getResolvedDerivedFieldValues()) {
+                if (resolvedValue != null && StringUtils.isNotBlank(resolvedValue.getFieldCode())) {
+                    values.put(resolvedValue.getFieldCode().trim(), normalize(resolvedValue.getValue()));
                 }
             }
         }
         return values;
     }
 
-    private CeSheet656ValidationRequest copyRowWithDefaultRowNumber(CeSheet656ValidationRequest request) {
-        CeSheet656ValidationRequest copy = new CeSheet656ValidationRequest();
+    private CeEmissionActivityValidationRequest copyRowWithDefaultRowNumber(CeEmissionActivityValidationRequest request) {
+        CeEmissionActivityValidationRequest copy = new CeEmissionActivityValidationRequest();
         copy.setRowNumber(request == null || request.getRowNumber() == null ? 1 : request.getRowNumber());
         copy.setFieldValues(request == null ? Collections.emptyList() : copyFieldValues(request.getFieldValues()));
         return copy;
     }
 
-    private List<CeSheet656FieldValue> copyFieldValues(List<CeSheet656FieldValue> values) {
+    private List<CeEmissionActivityFieldValue> copyFieldValues(List<CeEmissionActivityFieldValue> values) {
         if (values == null) {
             return Collections.emptyList();
         }
-        List<CeSheet656FieldValue> copies = new ArrayList<>(values.size());
-        for (CeSheet656FieldValue value : values) {
+        List<CeEmissionActivityFieldValue> copies = new ArrayList<>(values.size());
+        for (CeEmissionActivityFieldValue value : values) {
             if (value == null) {
                 copies.add(null);
                 continue;
             }
-            CeSheet656FieldValue copy = new CeSheet656FieldValue();
-            copy.setSourceColumnCode(value.getSourceColumnCode());
-            copy.setSourceColumnName(value.getSourceColumnName());
+            CeEmissionActivityFieldValue copy = new CeEmissionActivityFieldValue();
+            copy.setFieldCode(value.getFieldCode());
+            copy.setFieldName(value.getFieldName());
             copy.setValue(value.getValue());
             copies.add(copy);
         }
         return copies;
     }
 
-    private List<CeSheet656FieldDescriptor> copyFrozenHeader() {
-        return frozenFieldDescriptors().stream()
+    private List<CeEmissionActivityFieldDescriptor> copyEntryHeader() {
+        return CeEmissionActivityValidationServiceImpl.entryFieldDescriptors().stream()
             .map(this::copyDescriptor)
             .toList();
     }
 
-    private List<CeSheet656FieldDescriptor> frozenFieldDescriptors() {
-        return CeSheet656ValidationServiceImpl.frozenFieldDescriptors();
+    private List<CeEmissionActivityFieldDescriptor> allFieldDescriptors() {
+        return CeEmissionActivityValidationServiceImpl.allFieldDescriptors();
     }
 
-    private CeSheet656FieldDescriptor copyDescriptor(CeSheet656FieldDescriptor source) {
-        CeSheet656FieldDescriptor copy = new CeSheet656FieldDescriptor();
+    private CeEmissionActivityFieldDescriptor copyDescriptor(CeEmissionActivityFieldDescriptor source) {
+        CeEmissionActivityFieldDescriptor copy = new CeEmissionActivityFieldDescriptor();
         copy.setFieldOrder(source.getFieldOrder());
-        copy.setSourceColumnCode(source.getSourceColumnCode());
-        copy.setSourceColumnName(source.getSourceColumnName());
+        copy.setFieldCode(source.getFieldCode());
+        copy.setFieldName(source.getFieldName());
         copy.setSourceRequired(source.isSourceRequired());
         copy.setRowValueRequired(source.isRowValueRequired());
         copy.setDerivedField(source.isDerivedField());
         return copy;
     }
 
-    private BigDecimal toDecimalValue(String sourceColumnCode, String value) {
-        if (!StringUtils.equals("f014", sourceColumnCode) || StringUtils.isBlank(value)) {
+    private BigDecimal toDecimalValue(String fieldCode, String value) {
+        if (!StringUtils.equals("activityValue", fieldCode) || StringUtils.isBlank(value)) {
             return null;
         }
         return new BigDecimal(value.trim());
     }
 
-    private Date toDateValue(String sourceColumnCode, String value) {
-        if (!StringUtils.equals("f013", sourceColumnCode) || StringUtils.isBlank(value)) {
+    private Date toDateValue(String fieldCode, String value) {
+        if (!StringUtils.equals("activityDate", fieldCode) || StringUtils.isBlank(value)) {
             return null;
         }
         try {

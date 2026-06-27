@@ -65,6 +65,6 @@ class CeActivityDataControllerTest {
 
     private void assertRawWriteRejected(R<Void> response) {
         assertThat(response.getCode()).isEqualTo(R.FAIL);
-        assertThat(response.getMsg()).contains("sheet_656");
+        assertThat(response.getMsg()).contains("emission_activity");
     }
 }

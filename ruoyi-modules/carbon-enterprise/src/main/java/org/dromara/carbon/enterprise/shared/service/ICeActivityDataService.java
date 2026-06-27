@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Enterprise local activity data service.
  *
- * <p>Note: {@code insertByBo} is used by the sheet_656 capture pipeline.
+ * <p>Note: {@code insertByBo} is used by the emission_activity capture pipeline.
  * The controller still blocks direct raw creation, while update/delete/status
  * operations are exposed for maintaining already persisted activity data.</p>
  */

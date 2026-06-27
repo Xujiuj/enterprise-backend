@@ -3,10 +3,10 @@ package org.dromara.carbon.enterprise.activity.domain;
 import lombok.Data;
 
 /**
- * Row-level validation issue for sheet_656.
+ * Row-level validation issue for emission_activity.
  */
 @Data
-public class CeSheet656ValidationIssue {
+public class CeEmissionActivityValidationIssue {
 
     private String severity;
 
@@ -14,9 +14,9 @@ public class CeSheet656ValidationIssue {
 
     private Integer rowNumber;
 
-    private String sourceColumnCode;
+    private String fieldCode;
 
-    private String sourceColumnName;
+    private String fieldName;
 
     private String message;
 }

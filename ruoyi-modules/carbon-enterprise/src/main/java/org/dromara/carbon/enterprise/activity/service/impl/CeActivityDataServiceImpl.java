@@ -59,11 +59,11 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     private static final String STATUS_SUBMITTED = "submitted";
     private static final String STATUS_LOCKED = "locked";
     private static final String STATUS_DRAFT = "draft";
-    private static final String TARGET_TABLE_CODE = "sheet_656";
-    private static final String FIELD_SOURCE_CODE = "f001";
-    private static final String FIELD_YEAR = "f011";
-    private static final String FIELD_MONTH = "f012";
-    private static final String FIELD_DEPARTMENT = "f015";
+    private static final String TARGET_TABLE_CODE = "emission_activity";
+    private static final String FIELD_SOURCE_CODE = "sourceIdentificationCode";
+    private static final String FIELD_YEAR = "activityYear";
+    private static final String FIELD_MONTH = "activityMonth";
+    private static final String FIELD_DEPARTMENT = "responsibleDept";
     private static final String MODULE_ACTIVITY = "Activity data";
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
 
@@ -513,7 +513,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     }
 
     private Map<String, CaptureSubmissionMeta> loadCaptureMetaBySourceCode(String period) {
-        CeTemplateSheet sheet = resolveSheet656();
+        CeTemplateSheet sheet = resolveEmissionActivity();
         if (sheet == null || sheet.getId() == null) {
             return Map.of();
         }
@@ -609,7 +609,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         return result;
     }
 
-    private CeTemplateSheet resolveSheet656() {
+    private CeTemplateSheet resolveEmissionActivity() {
         return templateSheetMapper.selectList(new LambdaQueryWrapper<CeTemplateSheet>()
                 .eq(CeTemplateSheet::getTargetTableCode, TARGET_TABLE_CODE)
                 .orderByDesc(CeTemplateSheet::getTemplateVersionId)

@@ -3,10 +3,10 @@ package org.dromara.carbon.enterprise.activity.domain;
 import lombok.Data;
 
 /**
- * Enterprise-local resolved master data for one sheet_656 emission source.
+ * Enterprise-local resolved master data for one emission_activity emission source.
  */
 @Data
-public class CeSheet656ResolvedRow {
+public class CeEmissionActivityResolvedRow {
 
     private String emissionSourceCode;
 
