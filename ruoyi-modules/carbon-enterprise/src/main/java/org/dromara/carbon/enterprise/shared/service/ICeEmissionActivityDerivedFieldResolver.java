@@ -14,7 +14,8 @@ public interface ICeEmissionActivityDerivedFieldResolver {
     Optional<CeEmissionActivityResolvedRow> resolve(String emissionSourceCode);
 
     default List<CeEmissionActivityResolvedRow> resolveByEntryFields(String companyName, String factoryName, String scope,
-                                                             String scopeSubcategory, String emissionSourceName) {
+                                                             String scopeSubcategory, String sourceIdentificationName,
+                                                             String emissionSourceName) {
         return Collections.emptyList();
     }
 }

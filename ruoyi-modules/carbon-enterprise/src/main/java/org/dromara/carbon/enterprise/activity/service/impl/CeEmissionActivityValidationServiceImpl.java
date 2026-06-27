@@ -41,7 +41,7 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
         new FieldDescriptor(5, "sourceCategoryKey", "排放源分类", false, false, true),
         new FieldDescriptor(6, "scopeName", "范围", false, true, false),
         new FieldDescriptor(7, "scopeSubcategory", "范围子类别", false, true, false),
-        new FieldDescriptor(8, "sourceIdentificationName", "排放源识别", false, false, true),
+        new FieldDescriptor(8, "sourceIdentificationName", "排放源识别", false, true, false),
         new FieldDescriptor(9, "emissionSourceName", "排放源名称", false, true, false),
         new FieldDescriptor(10, "activityUnit", "单位", false, false, true),
         new FieldDescriptor(11, "activityPeriod", "活动期间", false, true, false),
@@ -120,6 +120,7 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
                 clientValues.get("factoryName"),
                 clientValues.get("scopeName"),
                 clientValues.get("scopeSubcategory"),
+                clientValues.get("sourceIdentificationName"),
                 clientValues.get("emissionSourceName")
             );
             if (matches.isEmpty()) {
@@ -172,6 +173,10 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
 
             resolvedFields.add(fieldValue(descriptor, serverValue));
 
+            if (StringUtils.isBlank(clientValue) && !descriptor.derivedField()) {
+                continue;
+            }
+
             if (StringUtils.isBlank(clientValue)) {
                 issues.add(issue(SEVERITY_WARNING, "DERIVED_FIELD_SERVER_FILLED", rowNumber, descriptor,
                     "client value is ignored and will be filled from enterprise-local master data"));
@@ -199,6 +204,7 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
             && StringUtils.isNotBlank(clientValues.get("factoryName"))
             && StringUtils.isNotBlank(clientValues.get("scopeName"))
             && StringUtils.isNotBlank(clientValues.get("scopeSubcategory"))
+            && StringUtils.isNotBlank(clientValues.get("sourceIdentificationName"))
             && StringUtils.isNotBlank(clientValues.get("emissionSourceName"));
     }
 

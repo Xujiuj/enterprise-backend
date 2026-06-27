@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CeEmissionActivityValidationTest {
 
     private static final List<String> DERIVED_CODES = List.of(
-        "sourceIdentificationCode", "companyCode", "sourceCategoryKey", "sourceIdentificationName", "activityUnit", "factorKey"
+        "sourceIdentificationCode", "companyCode", "sourceCategoryKey", "activityUnit", "factorKey"
     );
 
     @Test
@@ -43,6 +43,7 @@ class CeEmissionActivityValidationTest {
             "factoryName:工厂:false:true:false",
             "scopeName:范围:false:true:false",
             "scopeSubcategory:范围子类别:false:true:false",
+            "sourceIdentificationName:排放源识别:false:true:false",
             "emissionSourceName:排放源名称:false:true:false",
             "activityPeriod:活动期间:false:true:false",
             "activityDate:日期:false:true:false",
@@ -53,7 +54,7 @@ class CeEmissionActivityValidationTest {
             .map(field -> field.getFieldCode() + ":" + field.getFieldName() + ":"
                 + field.isSourceRequired() + ":" + field.isRowValueRequired() + ":" + field.isDerivedField())
             .toList());
-        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
             fields.stream().map(CeEmissionActivityFieldDescriptor::getFieldOrder).toList());
     }
 
@@ -127,6 +128,29 @@ class CeEmissionActivityValidationTest {
             "INVALID_VALUE_DOMAIN:activityValue:活动数据",
             "DERIVED_FIELD_SERVER_FILLED:sourceIdentificationCode:排放源识别编号"
         ), issueSummaries(result));
+    }
+
+    @Test
+    void sourceIdentificationDisambiguatesDuplicateEmissionSourceNames() {
+        CeEmissionActivityValidationServiceImpl service = new CeEmissionActivityValidationServiceImpl(fakeResolver());
+
+        CeEmissionActivityValidationResult disambiguated = service.validate(request(values -> {
+            values.put("sourceIdentificationCode", "");
+            values.put("sourceIdentificationName", "天然气锅炉");
+        }));
+
+        assertTrue(disambiguated.isValid());
+        assertFalse(disambiguated.isBlocking());
+        assertEquals("SRC-001", resolvedValueMap(disambiguated).get("sourceIdentificationCode"));
+
+        CeEmissionActivityValidationResult ambiguous = service.validate(request(values -> {
+            values.put("sourceIdentificationCode", "");
+            values.put("sourceIdentificationName", "");
+        }));
+
+        assertFalse(ambiguous.isValid());
+        assertTrue(ambiguous.isBlocking());
+        assertEquals(List.of("REQUIRED_FIELD_MISSING:sourceIdentificationName:排放源识别"), issueSummaries(ambiguous));
     }
 
     @Test
@@ -260,13 +284,22 @@ class CeEmissionActivityValidationTest {
 
             @Override
             public List<CeEmissionActivityResolvedRow> resolveByEntryFields(String companyName, String factoryName, String scope,
-                                                                            String scopeSubcategory, String emissionSourceName) {
+                                                                            String scopeSubcategory, String sourceIdentificationName,
+                                                                            String emissionSourceName) {
                 if ("测试公司".equals(companyName)
                     && "一厂".equals(factoryName)
                     && "范围1".equals(scope)
                     && "固定燃烧".equals(scopeSubcategory)
                     && "天然气".equals(emissionSourceName)) {
-                    return List.of(resolvedRow());
+                    if ("天然气锅炉".equals(sourceIdentificationName)) {
+                        return List.of(resolvedRow());
+                    }
+                    if (sourceIdentificationName == null || sourceIdentificationName.isBlank()) {
+                        CeEmissionActivityResolvedRow duplicate = resolvedRow();
+                        duplicate.setEmissionSourceCode("SRC-002");
+                        duplicate.setEmissionSourceIdentity("备用天然气锅炉");
+                        return List.of(resolvedRow(), duplicate);
+                    }
                 }
                 return List.of();
             }

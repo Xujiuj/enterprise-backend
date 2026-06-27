@@ -236,6 +236,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "activity-entry-source-factory" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getFactoryName, safeQuery);
             case "activity-entry-source-scope" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getScopeName, safeQuery);
             case "activity-entry-source-subcategory" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getScopeSubcategory, safeQuery);
+            case "activity-entry-source-identification" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getSourceIdentificationName, safeQuery);
             case "activity-entry-source-category" -> collectSourceCategoryOptions(options);
             case "activity-entry-source-leaf" -> collectEmissionSourceLeafOptions(options, safeQuery);
             case DIMENSION_FIELD_OPTION -> collectDimensionFieldOptions(options, safeQuery.getDimensionCode(), safeQuery.getField());

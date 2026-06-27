@@ -71,15 +71,15 @@ class CeEmissionActivityImportValidationServiceTest {
         CeEmissionActivityImportValidationRequest request = service.parseImportFile(xlsxFile(
             entryHeader().stream().map(CeEmissionActivityFieldDescriptor::getFieldCode).toList(),
             List.of(
-                rowValues("Company One", "Factory One", "Scope 1", "Stationary Combustion", "Natural Gas",
+                rowValues("Company One", "Factory One", "Scope 1", "Stationary Combustion", "Natural Gas Boiler", "Natural Gas",
                     "2026-06", "2026-06-05", "12.5", "Production", "Meter"),
                 blankRowValues(),
-                rowValues("Company One", "Factory One", "Scope 1", "Stationary Combustion", "Natural Gas",
+                rowValues("Company One", "Factory One", "Scope 1", "Stationary Combustion", "Natural Gas Boiler", "Natural Gas",
                     "2026-07", "2026-07-05", "18.5", "Production", "Meter")
             )
         ));
 
-        assertEquals(10, request.getHeaderFields().size());
+        assertEquals(11, request.getHeaderFields().size());
         assertEquals("公司名称", request.getHeaderFields().get(0).getFieldName());
         assertEquals(2, request.getRows().size());
         assertEquals(2, request.getRows().get(0).getRowNumber());
@@ -101,6 +101,7 @@ class CeEmissionActivityImportValidationServiceTest {
                 "Factory One",
                 "Scope 1",
                 "Stationary Combustion",
+                "Natural Gas Boiler",
                 "Natural Gas",
                 "2026-06",
                 "2026-06-05",
@@ -110,10 +111,11 @@ class CeEmissionActivityImportValidationServiceTest {
             ))
         ));
 
-        assertEquals(10, request.getHeaderFields().size());
+        assertEquals(11, request.getHeaderFields().size());
         assertEquals(19, request.getRows().get(0).getFieldValues().size());
         assertEquals("", fieldValue(request.getRows().get(0), "sourceIdentificationCode"));
         assertEquals("Company One", fieldValue(request.getRows().get(0), "companyName"));
+        assertEquals("Natural Gas Boiler", fieldValue(request.getRows().get(0), "sourceIdentificationName"));
         assertEquals("2026-06", fieldValue(request.getRows().get(0), "activityPeriod"));
         assertEquals("12.5", fieldValue(request.getRows().get(0), "activityValue"));
         assertEquals("", fieldValue(request.getRows().get(0), "companyCode"));
@@ -168,7 +170,7 @@ class CeEmissionActivityImportValidationServiceTest {
 
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.parseImportFile(xlsxFile(headers, List.of(
-                rowValues("Factory One", "Scope 1", "Stationary Combustion", "Natural Gas",
+                rowValues("Factory One", "Scope 1", "Stationary Combustion", "Natural Gas Boiler", "Natural Gas",
                     "2026-06", "2026-06-05", "12.5", "Production", "Meter")
             ))));
 
@@ -446,7 +448,7 @@ class CeEmissionActivityImportValidationServiceTest {
     }
 
     private List<String> blankRowValues() {
-        return new ArrayList<>(Collections.nCopies(10, ""));
+        return new ArrayList<>(Collections.nCopies(11, ""));
     }
 
     private ICeEmissionActivityDerivedFieldResolver fakeResolver() {
@@ -461,7 +463,8 @@ class CeEmissionActivityImportValidationServiceTest {
 
             @Override
             public List<CeEmissionActivityResolvedRow> resolveByEntryFields(String companyName, String factoryName, String scope,
-                                                                    String scopeSubcategory, String emissionSourceName) {
+                                                                    String scopeSubcategory, String sourceIdentificationName,
+                                                                    String emissionSourceName) {
                 if ("Company One".equals(companyName)
                     && "Factory One".equals(factoryName)
                     && "Scope 1".equals(scope)

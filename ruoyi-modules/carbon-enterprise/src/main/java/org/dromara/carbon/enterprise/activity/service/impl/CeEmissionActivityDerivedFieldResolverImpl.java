@@ -45,22 +45,26 @@ public class CeEmissionActivityDerivedFieldResolverImpl implements ICeEmissionAc
 
     @Override
     public List<CeEmissionActivityResolvedRow> resolveByEntryFields(String companyName, String factoryName, String scope,
-                                                            String scopeSubcategory, String emissionSourceName) {
+                                                            String scopeSubcategory, String sourceIdentificationName,
+                                                            String emissionSourceName) {
         if (StringUtils.isBlank(companyName) || StringUtils.isBlank(factoryName) || StringUtils.isBlank(scope)
             || StringUtils.isBlank(scopeSubcategory) || StringUtils.isBlank(emissionSourceName)) {
             return List.of();
         }
 
-        return emissionSourceMapper.selectList(
-                Wrappers.<CeEmissionSource>lambdaQuery()
-                    .eq(CeEmissionSource::getCompanyName, companyName.trim())
-                    .eq(CeEmissionSource::getFactoryName, factoryName.trim())
-                    .eq(CeEmissionSource::getScopeName, scope.trim())
-                    .eq(CeEmissionSource::getScopeSubcategory, scopeSubcategory.trim())
-                    .eq(CeEmissionSource::getEmissionSourceName, emissionSourceName.trim())
-                    .eq(CeEmissionSource::getEnabledFlag, Boolean.TRUE)
-                    .orderByAsc(CeEmissionSource::getSourceIdentificationCode)
-            )
+        var wrapper = Wrappers.<CeEmissionSource>lambdaQuery()
+            .eq(CeEmissionSource::getCompanyName, companyName.trim())
+            .eq(CeEmissionSource::getFactoryName, factoryName.trim())
+            .eq(CeEmissionSource::getScopeName, scope.trim())
+            .eq(CeEmissionSource::getScopeSubcategory, scopeSubcategory.trim())
+            .eq(CeEmissionSource::getEmissionSourceName, emissionSourceName.trim())
+            .eq(CeEmissionSource::getEnabledFlag, Boolean.TRUE)
+            .orderByAsc(CeEmissionSource::getSourceIdentificationCode);
+        if (StringUtils.isNotBlank(sourceIdentificationName)) {
+            wrapper.eq(CeEmissionSource::getSourceIdentificationName, sourceIdentificationName.trim());
+        }
+
+        return emissionSourceMapper.selectList(wrapper)
             .stream()
             .map(this::toResolvedRow)
             .toList();
