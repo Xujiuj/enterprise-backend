@@ -203,7 +203,10 @@ BEGIN
         (2, @tenantId, N'用户管理-账号初始密码', N'sys.user.initPassword', N'123456', N'Y', N'初始化密码 123456'),
         (3, @tenantId, N'主框架页-侧边栏主题', N'sys.index.sideTheme', N'theme-dark', N'Y', N'深色主题theme-dark，浅色主题theme-light'),
         (5, @tenantId, N'账号自助-是否开启用户注册功能', N'sys.account.registerUser', N'false', N'Y', N'是否开启注册用户功能（true开启，false关闭）'),
-        (11, @tenantId, N'OSS预览列表资源开关', N'sys.oss.previewListResource', N'true', N'Y', N'true:开启, false:关闭')
+        (11, @tenantId, N'OSS预览列表资源开关', N'sys.oss.previewListResource', N'true', N'Y', N'true:开启, false:关闭'),
+        (20, @tenantId, N'企业端授权验签公钥', N'carbon.license.public-key-pem',
+         N'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8//eDDZSHROkF3uJdVTnjuV5ZSeQ2gpgLJVGSAt7jKb9YPgX5gENaFftwOEapBwZ6a45olIVfk4V+lsElpx7mAaXn/n7/q0Du1hevMcI3f4xVBP4b8JsTHnTbbl3CJ2Sgz7kYlllwvubbBZuI/K7/BU8ZwMW7a2xSo0tlEJgEhRZ0Psd0j696OOGnrbcWWX80wPRP7L5QUdwawC67DSmA1YEOZj7ksF8KMavJVSHTFIt5um4SLbdsNHSA6R4ebyFfwkrp3bcDsgM780Y/NaImCqLKR5OUdDKVL0e+cA5qqASLYnUw/dYPLprEmCSG+QzXoOwSMXRul3QJISlGZpTXwIDAQAB',
+         N'Y', N'厂商端 local-key-2026-06-08 对应 RSA 公钥，仅用于企业端验签 .lic')
     ) AS source(config_id, tenant_id, config_name, config_key, config_value, config_type, remark)
     ON target.config_id = source.config_id
     WHEN MATCHED THEN

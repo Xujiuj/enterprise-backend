@@ -1,8 +1,8 @@
 package org.dromara.carbon.enterprise.license.service;
 
 import lombok.RequiredArgsConstructor;
+import org.dromara.common.core.service.ConfigService;
 import org.dromara.common.core.utils.StringUtils;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 /**
@@ -14,10 +14,10 @@ public class CeLicensePublicKeyProvider {
 
     private static final String CONFIG_KEY = "carbon.license.public-key-pem";
 
-    private final Environment environment;
+    private final ConfigService configService;
 
     public String getPublicKeyPem() {
-        String publicKeyPem = environment.getProperty(CONFIG_KEY);
+        String publicKeyPem = configService.getConfigValue(CONFIG_KEY);
         if (StringUtils.isBlank(publicKeyPem)) {
             return null;
         }
