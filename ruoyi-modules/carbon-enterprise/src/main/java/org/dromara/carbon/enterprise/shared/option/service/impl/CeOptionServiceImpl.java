@@ -488,10 +488,43 @@ public class CeOptionServiceImpl implements ICeOptionService {
 
     private void collectDimensionFieldOptions(List<CeOptionVo> target, String dimensionCode, String field) {
         validateDimensionOptionRequest(dimensionCode, field);
+        if ("company".equals(dimensionCode) && ("provinceCode".equals(field) || "provinceName".equals(field))) {
+            collectCompanyProvinceOptions(target, field);
+            return;
+        }
         for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
             Object value = dimensionValue(record, field);
             addOption(target, labelForDimensionField(field, value), value, dimensionRecordMap(record));
         }
+    }
+
+    private void collectCompanyProvinceOptions(List<CeOptionVo> target, String field) {
+        for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode("admin-division")) {
+            String provinceCode = normalizeValue(record.getRecordCode());
+            String provinceName = normalizeValue(record.getRecordName());
+            Object value = "provinceCode".equals(field) ? provinceCode : provinceName;
+            String label = provinceOptionLabel(field, provinceCode, provinceName);
+            addOption(target, label, value, provinceRecordMap(record, provinceCode, provinceName));
+        }
+    }
+
+    private String provinceOptionLabel(String field, String provinceCode, String provinceName) {
+        if ("provinceCode".equals(field) && StringUtils.isNotBlank(provinceCode) && StringUtils.isNotBlank(provinceName)) {
+            return provinceCode + " / " + provinceName;
+        }
+        if ("provinceName".equals(field) && StringUtils.isNotBlank(provinceName) && StringUtils.isNotBlank(provinceCode)) {
+            return provinceName + " / " + provinceCode;
+        }
+        return "provinceCode".equals(field) ? provinceCode : provinceName;
+    }
+
+    private Map<String, Object> provinceRecordMap(CeDimensionRecordVo record, String provinceCode, String provinceName) {
+        Map<String, Object> values = dimensionRecordMap(record);
+        values.put("divisionCode", provinceCode);
+        values.put("divisionName", provinceName);
+        values.put("provinceCode", provinceCode);
+        values.put("provinceName", provinceName);
+        return values;
     }
 
     private Map<String, Object> dimensionRecordMap(CeDimensionRecordVo record) {

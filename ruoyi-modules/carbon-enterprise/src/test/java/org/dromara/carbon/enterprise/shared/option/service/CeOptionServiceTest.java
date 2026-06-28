@@ -179,6 +179,56 @@ class CeOptionServiceTest {
     }
 
     @Test
+    void companyProvinceCodeOptionsComeFromAdminDivisionRecords() {
+        CeDimensionRecordVo beijing = new CeDimensionRecordVo();
+        beijing.setRecordCode("110000");
+        beijing.setRecordName("北京市");
+        beijing.setDivisionCode("SHOULD-NOT-REQUIRE-PROJECTION-ALIAS");
+        CeDimensionRecordVo shanghai = new CeDimensionRecordVo();
+        shanghai.setRecordCode("310000");
+        shanghai.setRecordName("上海市");
+        when(dimensionProjectionMapper.selectByDimensionCode("admin-division")).thenReturn(List.of(beijing, shanghai));
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setField("provinceCode");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("110000", "310000");
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getLabel()))
+            .containsExactly("110000 / 北京市", "310000 / 上海市");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("provinceCode", "110000")
+            .containsEntry("provinceName", "北京市");
+    }
+
+    @Test
+    void companyProvinceNameOptionsComeFromAdminDivisionRecords() {
+        CeDimensionRecordVo beijing = new CeDimensionRecordVo();
+        beijing.setRecordCode("110000");
+        beijing.setRecordName("北京市");
+        when(dimensionProjectionMapper.selectByDimensionCode("admin-division")).thenReturn(List.of(beijing));
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setField("provinceName");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("北京市");
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getLabel()))
+            .containsExactly("北京市 / 110000");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("provinceCode", "110000")
+            .containsEntry("provinceName", "北京市");
+    }
+
+    @Test
     void activityEntryLeafOptionsKeepEachEmissionSourceCodeWhenNamesRepeat() {
         CeEmissionSource largerCode = emissionSource("ES-002", "柴油", "A公司", "一厂", "cat-a");
         largerCode.setResponsibleDept("生产部");
