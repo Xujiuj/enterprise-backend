@@ -27,7 +27,7 @@ public class CeTemplateField implements Serializable {
 
     private String originalFieldName;
 
-    private String targetColumnCode;
+    private String businessFieldCode;
 
     private String valueType;
 

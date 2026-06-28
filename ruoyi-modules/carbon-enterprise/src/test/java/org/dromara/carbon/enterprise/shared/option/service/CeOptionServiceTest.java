@@ -121,13 +121,13 @@ class CeOptionServiceTest {
         CeDimensionRecordVo revenueTarget = new CeDimensionRecordVo();
         revenueTarget.setRecordCode("manufacturing");
         revenueTarget.setRecordName("2026");
-        revenueTarget.setField03("1.25");
-        revenueTarget.setField04("tCO2e/万元");
+        revenueTarget.setTargetValue("1.25");
+        revenueTarget.setUnitName("tCO2e/万元");
         CeDimensionRecordVo outputTarget = new CeDimensionRecordVo();
         outputTarget.setRecordCode("manufacturing");
         outputTarget.setRecordName("2027");
-        outputTarget.setField03("1.10");
-        outputTarget.setField04("tCO2e/万元");
+        outputTarget.setTargetValue("1.10");
+        outputTarget.setUnitName("tCO2e/万元");
         when(dimensionProjectionMapper.selectByDimensionCode("intensity-target")).thenReturn(List.of(revenueTarget, outputTarget));
 
         var options = service.listOptions("intensity-target-code", null);

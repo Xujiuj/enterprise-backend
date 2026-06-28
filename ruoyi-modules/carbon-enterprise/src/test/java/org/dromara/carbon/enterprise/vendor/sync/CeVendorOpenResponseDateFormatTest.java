@@ -109,14 +109,14 @@ class CeVendorOpenResponseDateFormatTest {
             """
                 {
                   "licenseId": "LIC-001",
-                  "dimensionCode": "report-template-download",
+                  "dimensionCode": "emission-source-category",
                   "total": 1,
                   "records": [
                     {
                       "id": 1,
-                      "dimensionCode": "report-template-download",
-                      "recordCode": "carbon-report-standard",
-                      "recordName": "碳排放报告模板",
+                      "dimensionCode": "emission-source-category",
+                      "recordCode": "stationary-combustion",
+                      "recordName": "固定燃烧",
                       "createTime": "2026-06-13 17:22:17",
                       "updateTime": "2026-06-13 17:22:17"
                     }

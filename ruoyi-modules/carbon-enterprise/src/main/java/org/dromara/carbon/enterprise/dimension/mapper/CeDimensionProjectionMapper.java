@@ -1,6 +1,8 @@
 package org.dromara.carbon.enterprise.dimension.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -20,6 +22,9 @@ public interface CeDimensionProjectionMapper {
 
     @SelectProvider(type = CeDimensionProjectionSqlProvider.class, method = "selectByDimensionCode")
     List<CeDimensionRecordVo> selectByDimensionCode(@Param("dimensionCode") String dimensionCode);
+
+    @SelectProvider(type = CeDimensionProjectionSqlProvider.class, method = "selectPageByDimensionCode")
+    IPage<CeDimensionRecordVo> selectPageByDimensionCode(@Param("page") Page<CeDimensionRecordVo> page, @Param("query") CeDimensionRecordBo query);
 
     @SelectProvider(type = CeDimensionProjectionSqlProvider.class, method = "selectByDimensionCodeAndId")
     CeDimensionRecordVo selectByDimensionCodeAndId(@Param("dimensionCode") String dimensionCode, @Param("id") Long id);

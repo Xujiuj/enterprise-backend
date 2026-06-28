@@ -1,6 +1,7 @@
 package org.dromara.carbon.enterprise.dimension.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.enterprise.vendor.client.CeVendorDimensionOpenClient;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseState;
@@ -59,8 +60,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         "intensity-denominator",
         "intensity-target",
         "denominator-fact",
-        "intensity-tolerance",
-        "report-template-download"
+        "intensity-tolerance"
     );
 
     private static final Set<String> ENTERPRISE_EDITABLE_DIMENSION_CODES = Set.of(
@@ -81,19 +81,13 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     @Override
     public TableDataInfo<CeDimensionRecordVo> queryPageList(CeDimensionRecordBo bo, PageQuery pageQuery) {
         validateDimensionCode(bo.getDimensionCode());
-        if (!"report-template-download".equals(bo.getDimensionCode())) {
-            return queryLocalProjectionPageList(bo, pageQuery);
-        }
-        return queryVendorPageList(bo, pageQuery);
+        return queryLocalProjectionPageList(bo, pageQuery);
     }
 
     @Override
     public List<CeDimensionRecordVo> queryList(CeDimensionRecordBo bo) {
         validateDimensionCode(bo.getDimensionCode());
-        if (!"report-template-download".equals(bo.getDimensionCode())) {
-            return filterProjectionRows(bo, dimensionProjectionMapper.selectByDimensionCode(bo.getDimensionCode()));
-        }
-        return queryVendorPageList(bo, new PageQuery(Integer.MAX_VALUE, 1)).getRows();
+        return filterProjectionRows(bo, dimensionProjectionMapper.selectByDimensionCode(bo.getDimensionCode()));
     }
 
     @Override
@@ -145,12 +139,9 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     }
 
     private TableDataInfo<CeDimensionRecordVo> queryLocalProjectionPageList(CeDimensionRecordBo bo, PageQuery pageQuery) {
-        List<CeDimensionRecordVo> rows = filterProjectionRows(bo, dimensionProjectionMapper.selectByDimensionCode(bo.getDimensionCode()));
-        int pageNum = pageQuery == null || pageQuery.getPageNum() == null ? 1 : pageQuery.getPageNum();
-        int pageSize = pageQuery == null || pageQuery.getPageSize() == null ? rows.size() : pageQuery.getPageSize();
-        int fromIndex = Math.min(Math.max(pageNum - 1, 0) * pageSize, rows.size());
-        int toIndex = Math.min(fromIndex + pageSize, rows.size());
-        return new TableDataInfo<>(rows.subList(fromIndex, toIndex), rows.size());
+        PageQuery effectivePageQuery = pageQuery == null ? new PageQuery(PageQuery.DEFAULT_PAGE_SIZE, PageQuery.DEFAULT_PAGE_NUM) : pageQuery;
+        IPage<CeDimensionRecordVo> page = dimensionProjectionMapper.selectPageByDimensionCode(effectivePageQuery.build(), bo);
+        return TableDataInfo.build(page);
     }
 
     private List<CeDimensionRecordVo> filterProjectionRows(CeDimensionRecordBo bo, List<CeDimensionRecordVo> rows) {
@@ -199,28 +190,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         target.setRecordCode(source.getRecordCode());
         target.setRecordName(source.getRecordName());
         target.setParentCode(source.getParentCode());
-        target.setField01(source.getField01());
-        target.setField02(source.getField02());
-        target.setField03(source.getField03());
-        target.setField04(source.getField04());
-        target.setField05(source.getField05());
-        target.setField06(source.getField06());
-        target.setField07(source.getField07());
-        target.setField08(source.getField08());
-        target.setField09(source.getField09());
-        target.setField10(source.getField10());
-        target.setField11(source.getField11());
-        target.setField12(source.getField12());
-        target.setField13(source.getField13());
-        target.setField14(source.getField14());
-        target.setField15(source.getField15());
-        target.setField16(source.getField16());
-        target.setField17(source.getField17());
-        target.setField18(source.getField18());
-        target.setField19(source.getField19());
-        target.setField20(source.getField20());
-        target.setField21(source.getField21());
-        target.setField22(source.getField22());
+        mapVendorFields(source, target);
         Integer sortOrder = source.getSortOrder();
         target.setSortOrder(sortOrder == null ? null : String.valueOf(sortOrder));
         target.setStatus(source.getStatus());
@@ -228,6 +198,62 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         target.setUpdateTime(source.getUpdateTime());
         target.setRemark(source.getRemark());
         return target;
+    }
+
+    private void mapVendorFields(CeVendorDimensionRecord source, CeDimensionRecordVo target) {
+        switch (source.getDimensionCode()) {
+            case "emission-source-category" -> {
+                target.setCategorySk(source.getCategorySk());
+                target.setBusinessKey(source.getBusinessKey());
+                target.setGhgScope(source.getGhgScope());
+                target.setGhgScopeCategorySort(asString(source.getGhgScopeCategorySort()));
+                target.setGhgScopeCategory(source.getGhgScopeCategory());
+                target.setGhgScopeEn(source.getGhgScopeEn());
+                target.setGhgScopeCategoryEn(source.getGhgScopeCategoryEn());
+                target.setIsoCategory(source.getIsoCategory());
+                target.setIsoCategoryEn(source.getIsoCategoryEn());
+                target.setIsoCategoryDescription(source.getIsoCategoryDescription());
+                target.setIsoCategoryDescriptionEn(source.getIsoCategoryDescriptionEn());
+                target.setIsoCustomSubcategory(source.getIsoCustomSubcategory());
+                target.setGbScopeCategory(source.getGbScopeCategory());
+                target.setGbSubcategory(source.getGbSubcategory());
+                target.setEffectiveDate(asString(source.getEffectiveDate()));
+                target.setExpiryDate(asString(source.getExpireDate()));
+                target.setCurrentFlag(source.getCurrentFlag());
+                target.setVersionNo(source.getVersionNo());
+                target.setUnifiedStandardCategory(source.getStandardCategory());
+            }
+            case "base-year" -> {
+                target.setBaseYear(asString(source.getBaseYear()));
+                target.setCurrentBaseFlag(source.getIsCurrent() != null && source.getIsCurrent() == 1 ? "Y" : "N");
+            }
+            case "ef-electricity-factor" -> {
+                target.setFactorVersion(source.getFactorVersion());
+                target.setDivisionCode(source.getDivisionCode());
+                target.setDivisionName(source.getDivisionName());
+                target.setRegionName(source.getRegionName());
+                target.setProvinceFactor(asString(source.getProvinceFactor()));
+                target.setRegionFactor(asString(source.getRegionFactor()));
+                target.setNationalFactor(asString(source.getNationalFactor()));
+                target.setNonFossilExcludedFactor(asString(source.getNonFossilExcludedFactor()));
+                target.setNationalFossilPowerFactor(asString(source.getNationalFossilPowerFactor()));
+            }
+            case "ef-electricity-version" -> {
+                target.setFactorVersion(source.getFactorVersion());
+                target.setEffectiveYear(asString(source.getEffectiveYear()));
+            }
+            case "ef-electricity-scope" -> {
+                target.setScopeKey(source.getScopeKey());
+                target.setScopeName(source.getScopeName());
+            }
+            case "greenhouse-gas" -> target.setGasNameEn(source.getGasNameEn());
+            default -> {
+            }
+        }
+    }
+
+    private String asString(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     private CeLicenseState requireCurrentLicense() {

@@ -161,7 +161,7 @@ public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivity
                 .orderByAsc(CeTemplateField::getFieldOrder)
         );
         Map<String, CeTemplateField> byCode = fields == null ? Collections.emptyMap() : fields.stream()
-            .collect(Collectors.toMap(CeTemplateField::getTargetColumnCode, Function.identity(), (left, right) -> left,
+            .collect(Collectors.toMap(CeTemplateField::getBusinessFieldCode, Function.identity(), (left, right) -> left,
                 LinkedHashMap::new));
 
         for (CeEmissionActivityFieldDescriptor descriptor : allFieldDescriptors()) {
@@ -314,8 +314,8 @@ public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivity
         cell.setRowId(rowId);
         cell.setFieldId(field.getId());
         cell.setTextValue(value);
-        cell.setDecimalValue(toDecimalValue(field.getTargetColumnCode(), value));
-        cell.setDateValue(toDateValue(field.getTargetColumnCode(), value));
+        cell.setDecimalValue(toDecimalValue(field.getBusinessFieldCode(), value));
+        cell.setDateValue(toDateValue(field.getBusinessFieldCode(), value));
         cell.setValueStatus(VALUE_STATUS_VALID);
         cell.setCreateTime(now);
         cell.setUpdateTime(now);

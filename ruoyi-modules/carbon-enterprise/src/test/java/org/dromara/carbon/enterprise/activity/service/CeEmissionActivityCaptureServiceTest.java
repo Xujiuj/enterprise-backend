@@ -323,7 +323,7 @@ class CeEmissionActivityCaptureServiceTest {
         field.setSheetId(50L);
         field.setFieldOrder(descriptor.getFieldOrder());
         field.setOriginalFieldName(descriptor.getFieldName());
-        field.setTargetColumnCode(descriptor.getFieldCode());
+        field.setBusinessFieldCode(descriptor.getFieldCode());
         field.setValueType("text");
         return field;
     }

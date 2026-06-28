@@ -1,29 +1,29 @@
-# Source(A) enterprise constraint redesign
+# Source(A) Enterprise Constraint Redesign
 
 ## Evidence
 
-- Customer workbook `source（A）/ALL/1 排放源识别表.xlsx` defines factory rows in `102公司表` with `BK_工厂编号`, and emission-source rows in `104排放源识别*` with `FK_公司编号` pointing to that factory code.
-- Customer activity workbooks define monthly facts with `PK_排放源识别编号`, `年度`, `月份`, and `活动数据`.
-- Local analysis in `tools/source_a_schema_analysis.txt` found 8323 activity rows. `PK_排放源识别编号 + 年度 + 月份` is unique; `PK_排放源识别编号` alone repeats monthly.
-- `factor_key` may legally point to dynamic electricity-factor references outside `ce_ef_factor`, so factor columns remain indexed but not strict foreign keys.
+- Customer workbook `source(A) ALL/1 排放源识别表.xlsx` defines factory rows in `102公司表` with `BK_工厂编号`, and emission-source rows in `104排放源识别` with factory code pointing to that key.
+- Customer activity workbooks define monthly facts with emission-source identification code, year, month, and activity value.
+- Activity facts repeat by emission source across months, so uniqueness belongs on source plus activity period, not source alone.
+- Factor keys may legally point to dynamic electricity-factor references outside the static EF table, so factor columns remain indexed but are not strict foreign keys.
 
-## Target relationships
+## Target Relationships
 
 - `ce_company_factory.factory_code` is the enterprise-side factory business key.
-- `ce_emission_source.source_identification_code` remains the stable emission-source business key.
-- `ce_emission_source.company_code` is retained for existing API compatibility, but semantically stores Source(A) `FK_公司编号`/factory code. `factory_code` is added as an explicit alias for future code.
-- `ce_activity_data.emission_source_id` links to `ce_emission_source.id`; `source_identification_code` is retained for imports, filters, and compatibility.
+- `ce_emission_source.source_identification_code` is the stable emission-source business key.
+- `ce_emission_source.company_code` currently stores the Source(A) factory code; new code should prefer explicit factory semantics.
+- `ce_activity_data.emission_source_id` links to `ce_emission_source.id`; `source_identification_code` remains for imports and filters.
 - `ce_activity_data` is unique by `(source_identification_code, activity_year, activity_month)`.
 - `ce_green_power_certificate` is unique by `(factory_code, activity_year, activity_month, certificate_code)`.
 - `ce_intensity_denominator_fact` is unique by `(factory_code, fact_year, fact_month, denominator_metric_name)`.
 
-## Execution order
+## Execution Order
 
-1. Run `script/sql/mysql/carbon_enterprise_source_a_dirty_data_diagnostics.sql` against `enterprise`.
-2. Clean duplicate/orphan rows until diagnostics return no blocking rows.
-3. Run `script/sql/mysql/carbon_enterprise_source_a_constraint_redesign.sql`.
+1. Run current SQL Server diagnostics under `script/sql/sqlserver/` against `enterprise`.
+2. Clean duplicate or orphan rows until diagnostics return no blocking rows.
+3. Apply the current SQL Server schema migration.
 4. Re-run diagnostics and Source(A) import validation.
 
-## RuoYi generator note
+## RuoYi Generator Note
 
-The affected module already exists and includes hand-written import/validation services around generated CRUD. The schema change is therefore implemented as a migration and minimal service alignment instead of regenerating all enterprise carbon tables.
+The affected module already exists and includes handwritten import and validation services around generated CRUD. Schema changes are therefore implemented as migrations plus minimal service alignment instead of regenerating all enterprise carbon tables.

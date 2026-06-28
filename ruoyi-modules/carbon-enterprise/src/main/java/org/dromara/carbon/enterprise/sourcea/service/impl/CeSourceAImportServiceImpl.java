@@ -359,18 +359,13 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
     }
 
     private void clearSourceAData() {
-        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
-        try {
-            jdbcTemplate.update("""
-                DELETE FROM ce_extension_field_value
-                WHERE owner_table_code = 'ce_activity_data'
-                  AND owner_record_id IN (SELECT id FROM ce_activity_data WHERE remark = ?)
-                """, MARK);
-            for (String table : DELETE_ORDER) {
-                jdbcTemplate.update("DELETE FROM " + table + " WHERE remark = ?", MARK);
-            }
-        } finally {
-            jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
+        jdbcTemplate.update("""
+            DELETE FROM ce_extension_field_value
+            WHERE owner_table_code = 'ce_activity_data'
+              AND owner_record_id IN (SELECT id FROM ce_activity_data WHERE remark = ?)
+            """, MARK);
+        for (String table : DELETE_ORDER) {
+            jdbcTemplate.update("DELETE FROM " + table + " WHERE remark = ?", MARK);
         }
     }
 

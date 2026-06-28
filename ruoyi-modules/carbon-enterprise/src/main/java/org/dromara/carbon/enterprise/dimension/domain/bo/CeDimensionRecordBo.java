@@ -32,49 +32,107 @@ public class CeDimensionRecordBo implements Serializable {
 
     private String parentCode;
 
-    private String field01;
+    private String companySk;
 
-    private String field02;
+    private String factoryName;
 
-    private String field03;
+    private String provinceCode;
 
-    private String field04;
+    private String provinceName;
 
-    private String field05;
+    private String factoryType;
 
-    private String field06;
+    private String industrySectionCode;
 
-    private String field07;
+    private String industrySectionName;
 
-    private String field08;
+    private String industryDivisionCode;
 
-    private String field09;
+    private String industryDivisionName;
 
-    private String field10;
+    private String industryGroupCode;
 
-    private String field11;
+    private String industryGroupName;
 
-    private String field12;
+    private String industryClassCode;
 
-    private String field13;
+    private String industryClassName;
 
-    private String field14;
+    private String effectiveDate;
 
-    private String field15;
+    private String expiryDate;
 
-    private String field16;
+    private String activeFlag;
 
-    private String field17;
+    private String baseYear;
 
-    private String field18;
+    private String currentBaseFlag;
 
-    private String field19;
+    private String emissionSourceNameEn;
 
-    private String field20;
+    private String fuelMaterialCategory;
 
-    private String field21;
+    private String sourceUnit;
 
-    private String field22;
+    private String co2;
+
+    private String ch4;
+
+    private String n2o;
+
+    private String hfcs;
+
+    private String pfcs;
+
+    private String sf6;
+
+    private String nf3;
+
+    private String applicableScope;
+
+    private String factorSource;
+
+    private String gwpCh4;
+
+    private String gwpN2o;
+
+    private String gwpHfcs;
+
+    private String gwpPfcs;
+
+    private String gwpSf6;
+
+    private String gwpNf3;
+
+    private String factorGwp;
+
+    private String factorUnit;
+
+    private String effectiveYear;
+
+    private String denominatorType;
+
+    private String denominatorMetricName;
+
+    private String intensityUnitDisplay;
+
+    private String enabledText;
+
+    private String targetValue;
+
+    private String unitName;
+
+    private String factoryTypeForFact;
+
+    private String factYear;
+
+    private String factMonth;
+
+    private String denominatorValue;
+
+    private String dataSource;
+
+    private String toleranceRate;
 
     private String sortOrder;
 

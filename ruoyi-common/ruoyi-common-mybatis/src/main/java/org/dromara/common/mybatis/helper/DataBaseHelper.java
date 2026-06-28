@@ -79,16 +79,7 @@ public class DataBaseHelper {
      */
     public static String findInSet(Object var1, String var2) {
         String var = Convert.toStr(var1);
-        return switch (getDataBaseType()) {
-            // instr(',0,100,101,' , ',100,') <> 0
-            case ORACLE -> "instr(','||%s||',' , ',%s,') <> 0".formatted(var2, var);
-            // (select strpos(',0,100,101,' , ',100,')) <> 0
-            case POSTGRE_SQL -> "(select strpos(','||%s||',' , ',%s,')) <> 0".formatted(var2, var);
-            // charindex(',100,' , ',0,100,101,') <> 0
-            case SQL_SERVER -> "charindex(',%s,' , ','+%s+',') <> 0".formatted(var, var2);
-            // find_in_set(100 , '0,100,101')
-            default -> "find_in_set('%s' , %s) <> 0".formatted(var, var2);
-        };
+        return "charindex(',%s,' , ','+%s+',') <> 0".formatted(var, var2);
     }
 
     /**

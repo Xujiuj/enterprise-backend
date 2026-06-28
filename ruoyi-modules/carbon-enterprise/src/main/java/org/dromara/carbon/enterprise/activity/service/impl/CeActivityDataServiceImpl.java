@@ -519,10 +519,10 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         }
         List<CeTemplateField> fields = templateFieldMapper.selectList(new LambdaQueryWrapper<CeTemplateField>()
             .eq(CeTemplateField::getSheetId, sheet.getId())
-            .in(CeTemplateField::getTargetColumnCode, List.of(FIELD_SOURCE_CODE, FIELD_YEAR, FIELD_MONTH, FIELD_DEPARTMENT)));
+            .in(CeTemplateField::getBusinessFieldCode, List.of(FIELD_SOURCE_CODE, FIELD_YEAR, FIELD_MONTH, FIELD_DEPARTMENT)));
         Map<Long, String> fieldCodeById = fields.stream()
-            .filter(field -> field.getId() != null && StringUtils.isNotBlank(field.getTargetColumnCode()))
-            .collect(Collectors.toMap(CeTemplateField::getId, CeTemplateField::getTargetColumnCode, (left, right) -> left));
+            .filter(field -> field.getId() != null && StringUtils.isNotBlank(field.getBusinessFieldCode()))
+            .collect(Collectors.toMap(CeTemplateField::getId, CeTemplateField::getBusinessFieldCode, (left, right) -> left));
         if (fieldCodeById.isEmpty()) {
             return Map.of();
         }

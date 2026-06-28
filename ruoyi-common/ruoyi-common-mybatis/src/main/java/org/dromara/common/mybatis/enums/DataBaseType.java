@@ -5,7 +5,7 @@ import lombok.Getter;
 import org.dromara.common.core.utils.StringUtils;
 
 /**
- * 数据库类型
+ * Database type for the current delivery.
  *
  * @author Lion Li
  */
@@ -14,71 +14,35 @@ import org.dromara.common.core.utils.StringUtils;
 public enum DataBaseType {
 
     /**
-     * MySQL
-     */
-    MY_SQL("MySQL"),
-
-    /**
-     * Oracle
-     */
-    ORACLE("Oracle"),
-
-    /**
-     * PostgreSQL
-     */
-    POSTGRE_SQL("PostgreSQL"),
-
-    /**
-     * SQL Server
+     * SQL Server.
      */
     SQL_SERVER("Microsoft SQL Server");
 
     /**
-     * 数据库类型
+     * Database product name.
      */
     private final String type;
 
     /**
-     * 根据数据库产品名称查找对应的数据库类型
+     * Resolve and validate the configured database product.
      *
-     * @param databaseProductName 数据库产品名称
-     * @return 对应的数据库类型枚举值
+     * @param databaseProductName database product name from JDBC metadata
+     * @return current supported database type
      */
     public static DataBaseType find(String databaseProductName) {
         if (StringUtils.isBlank(databaseProductName)) {
-            return MY_SQL;
+            throw new IllegalArgumentException("Database product name is blank; SQL Server is required");
         }
         for (DataBaseType type : values()) {
             if (type.getType().equals(databaseProductName)) {
                 return type;
             }
         }
-        return MY_SQL;
+        throw new IllegalArgumentException("Unsupported database product: " + databaseProductName + "; SQL Server is required");
     }
 
     /**
-     * 判断是否为 MySQL 类型
-     */
-    public boolean isMySql() {
-        return this == MY_SQL;
-    }
-
-    /**
-     * 判断是否为 Oracle 类型
-     */
-    public boolean isOracle() {
-        return this == ORACLE;
-    }
-
-    /**
-     * 判断是否为 PostgreSQL 类型
-     */
-    public boolean isPostgreSql() {
-        return this == POSTGRE_SQL;
-    }
-
-    /**
-     * 判断是否为 SQL Server 类型
+     * Whether the database is SQL Server.
      */
     public boolean isSqlServer() {
         return this == SQL_SERVER;

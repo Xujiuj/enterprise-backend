@@ -47,7 +47,6 @@ rtk python tools\verify_sql_boundaries.py
 ruoyi-admin/                         Spring Boot application entrypoint
 ruoyi-common/                        Shared RuoYi common modules
 ruoyi-modules/carbon-enterprise/     Enterprise-owned carbon domain code
-script/sql/mysql/                    MySQL development schema and seed scripts
 script/sql/sqlserver/                SQL Server reporting and permission scripts
 docs/                                Enterprise backend specs and task plans
 ```

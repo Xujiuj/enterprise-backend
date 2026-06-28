@@ -74,36 +74,37 @@ public class CeOptionServiceImpl implements ICeOptionService {
         "intensity-denominator",
         "intensity-target",
         "denominator-fact",
-        "intensity-tolerance",
-        "report-template-download"
+        "intensity-tolerance"
     );
 
     private static final Set<String> ALLOWED_DIMENSION_FIELDS = Set.of(
         "recordCode",
         "recordName",
         "parentCode",
-        "field01",
-        "field02",
-        "field03",
-        "field04",
-        "field05",
-        "field06",
-        "field07",
-        "field08",
-        "field09",
-        "field10",
-        "field11",
-        "field12",
-        "field13",
-        "field14",
-        "field15",
-        "field16",
-        "field17",
-        "field18",
-        "field19",
-        "field20",
-        "field21",
-        "field22",
+        "companySk",
+        "factoryName",
+        "provinceCode",
+        "provinceName",
+        "factoryType",
+        "industrySectionCode",
+        "industrySectionName",
+        "industryDivisionCode",
+        "industryDivisionName",
+        "industryGroupCode",
+        "industryGroupName",
+        "industryClassCode",
+        "industryClassName",
+        "activeFlag",
+        "ghgScope",
+        "ghgScopeCategory",
+        "currentBaseFlag",
+        "factorVersion",
+        "divisionCode",
+        "divisionName",
+        "scopeKey",
+        "scopeName",
+        "enabledText",
+        "dataSource",
         "status"
     );
 
@@ -335,7 +336,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 continue;
             }
             String value = factoryType + ":" + targetYear;
-            String label = Stream.of(factoryType, targetYear, record.getField03(), record.getField04())
+            String label = Stream.of(factoryType, targetYear, record.getTargetValue(), record.getUnitName())
                 .map(this::normalizeValue)
                 .filter(StringUtils::isNotBlank)
                 .distinct()
@@ -507,28 +508,30 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "recordCode" -> record.getRecordCode();
             case "recordName" -> record.getRecordName();
             case "parentCode" -> record.getParentCode();
-            case "field01" -> record.getField01();
-            case "field02" -> record.getField02();
-            case "field03" -> record.getField03();
-            case "field04" -> record.getField04();
-            case "field05" -> record.getField05();
-            case "field06" -> record.getField06();
-            case "field07" -> record.getField07();
-            case "field08" -> record.getField08();
-            case "field09" -> record.getField09();
-            case "field10" -> record.getField10();
-            case "field11" -> record.getField11();
-            case "field12" -> record.getField12();
-            case "field13" -> record.getField13();
-            case "field14" -> record.getField14();
-            case "field15" -> record.getField15();
-            case "field16" -> record.getField16();
-            case "field17" -> record.getField17();
-            case "field18" -> record.getField18();
-            case "field19" -> record.getField19();
-            case "field20" -> record.getField20();
-            case "field21" -> record.getField21();
-            case "field22" -> record.getField22();
+            case "companySk" -> record.getCompanySk();
+            case "factoryName" -> record.getFactoryName();
+            case "provinceCode" -> record.getProvinceCode();
+            case "provinceName" -> record.getProvinceName();
+            case "factoryType" -> record.getFactoryType();
+            case "industrySectionCode" -> record.getIndustrySectionCode();
+            case "industrySectionName" -> record.getIndustrySectionName();
+            case "industryDivisionCode" -> record.getIndustryDivisionCode();
+            case "industryDivisionName" -> record.getIndustryDivisionName();
+            case "industryGroupCode" -> record.getIndustryGroupCode();
+            case "industryGroupName" -> record.getIndustryGroupName();
+            case "industryClassCode" -> record.getIndustryClassCode();
+            case "industryClassName" -> record.getIndustryClassName();
+            case "activeFlag" -> record.getActiveFlag();
+            case "ghgScope" -> record.getGhgScope();
+            case "ghgScopeCategory" -> record.getGhgScopeCategory();
+            case "currentBaseFlag" -> record.getCurrentBaseFlag();
+            case "factorVersion" -> record.getFactorVersion();
+            case "divisionCode" -> record.getDivisionCode();
+            case "divisionName" -> record.getDivisionName();
+            case "scopeKey" -> record.getScopeKey();
+            case "scopeName" -> record.getScopeName();
+            case "enabledText" -> record.getEnabledText();
+            case "dataSource" -> record.getDataSource();
             case "status" -> record.getStatus();
             default -> null;
         };

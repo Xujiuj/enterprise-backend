@@ -25,6 +25,7 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         addColumnIfMissing("ce_activity_data", "emission_source_id", "BIGINT NULL");
         addColumnIfMissing("ce_activity_data", "activity_period", "NVARCHAR(32) NULL");
         addColumnIfMissing("ce_activity_data", "factory_code", "NVARCHAR(64) NULL");
+        addUniqueConstraintIfMissing("ce_template_field", "uk_ce_template_field_business_code", "sheet_id, business_field_code");
         backfillSourceARelationshipColumns();
     }
 
@@ -43,6 +44,23 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
             log.info("[SchemaMigration] added {}.{} ({})", tableName, columnName, columnDef);
         } catch (Exception e) {
             log.warn("[SchemaMigration] failed to process {}.{}: {}", tableName, columnName, e.getMessage());
+        }
+    }
+
+    private void addUniqueConstraintIfMissing(String tableName, String constraintName, String columns) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys.key_constraints WHERE parent_object_id = OBJECT_ID(?) AND name = ? AND type = 'UQ'",
+                Integer.class, tableName, constraintName
+            );
+            if (count != null && count > 0) {
+                log.debug("[SchemaMigration] unique constraint {} exists, skipped", constraintName);
+                return;
+            }
+            jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD CONSTRAINT " + constraintName + " UNIQUE (" + columns + ")");
+            log.info("[SchemaMigration] added unique constraint {} on {} ({})", constraintName, tableName, columns);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] failed to add unique constraint {} on {}: {}", constraintName, tableName, e.getMessage());
         }
     }
 
