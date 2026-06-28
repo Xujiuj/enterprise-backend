@@ -68,7 +68,7 @@ public class CeReportTemplateFileServiceImpl implements ICeReportTemplateFileSer
     public void download(Long id, HttpServletResponse response) throws IOException {
         ReportTemplateDownload download = resolveDownload(id);
         if (!Files.isRegularFile(download.path(), LinkOption.NOFOLLOW_LINKS)) {
-            throw new ServiceException("report template file path must point to a file");
+            throw new ServiceException("报表模板路径必须指向文件");
         }
         FileUtils.setAttachmentResponseHeader(response, download.downloadFileName());
         response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE + "; charset=UTF-8");
@@ -105,42 +105,42 @@ public class CeReportTemplateFileServiceImpl implements ICeReportTemplateFileSer
     private ReportTemplateDownload resolveDownload(Long id) {
         CeReportTemplateFile record = reportTemplateFileMapper.selectById(id);
         if (record == null) {
-            throw new ServiceException("report template file record does not exist");
+            throw new ServiceException("报表模板记录不存在");
         }
         if (!Boolean.TRUE.equals(record.getEnabledFlag())) {
-            throw new ServiceException("report template file is disabled");
+            throw new ServiceException("报表模板已停用");
         }
         if (StringUtils.isBlank(record.getFilePath())) {
-            throw new ServiceException("report template file path cannot be blank");
+            throw new ServiceException("报表模板路径不能为空");
         }
 
         Path templateRoot = resolveTemplateRoot();
         Path normalizedPath = resolveTemplatePath(record.getFilePath(), templateRoot);
         if (Files.isDirectory(normalizedPath)) {
-            throw new ServiceException("report template file path must point to a file");
+            throw new ServiceException("报表模板路径必须指向文件");
         }
         if (!Files.exists(normalizedPath)) {
-            throw new ServiceException("report template file does not exist");
+            throw new ServiceException("报表模板文件不存在");
         }
         if (!Files.isReadable(normalizedPath)) {
-            throw new ServiceException("report template file is not readable");
+            throw new ServiceException("报表模板文件不可读取");
         }
         Path realFile = resolveRealPathWithinTemplateRoot(templateRoot, normalizedPath);
         if (!Files.isRegularFile(realFile, LinkOption.NOFOLLOW_LINKS)) {
-            throw new ServiceException("report template file path must point to a file");
+            throw new ServiceException("报表模板路径必须指向文件");
         }
 
         String physicalFileName = realFile.getFileName() == null ? "" : realFile.getFileName().toString();
         String downloadFileName = StringUtils.isNotBlank(record.getFileName()) ? record.getFileName().trim() : physicalFileName;
         if (StringUtils.isBlank(downloadFileName)) {
-            throw new ServiceException("report template download file name cannot be resolved");
+            throw new ServiceException("报表模板下载文件名无法解析");
         }
         return new ReportTemplateDownload(realFile, downloadFileName);
     }
 
     private Path resolveTemplateRoot() {
         if (StringUtils.isBlank(reportTemplateRoot)) {
-            throw new ServiceException("report template root is invalid");
+            throw new ServiceException("企业报表模板目录配置无效");
         }
         try {
             Path configuredRoot = Path.of(reportTemplateRoot.trim());
@@ -149,7 +149,7 @@ public class CeReportTemplateFileServiceImpl implements ICeReportTemplateFileSer
             }
             return Path.of("").toAbsolutePath().normalize().resolve(configuredRoot).normalize();
         } catch (InvalidPathException ex) {
-            throw new ServiceException("report template root is invalid");
+            throw new ServiceException("企业报表模板目录配置无效");
         }
     }
 
@@ -169,11 +169,11 @@ public class CeReportTemplateFileServiceImpl implements ICeReportTemplateFileSer
                 normalizedPath = templateRoot.resolve(relativePath).normalize();
             }
             if (!normalizedPath.startsWith(templateRoot)) {
-                throw new ServiceException("report template file path is outside template root");
+                throw new ServiceException("报表模板路径超出企业模板目录");
             }
             return normalizedPath;
         } catch (InvalidPathException ex) {
-            throw new ServiceException("report template file path is invalid");
+            throw new ServiceException("报表模板路径无效");
         }
     }
 
@@ -182,13 +182,13 @@ public class CeReportTemplateFileServiceImpl implements ICeReportTemplateFileSer
             Path realRoot = templateRoot.toRealPath();
             Path realFile = normalizedPath.toRealPath();
             if (!realFile.startsWith(realRoot)) {
-                throw new ServiceException("report template file path is outside template root");
+                throw new ServiceException("报表模板路径超出企业模板目录");
             }
             return realFile;
         } catch (ServiceException ex) {
             throw ex;
         } catch (IOException ex) {
-            throw new ServiceException("report template file path is outside template root");
+            throw new ServiceException("报表模板路径超出企业模板目录");
         }
     }
 

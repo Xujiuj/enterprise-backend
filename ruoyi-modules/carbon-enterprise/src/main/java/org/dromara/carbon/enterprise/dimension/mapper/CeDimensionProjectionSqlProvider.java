@@ -47,14 +47,15 @@ public class CeDimensionProjectionSqlProvider {
                        'admin-division' as dimension_code,
                        division_code as record_code,
                        division_name as record_name,
-                       null as parent_code,
-                       id as sort_order,
-                       '0' as status,
+                       parent_code as parent_code,
+                       level_type as level_type,
+                       coalesce(sort_order, id) as sort_order,
+                       coalesce(status, '0') as status,
                        create_time,
                        update_time,
                        remark
                   from ce_admin_division
-                 order by division_code
+                 order by coalesce(sort_order, id), division_code
                 """;
             case "company" -> """
                 select id,
@@ -91,9 +92,10 @@ public class CeDimensionProjectionSqlProvider {
                        'emission-source-category' as dimension_code,
                        business_key as record_code,
                        coalesce(unified_standard_category, ghg_scope_category, iso_category, gb_scope_category, business_key) as record_name,
-                       null as parent_code,
+                       parent_code as parent_code,
                        category_sk as category_sk,
                        business_key as business_key,
+                       category_name_en as category_name_en,
                        ghg_scope as ghg_scope,
                        cast(ghg_scope_category_sort as char) as ghg_scope_category_sort,
                        ghg_scope_category as ghg_scope_category,
@@ -111,13 +113,13 @@ public class CeDimensionProjectionSqlProvider {
                        is_current as current_flag,
                        version_no as version_no,
                        unified_standard_category as unified_standard_category,
-                       coalesce(ghg_scope_category_sort, id) as sort_order,
-                       case when is_current = 'Y' then '0' else '1' end as status,
+                       coalesce(sort_order, ghg_scope_category_sort, id) as sort_order,
+                       coalesce(status, case when is_current = 'Y' then '0' else '1' end) as status,
                        create_time,
                        update_time,
                        remark
                   from ce_emission_source_category
-                 order by coalesce(ghg_scope_category_sort, id), business_key
+                 order by coalesce(sort_order, ghg_scope_category_sort, id), business_key
                 """;
             case "base-year" -> """
                 select id,
@@ -125,15 +127,18 @@ public class CeDimensionProjectionSqlProvider {
                        factory_code as record_code,
                        coalesce(factory_name, factory_code) as record_name,
                        null as parent_code,
+                       base_year_key as base_year_key,
+                       description as description,
                        cast(base_year as char) as base_year,
+                       cast(is_current as char) as is_current,
                        case when enabled_flag = 1 then 'Y' else 'N' end as current_base_flag,
-                       id as sort_order,
-                       case when enabled_flag = 1 then '0' else '1' end as status,
+                       coalesce(sort_order, id) as sort_order,
+                       coalesce(status, case when enabled_flag = 1 then '0' else '1' end) as status,
                        create_time,
                        update_time,
                        remark
                   from ce_base_year
-                 order by factory_code, base_year
+                 order by coalesce(sort_order, id), factory_code, base_year
                 """;
             case "ef-factor" -> """
                 select id,
@@ -184,13 +189,13 @@ public class CeDimensionProjectionSqlProvider {
                        cast(national_factor as char) as national_factor,
                        cast(non_fossil_excluded_factor as char) as non_fossil_excluded_factor,
                        cast(national_fossil_power_factor as char) as national_fossil_power_factor,
-                       id as sort_order,
-                       '0' as status,
+                       coalesce(sort_order, id) as sort_order,
+                       coalesce(status, '0') as status,
                        create_time,
                        update_time,
                        remark
                   from ce_electricity_factor
-                 order by factor_version, division_code
+                 order by coalesce(sort_order, id), factor_version, division_code
                 """;
             case "ef-electricity-version" -> """
                 select id,
@@ -200,13 +205,13 @@ public class CeDimensionProjectionSqlProvider {
                        null as parent_code,
                        factor_version as factor_version,
                        cast(effective_year as char) as effective_year,
-                       id as sort_order,
-                       '0' as status,
+                       coalesce(sort_order, id) as sort_order,
+                       coalesce(status, '0') as status,
                        create_time,
                        update_time,
                        remark
                   from ce_electricity_factor_version_map
-                 order by effective_year asc, factor_version asc
+                 order by coalesce(sort_order, id), effective_year asc, factor_version asc
                 """;
             case "ef-electricity-scope" -> """
                 select id,
@@ -216,13 +221,13 @@ public class CeDimensionProjectionSqlProvider {
                        null as parent_code,
                        scope_key as scope_key,
                        scope_name as scope_name,
-                       id as sort_order,
-                       '0' as status,
+                       coalesce(sort_order, id) as sort_order,
+                       coalesce(status, '0') as status,
                        create_time,
                        update_time,
                        remark
                   from ce_electricity_factor_scope
-                 order by scope_key
+                 order by coalesce(sort_order, id), scope_key
                 """;
             case "greenhouse-gas" -> """
                 select id,
@@ -231,13 +236,16 @@ public class CeDimensionProjectionSqlProvider {
                        gas_name as record_name,
                        null as parent_code,
                        gas_name_en as gas_name_en,
-                       id as sort_order,
-                       '0' as status,
+                       cast(gwp_value as char) as gwp_value,
+                       gwp_version as gwp_version,
+                       chemical_formula as chemical_formula,
+                       coalesce(sort_order, id) as sort_order,
+                       coalesce(status, '0') as status,
                        create_time,
                        update_time,
                        remark
                   from ce_greenhouse_gas
-                 order by gas_code
+                 order by coalesce(sort_order, id), gas_code
                 """;
             case "intensity-denominator" -> """
                 select id,

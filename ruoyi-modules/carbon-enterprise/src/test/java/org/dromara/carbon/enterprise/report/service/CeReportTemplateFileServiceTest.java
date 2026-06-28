@@ -87,7 +87,7 @@ class CeReportTemplateFileServiceTest {
 
         assertThatThrownBy(() -> service.download(3L, new MockHttpServletResponse()))
             .isInstanceOf(ServiceException.class)
-            .hasMessage("report template file record does not exist");
+            .hasMessage("报表模板记录不存在");
     }
 
     @Test
@@ -99,7 +99,7 @@ class CeReportTemplateFileServiceTest {
 
         assertThatThrownBy(() -> service.download(4L, new MockHttpServletResponse()))
             .isInstanceOf(ServiceException.class)
-            .hasMessage("report template file is disabled");
+            .hasMessage("报表模板已停用");
     }
 
     @Test
@@ -111,7 +111,7 @@ class CeReportTemplateFileServiceTest {
 
         assertThatThrownBy(() -> service.download(5L, new MockHttpServletResponse()))
             .isInstanceOf(ServiceException.class)
-            .hasMessage("report template file path cannot be blank");
+            .hasMessage("报表模板路径不能为空");
     }
 
     @Test
@@ -124,7 +124,7 @@ class CeReportTemplateFileServiceTest {
 
         assertThatThrownBy(() -> service.download(6L, new MockHttpServletResponse()))
             .isInstanceOf(ServiceException.class)
-            .hasMessage("report template file path must point to a file");
+            .hasMessage("报表模板路径必须指向文件");
     }
 
     @Test
@@ -137,7 +137,7 @@ class CeReportTemplateFileServiceTest {
 
         assertThatThrownBy(() -> service.download(7L, new MockHttpServletResponse()))
             .isInstanceOf(ServiceException.class)
-            .hasMessage("report template file does not exist");
+            .hasMessage("报表模板文件不存在");
     }
 
     @Test
@@ -156,7 +156,7 @@ class CeReportTemplateFileServiceTest {
 
             assertThatThrownBy(() -> service.download(8L, new MockHttpServletResponse()))
                 .isInstanceOf(ServiceException.class)
-                .hasMessage("report template file is not readable");
+                .hasMessage("报表模板文件不可读取");
         }
     }
 
@@ -174,7 +174,7 @@ class CeReportTemplateFileServiceTest {
 
             assertThatThrownBy(() -> service.download(9L, new MockHttpServletResponse()))
                 .isInstanceOf(ServiceException.class)
-                .hasMessage("report template file path is invalid");
+                .hasMessage("报表模板路径无效");
         }
     }
 
@@ -190,7 +190,7 @@ class CeReportTemplateFileServiceTest {
 
         assertThatThrownBy(() -> service.download(10L, new MockHttpServletResponse()))
             .isInstanceOf(ServiceException.class)
-            .hasMessage("report template file path is outside template root");
+            .hasMessage("报表模板路径超出企业模板目录");
     }
 
     @Test
@@ -213,7 +213,7 @@ class CeReportTemplateFileServiceTest {
 
         assertThatThrownBy(() -> service.download(11L, new MockHttpServletResponse()))
             .isInstanceOf(ServiceException.class)
-            .hasMessage("report template file path is outside template root");
+            .hasMessage("报表模板路径超出企业模板目录");
     }
 
     @Test

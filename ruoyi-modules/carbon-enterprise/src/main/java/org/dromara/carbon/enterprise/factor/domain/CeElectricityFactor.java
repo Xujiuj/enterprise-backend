@@ -54,6 +54,12 @@ public class CeElectricityFactor implements Serializable {
     /** 全国化石电力因子 */
     private BigDecimal nationalFossilPowerFactor;
 
+    /** 厂商排序号 */
+    private Integer sortOrder;
+
+    /** 厂商状态 */
+    private String status;
+
     /** 创建时间 */
     private Date createTime;
 

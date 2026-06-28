@@ -53,7 +53,7 @@ class HttpCeVendorReportTemplateOpenClientTest {
         ServiceException exception = assertThrows(ServiceException.class,
             () -> client.downloadTemplateFile("TOKEN-001"));
 
-        assertEquals("report template file does not exist", exception.getMessage());
+        assertEquals("厂商报表模板文件不存在", exception.getMessage());
         server.verify();
     }
 

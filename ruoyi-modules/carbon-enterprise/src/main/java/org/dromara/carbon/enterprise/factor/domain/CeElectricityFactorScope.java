@@ -29,6 +29,12 @@ public class CeElectricityFactorScope implements Serializable {
     /** 范围名称 */
     private String scopeName;
 
+    /** 厂商排序号 */
+    private Integer sortOrder;
+
+    /** 厂商状态 */
+    private String status;
+
     /** 创建时间 */
     private Date createTime;
 

@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.Date;
 
 /**
@@ -31,6 +32,21 @@ public class CeGreenhouseGas implements Serializable {
 
     /** 气体英文名称 */
     private String gasNameEn;
+
+    /** 全球变暖潜势值 */
+    private BigDecimal gwpValue;
+
+    /** GWP版本 */
+    private String gwpVersion;
+
+    /** 化学式 */
+    private String chemicalFormula;
+
+    /** 厂商排序号 */
+    private Integer sortOrder;
+
+    /** 厂商状态 */
+    private String status;
 
     /** 创建时间 */
     private Date createTime;

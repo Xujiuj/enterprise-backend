@@ -29,6 +29,12 @@ public class CeElectricityFactorVersionMap implements Serializable {
     /** 生效年度 */
     private Integer effectiveYear;
 
+    /** 厂商排序号 */
+    private Integer sortOrder;
+
+    /** 厂商状态 */
+    private String status;
+
     /** 创建时间 */
     private Date createTime;
 

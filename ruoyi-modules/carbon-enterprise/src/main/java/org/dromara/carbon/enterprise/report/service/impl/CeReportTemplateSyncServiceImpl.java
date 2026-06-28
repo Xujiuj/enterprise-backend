@@ -73,14 +73,14 @@ public class CeReportTemplateSyncServiceImpl implements ICeReportTemplateSyncSer
             .orderByDesc(CeLicenseState::getLastVerifiedTime)
             .orderByDesc(CeLicenseState::getId));
         CeLicenseState license = states.stream().findFirst()
-            .orElseThrow(() -> new ServiceException("valid license state does not exist"));
+            .orElseThrow(() -> new ServiceException("未找到有效的许可证状态"));
         if (StringUtils.isBlank(license.getLicenseId()) || StringUtils.isBlank(license.getInstallId())) {
-            throw new ServiceException("valid license state is incomplete");
+            throw new ServiceException("许可证状态信息不完整");
         }
         Date now = new Date();
         if ((license.getValidFrom() != null && license.getValidFrom().after(now))
             || (license.getValidTo() != null && license.getValidTo().before(now))) {
-            throw new ServiceException("valid license state is not currently valid");
+            throw new ServiceException("许可证当前不在有效期内");
         }
         return license;
     }
@@ -90,7 +90,7 @@ public class CeReportTemplateSyncServiceImpl implements ICeReportTemplateSyncSer
         CeVendorReportTemplateRecord template
     ) {
         if (template == null || template.getTemplateId() == null) {
-            throw new ServiceException("vendor report template list response is incomplete");
+            throw new ServiceException("厂商报表模板列表响应不完整");
         }
         CeVendorReportTemplateDownloadResponse download = vendorReportTemplateOpenClient.downloadTemplate(
             template.getTemplateId(),
@@ -105,7 +105,7 @@ public class CeReportTemplateSyncServiceImpl implements ICeReportTemplateSyncSer
         validateDownloadToken(download);
         byte[] content = vendorReportTemplateOpenClient.downloadTemplateFile(download.getDownloadToken());
         if (content == null || content.length == 0) {
-            throw new ServiceException("vendor report template file content is empty");
+            throw new ServiceException("厂商报表模板文件内容为空");
         }
         Path root = resolveTemplateRoot();
         String fileName = safeFileName(download.getFileName());
@@ -113,13 +113,13 @@ public class CeReportTemplateSyncServiceImpl implements ICeReportTemplateSyncSer
             + "-" + download.getTemplateId() + "-" + fileName;
         Path targetPath = root.resolve(relativePath).normalize();
         if (!targetPath.startsWith(root)) {
-            throw new ServiceException("report template target path is outside template root");
+            throw new ServiceException("报表模板目标路径超出企业模板目录");
         }
         try {
             Files.createDirectories(targetPath.getParent());
             writeAtomically(targetPath, content);
         } catch (IOException ex) {
-            throw new ServiceException("report template file cannot be materialized locally");
+            throw new ServiceException("报表模板文件无法保存到企业本地目录");
         }
         return new MaterializedTemplate(download, relativePath);
     }
@@ -174,7 +174,7 @@ public class CeReportTemplateSyncServiceImpl implements ICeReportTemplateSyncSer
         if (response == null
             || !license.getLicenseId().equals(response.getLicenseId())
             || response.getTemplates() == null) {
-            throw new ServiceException("vendor report template list response is incomplete");
+            throw new ServiceException("厂商报表模板列表响应不完整");
         }
     }
 
@@ -189,19 +189,19 @@ public class CeReportTemplateSyncServiceImpl implements ICeReportTemplateSyncSer
             || StringUtils.isBlank(response.getTemplateCode())
             || StringUtils.isBlank(response.getTemplateName())
             || StringUtils.isBlank(response.getFileName())) {
-            throw new ServiceException("vendor report template download response is incomplete");
+            throw new ServiceException("厂商报表模板下载授权响应不完整");
         }
     }
 
     private void validateDownloadToken(CeVendorReportTemplateDownloadResponse response) {
         if (response == null || StringUtils.isBlank(response.getDownloadToken())) {
-            throw new ServiceException("vendor report template download token is missing");
+            throw new ServiceException("厂商报表模板下载凭证缺失");
         }
     }
 
     private Path resolveTemplateRoot() {
         if (StringUtils.isBlank(reportTemplateRoot)) {
-            throw new ServiceException("report template root is invalid");
+            throw new ServiceException("企业报表模板目录配置无效");
         }
         try {
             Path configuredRoot = Path.of(reportTemplateRoot.trim());
@@ -210,17 +210,17 @@ public class CeReportTemplateSyncServiceImpl implements ICeReportTemplateSyncSer
             }
             return Path.of("").toAbsolutePath().normalize().resolve(configuredRoot).normalize();
         } catch (InvalidPathException ex) {
-            throw new ServiceException("report template root is invalid");
+            throw new ServiceException("企业报表模板目录配置无效");
         }
     }
 
     private String safeFileName(String value) {
         if (StringUtils.isBlank(value)) {
-            throw new ServiceException("report template file name is invalid");
+            throw new ServiceException("报表模板文件名无效");
         }
         String safe = value.trim().replaceAll("[^a-zA-Z0-9._-]", "_");
         if (StringUtils.isBlank(safe) || ".".equals(safe) || "..".equals(safe)) {
-            throw new ServiceException("report template file name is invalid");
+            throw new ServiceException("报表模板文件名无效");
         }
         return safe;
     }

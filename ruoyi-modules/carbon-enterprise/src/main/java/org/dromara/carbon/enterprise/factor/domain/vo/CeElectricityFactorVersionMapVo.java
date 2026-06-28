@@ -24,6 +24,10 @@ public class CeElectricityFactorVersionMapVo implements Serializable {
 
     private Integer effectiveYear;
 
+    private Integer sortOrder;
+
+    private String status;
+
     private Date createTime;
 
     private Date updateTime;

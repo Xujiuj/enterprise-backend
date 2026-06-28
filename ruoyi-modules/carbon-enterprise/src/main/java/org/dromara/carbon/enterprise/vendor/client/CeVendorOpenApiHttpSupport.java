@@ -107,6 +107,19 @@ public class CeVendorOpenApiHttpSupport {
     }
 
     private String stableMessage(String message, String fallback) {
-        return StringUtils.isBlank(message) ? fallback : message;
+        if (StringUtils.isBlank(message)) {
+            return fallback;
+        }
+        if (message.startsWith("Unsupported vendor dimension code")) {
+            return "厂商不支持该维度编码";
+        }
+        return switch (message) {
+            case "report template file does not exist" -> "厂商报表模板文件不存在";
+            case "license entitlement does not exist" -> "厂商授权不存在";
+            case "license entitlement is revoked" -> "厂商授权已撤销";
+            case "license entitlement is not currently valid" -> "厂商授权当前不在有效期内";
+            case "dimensionCode cannot be blank" -> "维度编码不能为空";
+            default -> message;
+        };
     }
 }

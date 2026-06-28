@@ -115,7 +115,7 @@ class CeReportTemplateSyncServiceTest {
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.syncCurrentLicenseReportTemplates());
 
-        assertEquals("vendor report template download token is missing", exception.getMessage());
+        assertEquals("厂商报表模板下载凭证缺失", exception.getMessage());
         verify(reportTemplateFileMapper, never()).insert(any(CeReportTemplateFile.class));
         verify(reportTemplateFileMapper, never()).updateById(any(CeReportTemplateFile.class));
     }
@@ -127,7 +127,7 @@ class CeReportTemplateSyncServiceTest {
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.syncCurrentLicenseReportTemplates());
 
-        assertEquals("valid license state does not exist", exception.getMessage());
+        assertEquals("未找到有效的许可证状态", exception.getMessage());
         verify(vendorReportTemplateOpenClient, never()).listTemplates(any(), any());
     }
 

@@ -52,7 +52,7 @@ public class HttpCeVendorReportTemplateOpenClient implements CeVendorReportTempl
     @Override
     public CeVendorReportTemplateDownloadResponse downloadTemplate(Long templateId, String licenseId, String installId) {
         if (templateId == null) {
-            throw new ServiceException("vendor report template id cannot be null");
+            throw new ServiceException("厂商报表模板ID不能为空");
         }
         String url = httpSupport.baseBuilder(vendorOpenBaseUrl)
             .path("/open/report-templates/{id}/download")
@@ -73,7 +73,7 @@ public class HttpCeVendorReportTemplateOpenClient implements CeVendorReportTempl
     @Override
     public byte[] downloadTemplateFile(String downloadToken) {
         if (StringUtils.isBlank(downloadToken)) {
-            throw new ServiceException("vendor report template download token cannot be blank");
+            throw new ServiceException("厂商报表模板下载凭证不能为空");
         }
         String url = httpSupport.baseBuilder(vendorOpenBaseUrl)
             .path("/open/report-templates/download-tokens/{token}")
@@ -88,10 +88,10 @@ public class HttpCeVendorReportTemplateOpenClient implements CeVendorReportTempl
         );
         byte[] body = response.getBody();
         if (body == null || body.length == 0) {
-            throw new ServiceException("vendor report template file download failed");
+            throw new ServiceException("厂商报表模板文件下载失败");
         }
         if (!response.getStatusCode().is2xxSuccessful()) {
-            throw new ServiceException("vendor report template file download failed");
+            throw new ServiceException("厂商报表模板文件下载失败");
         }
         if (isJsonResponse(response.getHeaders().getContentType()) || looksLikeJson(body)) {
             throw new ServiceException(vendorDownloadErrorMessage(body));
@@ -121,11 +121,20 @@ public class HttpCeVendorReportTemplateOpenClient implements CeVendorReportTempl
             Map<?, ?> payload = OBJECT_MAPPER.readValue(body, Map.class);
             Object message = payload.get("msg");
             if (message != null && StringUtils.isNotBlank(message.toString())) {
-                return message.toString();
+                return translateVendorMessage(message.toString());
             }
         } catch (IOException | RuntimeException ignored) {
             // Fall through to a stable generic error for non-R JSON bodies.
         }
-        return "vendor report template file download failed";
+        return "厂商报表模板文件下载失败";
+    }
+
+    private String translateVendorMessage(String message) {
+        return switch (message) {
+            case "report template file does not exist" -> "厂商报表模板文件不存在";
+            case "vendor report template file download failed" -> "厂商报表模板文件下载失败";
+            case "vendor report template download token cannot be blank" -> "厂商报表模板下载凭证不能为空";
+            default -> message;
+        };
     }
 }

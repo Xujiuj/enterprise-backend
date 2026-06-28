@@ -29,6 +29,18 @@ public class CeAdminDivision implements Serializable {
     /** 行政区划名称 */
     private String divisionName;
 
+    /** 上级行政区划编码 */
+    private String parentCode;
+
+    /** 区划层级类型 */
+    private String levelType;
+
+    /** 厂商排序号 */
+    private Integer sortOrder;
+
+    /** 厂商状态 */
+    private String status;
+
     /** 创建时间 */
     private Date createTime;
 

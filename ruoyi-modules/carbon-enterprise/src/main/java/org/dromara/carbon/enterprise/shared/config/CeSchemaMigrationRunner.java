@@ -25,6 +25,8 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         addColumnIfMissing("ce_activity_data", "emission_source_id", "BIGINT NULL");
         addColumnIfMissing("ce_activity_data", "activity_period", "NVARCHAR(32) NULL");
         addColumnIfMissing("ce_activity_data", "factory_code", "NVARCHAR(64) NULL");
+        addColumnIfMissing("ce_template_field", "business_field_code", "NVARCHAR(64) NULL");
+        backfillTemplateFieldBusinessCode();
         addUniqueConstraintIfMissing("ce_template_field", "uk_ce_template_field_business_code", "sheet_id, business_field_code");
         backfillSourceARelationshipColumns();
     }
@@ -86,6 +88,33 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
              """);
         } catch (Exception e) {
             log.warn("[SchemaMigration] Source(A) relationship column backfill skipped: {}", e.getMessage());
+        }
+    }
+
+    private void backfillTemplateFieldBusinessCode() {
+        try {
+            Integer legacyColumnCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = SCHEMA_NAME() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, "ce_template_field", "target_column_code"
+            );
+            if (legacyColumnCount != null && legacyColumnCount > 0) {
+                jdbcTemplate.update("""
+                    UPDATE ce_template_field
+                       SET business_field_code = COALESCE(NULLIF(target_column_code, ''), NULLIF(original_field_name, ''))
+                     WHERE (business_field_code IS NULL OR business_field_code = '')
+                    """);
+            } else {
+                jdbcTemplate.update("""
+                    UPDATE ce_template_field
+                       SET business_field_code = original_field_name
+                     WHERE (business_field_code IS NULL OR business_field_code = '')
+                       AND original_field_name IS NOT NULL
+                       AND original_field_name <> ''
+                    """);
+            }
+            log.info("[SchemaMigration] backfilled ce_template_field.business_field_code");
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] ce_template_field business code backfill skipped: {}", e.getMessage());
         }
     }
 }

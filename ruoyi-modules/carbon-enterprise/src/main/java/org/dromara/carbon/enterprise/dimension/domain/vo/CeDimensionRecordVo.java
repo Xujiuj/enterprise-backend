@@ -57,9 +57,13 @@ public class CeDimensionRecordVo implements Serializable {
 
     private String activeFlag;
 
+    private String levelType;
+
     private String categorySk;
 
     private String businessKey;
+
+    private String categoryNameEn;
 
     private String ghgScope;
 
@@ -92,6 +96,12 @@ public class CeDimensionRecordVo implements Serializable {
     private String unifiedStandardCategory;
 
     private String baseYear;
+
+    private String baseYearKey;
+
+    private String description;
+
+    private String isCurrent;
 
     private String currentBaseFlag;
 
@@ -160,6 +170,12 @@ public class CeDimensionRecordVo implements Serializable {
     private String scopeName;
 
     private String gasNameEn;
+
+    private String gwpValue;
+
+    private String gwpVersion;
+
+    private String chemicalFormula;
 
     private String denominatorType;
 

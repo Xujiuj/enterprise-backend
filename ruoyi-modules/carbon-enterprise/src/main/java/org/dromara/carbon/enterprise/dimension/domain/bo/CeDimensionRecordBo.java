@@ -64,7 +64,17 @@ public class CeDimensionRecordBo implements Serializable {
 
     private String activeFlag;
 
+    private String levelType;
+
+    private String categoryNameEn;
+
     private String baseYear;
+
+    private String baseYearKey;
+
+    private String description;
+
+    private String isCurrent;
 
     private String currentBaseFlag;
 
@@ -109,6 +119,12 @@ public class CeDimensionRecordBo implements Serializable {
     private String factorUnit;
 
     private String effectiveYear;
+
+    private String gwpValue;
+
+    private String gwpVersion;
+
+    private String chemicalFormula;
 
     private String denominatorType;
 

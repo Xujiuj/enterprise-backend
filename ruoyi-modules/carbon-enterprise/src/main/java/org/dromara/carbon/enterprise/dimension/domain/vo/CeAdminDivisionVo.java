@@ -24,6 +24,14 @@ public class CeAdminDivisionVo implements Serializable {
 
     private String divisionName;
 
+    private String parentCode;
+
+    private String levelType;
+
+    private Integer sortOrder;
+
+    private String status;
+
     private Date createTime;
 
     private Date updateTime;

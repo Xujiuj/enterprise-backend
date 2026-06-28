@@ -185,10 +185,18 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             CeAdminDivision entity = new CeAdminDivision();
             entity.setDivisionCode(divisionCode);
             entity.setDivisionName(record.getRecordName());
+            entity.setParentCode(record.getParentCode());
+            entity.setLevelType(record.getLevelType());
+            entity.setSortOrder(record.getSortOrder());
+            entity.setStatus(record.getStatus());
             entity.setRemark(record.getRemark());
             adminDivisionMapper.insert(entity);
         } else {
             existing.setDivisionName(record.getRecordName());
+            existing.setParentCode(record.getParentCode());
+            existing.setLevelType(record.getLevelType());
+            existing.setSortOrder(record.getSortOrder());
+            existing.setStatus(record.getStatus());
             existing.setUpdateTime(new Date());
             existing.setRemark(record.getRemark());
             adminDivisionMapper.updateById(existing);
@@ -207,6 +215,8 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             CeEmissionSourceCategory entity = new CeEmissionSourceCategory();
             entity.setCategorySk(record.getCategorySk());
             entity.setBusinessKey(businessKey);
+            entity.setParentCode(record.getParentCode());
+            entity.setCategoryNameEn(record.getCategoryNameEn());
             entity.setGhgScope(record.getGhgScope());
             entity.setGhgScopeCategorySort(record.getGhgScopeCategorySort());
             entity.setGhgScopeCategory(record.getGhgScopeCategory());
@@ -224,10 +234,14 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             entity.setIsCurrent(record.getCurrentFlag());
             entity.setVersionNo(record.getVersionNo());
             entity.setUnifiedStandardCategory(record.getStandardCategory());
+            entity.setSortOrder(record.getSortOrder());
+            entity.setStatus(record.getStatus());
             entity.setRemark(record.getRemark());
             emissionSourceCategoryMapper.insert(entity);
         } else {
             existing.setCategorySk(record.getCategorySk());
+            existing.setParentCode(record.getParentCode());
+            existing.setCategoryNameEn(record.getCategoryNameEn());
             existing.setGhgScope(record.getGhgScope());
             existing.setGhgScopeCategorySort(record.getGhgScopeCategorySort());
             existing.setGhgScopeCategory(record.getGhgScopeCategory());
@@ -245,6 +259,8 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             existing.setIsCurrent(record.getCurrentFlag());
             existing.setVersionNo(record.getVersionNo());
             existing.setUnifiedStandardCategory(record.getStandardCategory());
+            existing.setSortOrder(record.getSortOrder());
+            existing.setStatus(record.getStatus());
             existing.setRemark(record.getRemark());
             emissionSourceCategoryMapper.updateById(existing);
         }
@@ -262,14 +278,24 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             CeBaseYear entity = new CeBaseYear();
             entity.setFactoryCode(factoryCode);
             entity.setFactoryName(record.getRecordName());
+            entity.setBaseYearKey(record.getBaseYearKey());
+            entity.setDescription(record.getDescription());
             entity.setBaseYear(record.getBaseYear());
+            entity.setIsCurrent(record.getIsCurrent());
             entity.setEnabledFlag(record.getIsCurrent() != null && record.getIsCurrent() == 0 || "1".equals(record.getStatus()) ? 0 : 1);
+            entity.setSortOrder(record.getSortOrder());
+            entity.setStatus(record.getStatus());
             entity.setRemark(record.getRemark());
             baseYearMapper.insert(entity);
         } else {
             existing.setFactoryName(record.getRecordName());
+            existing.setBaseYearKey(record.getBaseYearKey());
+            existing.setDescription(record.getDescription());
             existing.setBaseYear(record.getBaseYear());
+            existing.setIsCurrent(record.getIsCurrent());
             existing.setEnabledFlag(record.getIsCurrent() != null && record.getIsCurrent() == 0 || "1".equals(record.getStatus()) ? 0 : 1);
+            existing.setSortOrder(record.getSortOrder());
+            existing.setStatus(record.getStatus());
             existing.setUpdateTime(new Date());
             existing.setRemark(record.getRemark());
             baseYearMapper.updateById(existing);
@@ -296,6 +322,8 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             entity.setNationalFactor(record.getNationalFactor());
             entity.setNonFossilExcludedFactor(record.getNonFossilExcludedFactor());
             entity.setNationalFossilPowerFactor(record.getNationalFossilPowerFactor());
+            entity.setSortOrder(record.getSortOrder());
+            entity.setStatus(record.getStatus());
             entity.setRemark(record.getRemark());
             electricityFactorMapper.insert(entity);
         } else {
@@ -308,6 +336,8 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             existing.setNationalFactor(record.getNationalFactor());
             existing.setNonFossilExcludedFactor(record.getNonFossilExcludedFactor());
             existing.setNationalFossilPowerFactor(record.getNationalFossilPowerFactor());
+            existing.setSortOrder(record.getSortOrder());
+            existing.setStatus(record.getStatus());
             existing.setUpdateTime(new Date());
             existing.setRemark(record.getRemark());
             electricityFactorMapper.updateById(existing);
@@ -326,10 +356,14 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             CeElectricityFactorVersionMap entity = new CeElectricityFactorVersionMap();
             entity.setFactorVersion(factorVersion);
             entity.setEffectiveYear(record.getEffectiveYear());
+            entity.setSortOrder(record.getSortOrder());
+            entity.setStatus(record.getStatus());
             entity.setRemark(record.getRemark());
             electricityFactorVersionMapMapper.insert(entity);
         } else {
             existing.setEffectiveYear(record.getEffectiveYear());
+            existing.setSortOrder(record.getSortOrder());
+            existing.setStatus(record.getStatus());
             existing.setUpdateTime(new Date());
             existing.setRemark(record.getRemark());
             electricityFactorVersionMapMapper.updateById(existing);
@@ -348,10 +382,14 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             CeElectricityFactorScope entity = new CeElectricityFactorScope();
             entity.setScopeKey(scopeKey);
             entity.setScopeName(record.getRecordName());
+            entity.setSortOrder(record.getSortOrder());
+            entity.setStatus(record.getStatus());
             entity.setRemark(record.getRemark());
             electricityFactorScopeMapper.insert(entity);
         } else {
             existing.setScopeName(record.getRecordName());
+            existing.setSortOrder(record.getSortOrder());
+            existing.setStatus(record.getStatus());
             existing.setUpdateTime(new Date());
             existing.setRemark(record.getRemark());
             electricityFactorScopeMapper.updateById(existing);
@@ -371,11 +409,21 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             entity.setGasCode(gasCode);
             entity.setGasName(record.getRecordName());
             entity.setGasNameEn(record.getGasNameEn());
+            entity.setGwpValue(record.getGwpValue());
+            entity.setGwpVersion(record.getGwpVersion());
+            entity.setChemicalFormula(record.getChemicalFormula());
+            entity.setSortOrder(record.getSortOrder());
+            entity.setStatus(record.getStatus());
             entity.setRemark(record.getRemark());
             greenhouseGasMapper.insert(entity);
         } else {
             existing.setGasName(record.getRecordName());
             existing.setGasNameEn(record.getGasNameEn());
+            existing.setGwpValue(record.getGwpValue());
+            existing.setGwpVersion(record.getGwpVersion());
+            existing.setChemicalFormula(record.getChemicalFormula());
+            existing.setSortOrder(record.getSortOrder());
+            existing.setStatus(record.getStatus());
             existing.setUpdateTime(new Date());
             existing.setRemark(record.getRemark());
             greenhouseGasMapper.updateById(existing);

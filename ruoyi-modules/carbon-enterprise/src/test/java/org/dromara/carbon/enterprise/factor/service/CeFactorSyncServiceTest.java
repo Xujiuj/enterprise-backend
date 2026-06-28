@@ -114,7 +114,7 @@ class CeFactorSyncServiceTest {
 
         ServiceException exception = assertThrows(ServiceException.class, () -> service.syncCurrentLicenseFactors());
 
-        assertEquals("valid license state does not exist", exception.getMessage());
+        assertEquals("未找到有效的许可证状态", exception.getMessage());
         verify(vendorFactorOpenClient, never()).syncFactors(any(), any(), any());
     }
 

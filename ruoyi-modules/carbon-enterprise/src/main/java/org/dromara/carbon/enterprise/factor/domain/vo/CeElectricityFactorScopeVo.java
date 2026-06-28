@@ -24,6 +24,10 @@ public class CeElectricityFactorScopeVo implements Serializable {
 
     private String scopeName;
 
+    private Integer sortOrder;
+
+    private String status;
+
     private Date createTime;
 
     private Date updateTime;

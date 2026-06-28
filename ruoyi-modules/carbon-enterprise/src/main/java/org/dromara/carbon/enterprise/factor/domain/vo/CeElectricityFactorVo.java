@@ -41,6 +41,10 @@ public class CeElectricityFactorVo implements Serializable {
 
     private BigDecimal nationalFossilPowerFactor;
 
+    private Integer sortOrder;
+
+    private String status;
+
     private Date createTime;
 
     private Date updateTime;

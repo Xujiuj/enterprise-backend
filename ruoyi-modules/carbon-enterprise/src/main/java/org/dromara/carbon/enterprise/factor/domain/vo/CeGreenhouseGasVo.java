@@ -6,6 +6,7 @@ import org.dromara.carbon.enterprise.factor.domain.CeGreenhouseGas;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.Date;
 
 /**
@@ -25,6 +26,16 @@ public class CeGreenhouseGasVo implements Serializable {
     private String gasName;
 
     private String gasNameEn;
+
+    private BigDecimal gwpValue;
+
+    private String gwpVersion;
+
+    private String chemicalFormula;
+
+    private Integer sortOrder;
+
+    private String status;
 
     private Date createTime;
 

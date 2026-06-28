@@ -60,14 +60,14 @@ public class CeFactorSyncServiceImpl implements ICeFactorSyncService {
             .orderByDesc(CeLicenseState::getLastVerifiedTime)
             .orderByDesc(CeLicenseState::getId));
         CeLicenseState license = states.stream().findFirst()
-            .orElseThrow(() -> new ServiceException("valid license state does not exist"));
+            .orElseThrow(() -> new ServiceException("未找到有效的许可证状态"));
         if (StringUtils.isBlank(license.getLicenseId()) || StringUtils.isBlank(license.getInstallId())) {
-            throw new ServiceException("valid license state is incomplete");
+            throw new ServiceException("许可证状态信息不完整");
         }
         Date now = new Date();
         if ((license.getValidFrom() != null && license.getValidFrom().after(now))
             || (license.getValidTo() != null && license.getValidTo().before(now))) {
-            throw new ServiceException("valid license state is not currently valid");
+            throw new ServiceException("许可证当前不在有效期内");
         }
         return license;
     }

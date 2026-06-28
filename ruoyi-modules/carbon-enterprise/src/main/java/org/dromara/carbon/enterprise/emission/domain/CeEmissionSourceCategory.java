@@ -28,6 +28,12 @@ public class CeEmissionSourceCategory implements Serializable {
     /** 业务编码 */
     private String businessKey;
 
+    /** 上级分类编码 */
+    private String parentCode;
+
+    /** 分类英文名称 */
+    private String categoryNameEn;
+
     /** GHG范围 */
     private String ghgScope;
 
@@ -78,6 +84,12 @@ public class CeEmissionSourceCategory implements Serializable {
 
     /** 统一标准分类 */
     private String unifiedStandardCategory;
+
+    /** 厂商排序号 */
+    private Integer sortOrder;
+
+    /** 厂商状态 */
+    private String status;
 
     /** 备注 */
     private String remark;

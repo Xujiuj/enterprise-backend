@@ -29,11 +29,26 @@ public class CeBaseYear implements Serializable {
     /** 工厂名称 */
     private String factoryName;
 
+    /** 厂商基准年业务键 */
+    private String baseYearKey;
+
+    /** 厂商描述 */
+    private String description;
+
     /** 基准年 */
     private Integer baseYear;
 
+    /** 厂商当前基准标识 */
+    private Integer isCurrent;
+
     /** 启用标志 1启用 0停用 */
     private Integer enabledFlag;
+
+    /** 厂商排序号 */
+    private Integer sortOrder;
+
+    /** 厂商状态 */
+    private String status;
 
     /** 创建时间 */
     private Date createTime;
