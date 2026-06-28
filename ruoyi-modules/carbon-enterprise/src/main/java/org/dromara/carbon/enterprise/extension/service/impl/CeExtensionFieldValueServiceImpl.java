@@ -9,9 +9,12 @@ import org.dromara.carbon.enterprise.extension.domain.bo.CeExtensionFieldValueBo
 import org.dromara.carbon.enterprise.extension.domain.vo.CeExtensionFieldValueVo;
 import org.dromara.carbon.enterprise.activity.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
+import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.extension.mapper.CeExtensionFieldMapper;
 import org.dromara.carbon.enterprise.extension.mapper.CeExtensionFieldValueMapper;
+import org.dromara.carbon.enterprise.extension.support.CeExtensionModuleRegistry;
 import org.dromara.carbon.enterprise.greenpower.mapper.CeGreenPowerCertificateMapper;
+import org.dromara.carbon.enterprise.intensity.mapper.CeIntensityMetricMapper;
 import org.dromara.carbon.enterprise.shared.service.ICeExtensionFieldValueService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
@@ -23,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Enterprise extension field value service implementation.
@@ -32,16 +34,12 @@ import java.util.Map;
 @Service
 public class CeExtensionFieldValueServiceImpl implements ICeExtensionFieldValueService {
 
-    private static final Map<String, String> MODULE_OWNER_TABLES = Map.of(
-        "activity_data", "ce_activity_data",
-        "green_electricity", "ce_green_power_certificate",
-        "intensity_denominator", "ce_intensity_denominator_fact"
-    );
-
     private final CeExtensionFieldValueMapper extensionFieldValueMapper;
     private final CeExtensionFieldMapper extensionFieldMapper;
     private final CeActivityDataMapper activityDataMapper;
+    private final CeEmissionSourceMapper emissionSourceMapper;
     private final CeGreenPowerCertificateMapper greenPowerCertificateMapper;
+    private final CeIntensityMetricMapper intensityMetricMapper;
     private final CeDimensionProjectionMapper dimensionProjectionMapper;
 
     @Override
@@ -67,8 +65,8 @@ public class CeExtensionFieldValueServiceImpl implements ICeExtensionFieldValueS
 
     @Override
     public Boolean insertByBo(CeExtensionFieldValueBo bo) {
-        validateExtensionFieldOwner(bo.getExtensionFieldId(), bo.getOwnerTableCode());
-        validateOwnerRecordExists(bo.getOwnerTableCode(), bo.getOwnerRecordId());
+        CeExtensionModuleRegistry.ModuleDefinition module = validateExtensionFieldOwner(bo.getExtensionFieldId(), bo.getOwnerTableCode());
+        validateOwnerRecordExists(module, bo.getOwnerRecordId());
         CeExtensionFieldValue add = toEntity(bo);
         boolean flag = extensionFieldValueMapper.insert(add) > 0;
         if (flag) {
@@ -79,8 +77,8 @@ public class CeExtensionFieldValueServiceImpl implements ICeExtensionFieldValueS
 
     @Override
     public Boolean updateByBo(CeExtensionFieldValueBo bo) {
-        validateExtensionFieldOwner(bo.getExtensionFieldId(), bo.getOwnerTableCode());
-        validateOwnerRecordExists(bo.getOwnerTableCode(), bo.getOwnerRecordId());
+        CeExtensionModuleRegistry.ModuleDefinition module = validateExtensionFieldOwner(bo.getExtensionFieldId(), bo.getOwnerTableCode());
+        validateOwnerRecordExists(module, bo.getOwnerRecordId());
         CeExtensionFieldValue update = toEntity(bo);
         return extensionFieldValueMapper.updateById(update) > 0;
     }
@@ -92,8 +90,8 @@ public class CeExtensionFieldValueServiceImpl implements ICeExtensionFieldValueS
             return true;
         }
         for (CeExtensionFieldValueBo bo : values) {
-            validateExtensionFieldOwner(bo.getExtensionFieldId(), bo.getOwnerTableCode());
-            validateOwnerRecordExists(bo.getOwnerTableCode(), bo.getOwnerRecordId());
+            CeExtensionModuleRegistry.ModuleDefinition module = validateExtensionFieldOwner(bo.getExtensionFieldId(), bo.getOwnerTableCode());
+            validateOwnerRecordExists(module, bo.getOwnerRecordId());
             CeExtensionFieldValue existing = selectExistingValue(bo);
             if (existing != null) {
                 bo.setId(existing.getId());
@@ -135,7 +133,7 @@ public class CeExtensionFieldValueServiceImpl implements ICeExtensionFieldValueS
             .orderByDesc(CeExtensionFieldValue::getId), false);
     }
 
-    private void validateExtensionFieldOwner(Long extensionFieldId, String ownerTableCode) {
+    private CeExtensionModuleRegistry.ModuleDefinition validateExtensionFieldOwner(Long extensionFieldId, String ownerTableCode) {
         if (extensionFieldId == null) {
             throw new ServiceException("extension field id cannot be null");
         }
@@ -149,27 +147,32 @@ public class CeExtensionFieldValueServiceImpl implements ICeExtensionFieldValueS
         if (Boolean.FALSE.equals(field.getEnabledFlag())) {
             throw new ServiceException("extension field is disabled");
         }
-        String expectedOwnerTable = MODULE_OWNER_TABLES.get(field.getModuleCode());
-        if (expectedOwnerTable == null) {
-            throw new ServiceException("Unsupported enterprise extension module code: " + field.getModuleCode());
-        }
-        if (!expectedOwnerTable.equals(ownerTableCode)) {
+        CeExtensionModuleRegistry.ModuleDefinition module = CeExtensionModuleRegistry.require(field.getModuleCode());
+        if (!module.ownsTable(ownerTableCode)) {
             throw new ServiceException("extension field owner table does not match module code");
         }
+        return module;
     }
 
-    private void validateOwnerRecordExists(String ownerTableCode, Long ownerRecordId) {
+    private void validateOwnerRecordExists(CeExtensionModuleRegistry.ModuleDefinition module, Long ownerRecordId) {
         if (ownerRecordId == null) {
             throw new ServiceException("extension field owner record id cannot be null");
         }
-        Object owner = switch (ownerTableCode) {
+        Object owner = switch (module.ownerTableCode()) {
             case "ce_activity_data" -> activityDataMapper.selectById(ownerRecordId);
+            case "ce_emission_source" -> emissionSourceMapper.selectById(ownerRecordId);
             case "ce_green_power_certificate" -> greenPowerCertificateMapper.selectById(ownerRecordId);
-            case "ce_intensity_denominator_fact" -> dimensionProjectionMapper.selectByDimensionCodeAndId("denominator-fact", ownerRecordId);
-            default -> throw new ServiceException("Unsupported enterprise extension owner table: " + ownerTableCode);
+            case "ce_intensity_metric" -> intensityMetricMapper.selectById(ownerRecordId);
+            default -> module.isDimensionProjection()
+                ? dimensionProjectionMapper.selectByDimensionCodeAndId(module.dimensionCode(), ownerRecordId)
+                : throwUnsupportedOwnerTable(module.ownerTableCode());
         };
         if (owner == null) {
             throw new ServiceException("extension field owner record does not exist");
         }
+    }
+
+    private Object throwUnsupportedOwnerTable(String ownerTableCode) {
+        throw new ServiceException("Unsupported enterprise extension owner table: " + ownerTableCode);
     }
 }

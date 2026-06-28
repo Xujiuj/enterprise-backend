@@ -103,12 +103,14 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     @Override
     public Boolean insertByBo(CeDimensionRecordBo bo) {
         validateEditableDimensionCode(bo.getDimensionCode());
+        normalizeCompanyRecord(bo);
         return dimensionProjectionMapper.insertByDimensionCode(bo) > 0;
     }
 
     @Override
     public Boolean updateByBo(CeDimensionRecordBo bo) {
         validateEditableDimensionCode(bo.getDimensionCode());
+        normalizeCompanyRecord(bo);
         return dimensionProjectionMapper.updateByDimensionCode(bo) > 0;
     }
 
@@ -163,6 +165,31 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private boolean contains(String value, String query) {
         return StringUtils.isNotBlank(value) && value.contains(query);
+    }
+
+    private void normalizeCompanyRecord(CeDimensionRecordBo bo) {
+        if (!"company".equals(bo.getDimensionCode())) {
+            return;
+        }
+        if (StringUtils.isBlank(bo.getCompanySk())) {
+            bo.setCompanySk(buildCompanySk(bo));
+        }
+        if (StringUtils.isBlank(bo.getActiveFlag())) {
+            bo.setActiveFlag("1".equals(bo.getStatus()) ? "N" : "Y");
+        }
+    }
+
+    private String buildCompanySk(CeDimensionRecordBo bo) {
+        String companyCode = normalizeKeyPart(bo.getRecordCode());
+        String factoryCode = normalizeKeyPart(bo.getParentCode());
+        if (StringUtils.isBlank(factoryCode)) {
+            return "SK_" + companyCode;
+        }
+        return "SK_" + companyCode + "_" + factoryCode;
+    }
+
+    private String normalizeKeyPart(String value) {
+        return StringUtils.trimToEmpty(value).replaceAll("\\s+", "_");
     }
 
     private TableDataInfo<CeDimensionRecordVo> queryVendorPageList(CeDimensionRecordBo bo, PageQuery pageQuery) {

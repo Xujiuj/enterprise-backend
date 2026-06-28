@@ -109,7 +109,7 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
             try {
                 List<CeDimensionSyncResponse> dimensionResults = dimensionSyncService.syncAllVendorDimensions();
                 int successDimensions = (int) dimensionResults.stream().filter(CeDimensionSyncResponse::isSuccess).count();
-                int syncedRows = dimensionResults.stream().mapToInt(CeDimensionSyncResponse::getSyncedCount).sum();
+                int syncedRows = dimensionResults.stream().mapToInt(CeDimensionSyncResponse::getRecordCount).sum();
                 dimensionSyncMessage = "维度数据同步完成：" + successDimensions + " 类维度，" + syncedRows + " 条记录";
                 log.info("授权导入成功，{}", dimensionSyncMessage);
             } catch (Exception e) {

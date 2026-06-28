@@ -156,6 +156,29 @@ class CeOptionServiceTest {
     }
 
     @Test
+    void dimensionFieldOptionsUseFieldValueLabelsExceptStatus() {
+        CeDimensionRecordVo company = new CeDimensionRecordVo();
+        company.setIndustrySectionCode("C");
+        company.setIndustrySectionName("制造业");
+        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(company));
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setField("industrySectionCode");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getLabel()))
+            .containsExactly("C");
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("C");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("industrySectionCode", "C")
+            .containsEntry("industrySectionName", "制造业");
+    }
+
+    @Test
     void activityEntryLeafOptionsKeepEachEmissionSourceCodeWhenNamesRepeat() {
         CeEmissionSource largerCode = emissionSource("ES-002", "柴油", "A公司", "一厂", "cat-a");
         largerCode.setResponsibleDept("生产部");

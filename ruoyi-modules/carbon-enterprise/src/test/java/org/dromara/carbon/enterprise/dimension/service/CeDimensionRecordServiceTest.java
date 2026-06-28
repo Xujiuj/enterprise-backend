@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -78,6 +79,24 @@ class CeDimensionRecordServiceTest {
         assertThrows(ServiceException.class, () -> service.insertByBo(bo));
 
         verify(dimensionProjectionMapper, never()).insertByDimensionCode(any());
+    }
+
+    @Test
+    void companyInsertGeneratesCompanySkWhenUserDoesNotProvideIt() {
+        CeDimensionRecordBo bo = new CeDimensionRecordBo();
+        bo.setDimensionCode("company");
+        bo.setRecordCode("COMP-001");
+        bo.setParentCode("FAC-001");
+        bo.setRecordName("Demo Company");
+        bo.setFactoryName("Demo Factory");
+        bo.setStatus("0");
+        when(dimensionProjectionMapper.insertByDimensionCode(any())).thenReturn(1);
+
+        service.insertByBo(bo);
+
+        verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record ->
+            "SK_COMP-001_FAC-001".equals(record.getCompanySk()) && "Y".equals(record.getActiveFlag())
+        ));
     }
 
     private CeDimensionRecordVo localCompany() {

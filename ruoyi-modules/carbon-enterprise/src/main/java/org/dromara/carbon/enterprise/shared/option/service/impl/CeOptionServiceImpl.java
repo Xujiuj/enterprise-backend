@@ -490,8 +490,38 @@ public class CeOptionServiceImpl implements ICeOptionService {
         validateDimensionOptionRequest(dimensionCode, field);
         for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
             Object value = dimensionValue(record, field);
-            addOption(target, labelForStatus(value), value);
+            addOption(target, labelForDimensionField(field, value), value, dimensionRecordMap(record));
         }
+    }
+
+    private Map<String, Object> dimensionRecordMap(CeDimensionRecordVo record) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("recordCode", record.getRecordCode());
+        values.put("recordName", record.getRecordName());
+        values.put("parentCode", record.getParentCode());
+        values.put("companySk", record.getCompanySk());
+        values.put("factoryName", record.getFactoryName());
+        values.put("provinceCode", record.getProvinceCode());
+        values.put("provinceName", record.getProvinceName());
+        values.put("factoryType", record.getFactoryType());
+        values.put("industrySectionCode", record.getIndustrySectionCode());
+        values.put("industrySectionName", record.getIndustrySectionName());
+        values.put("industryDivisionCode", record.getIndustryDivisionCode());
+        values.put("industryDivisionName", record.getIndustryDivisionName());
+        values.put("industryGroupCode", record.getIndustryGroupCode());
+        values.put("industryGroupName", record.getIndustryGroupName());
+        values.put("industryClassCode", record.getIndustryClassCode());
+        values.put("industryClassName", record.getIndustryClassName());
+        values.put("activeFlag", record.getActiveFlag());
+        values.put("status", record.getStatus());
+        return values;
+    }
+
+    private String labelForDimensionField(String field, Object value) {
+        if ("status".equals(field)) {
+            return labelForStatus(value);
+        }
+        return labelForRaw(value);
     }
 
     private void validateDimensionOptionRequest(String dimensionCode, String field) {

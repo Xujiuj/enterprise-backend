@@ -59,18 +59,18 @@ public class CeReportTemplateFileController extends BaseController {
     @SaCheckPermission("enterprise:reportTemplateFile:add")
     @PostMapping
     public R<Void> add(@Validated(AddGroup.class) @RequestBody CeReportTemplateFileBo bo) {
-        return toAjax(reportTemplateFileService.insertByBo(bo));
+        return R.fail("Enterprise report templates can only be synced from vendor and downloaded");
     }
 
     @SaCheckPermission("enterprise:reportTemplateFile:edit")
     @PutMapping
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody CeReportTemplateFileBo bo) {
-        return toAjax(reportTemplateFileService.updateByBo(bo));
+        return R.fail("Enterprise report templates can only be synced from vendor and downloaded");
     }
 
     @SaCheckPermission("enterprise:reportTemplateFile:remove")
     @DeleteMapping("/{ids}")
     public R<Void> remove(@NotEmpty(message = "ids cannot be empty") @PathVariable Long[] ids) {
-        return toAjax(reportTemplateFileService.deleteByIds(List.of(ids)));
+        return R.fail("Enterprise report templates can only be synced from vendor and downloaded");
     }
 }

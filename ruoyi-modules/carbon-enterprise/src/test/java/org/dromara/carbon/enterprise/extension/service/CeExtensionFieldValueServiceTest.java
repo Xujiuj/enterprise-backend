@@ -6,10 +6,12 @@ import org.dromara.carbon.enterprise.extension.domain.bo.CeExtensionFieldValueBo
 import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.activity.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
+import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.extension.mapper.CeExtensionFieldMapper;
 import org.dromara.carbon.enterprise.extension.mapper.CeExtensionFieldValueMapper;
 import org.dromara.carbon.enterprise.greenpower.mapper.CeGreenPowerCertificateMapper;
 import org.dromara.carbon.enterprise.extension.service.impl.CeExtensionFieldValueServiceImpl;
+import org.dromara.carbon.enterprise.intensity.mapper.CeIntensityMetricMapper;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -21,6 +23,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -33,7 +36,9 @@ class CeExtensionFieldValueServiceTest {
     private CeExtensionFieldValueMapper extensionFieldValueMapper;
     private CeExtensionFieldMapper extensionFieldMapper;
     private CeActivityDataMapper activityDataMapper;
+    private CeEmissionSourceMapper emissionSourceMapper;
     private CeGreenPowerCertificateMapper greenPowerCertificateMapper;
+    private CeIntensityMetricMapper intensityMetricMapper;
     private CeDimensionProjectionMapper dimensionProjectionMapper;
     private CeExtensionFieldValueServiceImpl service;
 
@@ -42,13 +47,17 @@ class CeExtensionFieldValueServiceTest {
         extensionFieldValueMapper = mock(CeExtensionFieldValueMapper.class);
         extensionFieldMapper = mock(CeExtensionFieldMapper.class);
         activityDataMapper = mock(CeActivityDataMapper.class);
+        emissionSourceMapper = mock(CeEmissionSourceMapper.class);
         greenPowerCertificateMapper = mock(CeGreenPowerCertificateMapper.class);
+        intensityMetricMapper = mock(CeIntensityMetricMapper.class);
         dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
         service = new CeExtensionFieldValueServiceImpl(
             extensionFieldValueMapper,
             extensionFieldMapper,
             activityDataMapper,
+            emissionSourceMapper,
             greenPowerCertificateMapper,
+            intensityMetricMapper,
             dimensionProjectionMapper
         ) {
             @Override
@@ -92,7 +101,7 @@ class CeExtensionFieldValueServiceTest {
 
     @Test
     void savesValueForIntensityDenominatorFactProjectionOwner() {
-        when(extensionFieldMapper.selectById(501L)).thenReturn(field("intensity_denominator", true));
+        when(extensionFieldMapper.selectById(501L)).thenReturn(field("denominator-fact", true));
         when(dimensionProjectionMapper.selectByDimensionCodeAndId("denominator-fact", 9001L))
             .thenReturn(new CeDimensionRecordVo());
 
@@ -103,13 +112,35 @@ class CeExtensionFieldValueServiceTest {
 
     @Test
     void rejectsValueWhenExtensionFieldModuleIsUnsupported() {
-        when(extensionFieldMapper.selectById(501L)).thenReturn(field("emission_source", true));
+        when(extensionFieldMapper.selectById(501L)).thenReturn(field("unsupported_module", true));
 
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.insertByBo(validBo("ce_activity_data")));
 
-        assertEquals("Unsupported enterprise extension module code: emission_source", exception.getMessage());
+        assertEquals("Unsupported enterprise extension module code: unsupported_module", exception.getMessage());
         verify(extensionFieldValueMapper, never()).insert(any(CeExtensionFieldValue.class));
+    }
+
+    @Test
+    void savesValueForEnterpriseEmissionSourceOwner() {
+        when(extensionFieldMapper.selectById(501L)).thenReturn(field("emission_source", true));
+        when(emissionSourceMapper.selectById(9001L))
+            .thenReturn(new org.dromara.carbon.enterprise.emission.domain.CeEmissionSource());
+
+        service.insertByBo(validBo("ce_emission_source"));
+
+        verify(extensionFieldValueMapper).insert(any(CeExtensionFieldValue.class));
+    }
+
+    @Test
+    void savesValueForEnterpriseIntensityMetricOwner() {
+        when(extensionFieldMapper.selectById(501L)).thenReturn(field("intensity_metric", true));
+        when(intensityMetricMapper.selectById(9001L))
+            .thenReturn(new org.dromara.carbon.enterprise.intensity.domain.CeIntensityMetric());
+
+        service.insertByBo(validBo("ce_intensity_metric"));
+
+        verify(extensionFieldValueMapper).insert(any(CeExtensionFieldValue.class));
     }
 
     @Test
@@ -164,8 +195,9 @@ class CeExtensionFieldValueServiceTest {
         when(activityDataMapper.selectById(9001L)).thenReturn(new org.dromara.carbon.enterprise.activity.domain.CeActivityData());
         CeExtensionFieldValue existing = new CeExtensionFieldValue();
         existing.setId(888L);
-        when(extensionFieldValueMapper.selectOne(any())).thenReturn(existing);
+        when(extensionFieldValueMapper.selectOne(any(), anyBoolean())).thenReturn(existing);
         when(extensionFieldValueMapper.updateById(any(CeExtensionFieldValue.class))).thenReturn(1);
+        when(extensionFieldValueMapper.insert(any(CeExtensionFieldValue.class))).thenReturn(1);
 
         CeExtensionFieldValueBo bo = validBo("ce_activity_data");
         bo.setId(777L);

@@ -22,7 +22,7 @@ public class CeDimensionSyncResponse implements Serializable {
     private String dimensionCode;
 
     /** 同步记录数 */
-    private int syncedCount;
+    private int recordCount;
 
     /** 同步时间 */
     private Date syncedTime;

@@ -1,8 +1,6 @@
 package org.dromara.carbon.enterprise.factor.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.enterprise.vendor.client.CeVendorFactorOpenClient;
 import org.dromara.carbon.enterprise.factor.domain.CeFactorCacheRecord;
@@ -30,8 +28,6 @@ import java.util.List;
 public class CeFactorSyncServiceImpl implements ICeFactorSyncService {
 
     private static final String LICENSE_STATUS_VALID = "VALID";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
     private final CeLicenseStateMapper licenseStateMapper;
     private final CeFactorCacheVersionMapper factorCacheVersionMapper;
     private final CeFactorCacheRecordMapper factorCacheRecordMapper;
@@ -169,19 +165,8 @@ public class CeFactorSyncServiceImpl implements ICeFactorSyncService {
         target.setGwpValue(source.getGwpValue());
         target.setConvertedFactor(source.getConvertedFactor());
         target.setSourceRef(source.getSourceRef());
-        target.setCustomFields(source.getCustomFields() == null || source.getCustomFields().isEmpty()
-            ? null
-            : toJsonString(source.getCustomFields()));
         target.setEnabledFlag(Boolean.TRUE);
         target.setSyncedTime(syncedTime);
-    }
-
-    private String toJsonString(Object value) {
-        try {
-            return OBJECT_MAPPER.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
-            throw new ServiceException("factor custom fields serialization failed");
-        }
     }
 
     private void validateVendorResponse(CeVendorFactorSyncResponse vendorResponse) {

@@ -120,7 +120,7 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
     private CeDimensionSyncResponse syncDimensionInternal(CeLicenseState license, String dimensionCode) {
         log.info("开始同步维度: dimensionCode={}, licenseId={}", dimensionCode, license.getLicenseId());
         Date syncedTime = new Date();
-        int syncedCount = 0;
+        int recordCount = 0;
 
         CeDimensionRecordBo query = new CeDimensionRecordBo();
         query.setDimensionCode(dimensionCode);
@@ -141,17 +141,17 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             }
             for (CeVendorDimensionRecord record : records) {
                 upsertDimensionRecord(dimensionCode, record);
-                syncedCount++;
+                recordCount++;
             }
             hasMore = records.size() >= PAGE_SIZE;
             pageNum++;
         }
 
-        log.info("维度同步完成: dimensionCode={}, syncedCount={}", dimensionCode, syncedCount);
+        log.info("维度同步完成: dimensionCode={}, recordCount={}", dimensionCode, recordCount);
         CeDimensionSyncResponse response = new CeDimensionSyncResponse();
         response.setLicenseId(license.getLicenseId());
         response.setDimensionCode(dimensionCode);
-        response.setSyncedCount(syncedCount);
+        response.setRecordCount(recordCount);
         response.setSyncedTime(syncedTime);
         response.setSuccess(true);
         return response;

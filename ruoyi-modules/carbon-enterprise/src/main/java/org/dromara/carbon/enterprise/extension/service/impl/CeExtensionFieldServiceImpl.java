@@ -7,6 +7,7 @@ import org.dromara.carbon.enterprise.extension.domain.CeExtensionField;
 import org.dromara.carbon.enterprise.extension.domain.bo.CeExtensionFieldBo;
 import org.dromara.carbon.enterprise.extension.domain.vo.CeExtensionFieldVo;
 import org.dromara.carbon.enterprise.extension.mapper.CeExtensionFieldMapper;
+import org.dromara.carbon.enterprise.extension.support.CeExtensionModuleRegistry;
 import org.dromara.carbon.enterprise.shared.service.ICeExtensionFieldService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
@@ -17,7 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
+import java.util.Locale;
 
 /**
  * Enterprise allowed extension fields service implementation.
@@ -26,11 +27,7 @@ import java.util.Set;
 @Service
 public class CeExtensionFieldServiceImpl implements ICeExtensionFieldService {
 
-    private static final Set<String> ALLOWED_MODULE_CODES = Set.of(
-        "activity_data",
-        "green_electricity",
-        "intensity_denominator"
-    );
+    private static final String FIELD_CODE_PATTERN = "^[A-Za-z][A-Za-z0-9_]{1,63}$";
 
     private final CeExtensionFieldMapper extensionFieldMapper;
 
@@ -59,8 +56,15 @@ public class CeExtensionFieldServiceImpl implements ICeExtensionFieldService {
 
     @Override
     public Boolean insertByBo(CeExtensionFieldBo bo) {
-        validateModuleCode(bo.getModuleCode());
-        CeExtensionField add = MapstructUtils.convert(bo, CeExtensionField.class);
+        validateExtensionFieldDefinition(bo);
+        CeExtensionField add = toEntity(bo);
+        add.setFieldCode(normalizeFieldCode(bo.getFieldCode()));
+        if (add.getValueType() == null) {
+            add.setValueType("text");
+        }
+        if (add.getEnabledFlag() == null) {
+            add.setEnabledFlag(true);
+        }
         boolean flag = extensionFieldMapper.insert(add) > 0;
         if (flag) {
             bo.setId(add.getId());
@@ -70,8 +74,12 @@ public class CeExtensionFieldServiceImpl implements ICeExtensionFieldService {
 
     @Override
     public Boolean updateByBo(CeExtensionFieldBo bo) {
-        validateModuleCode(bo.getModuleCode());
-        CeExtensionField update = MapstructUtils.convert(bo, CeExtensionField.class);
+        validateExtensionFieldDefinition(bo);
+        CeExtensionField update = toEntity(bo);
+        update.setFieldCode(normalizeFieldCode(bo.getFieldCode()));
+        if (update.getValueType() == null) {
+            update.setValueType("text");
+        }
         return extensionFieldMapper.updateById(update) > 0;
     }
 
@@ -89,9 +97,30 @@ public class CeExtensionFieldServiceImpl implements ICeExtensionFieldService {
             .eq(bo.getEnabledFlag() != null, CeExtensionField::getEnabledFlag, bo.getEnabledFlag());
     }
 
-    private void validateModuleCode(String moduleCode) {
-        if (!ALLOWED_MODULE_CODES.contains(moduleCode)) {
-            throw new ServiceException("Unsupported enterprise extension module code: " + moduleCode);
+    protected CeExtensionField toEntity(CeExtensionFieldBo bo) {
+        return MapstructUtils.convert(bo, CeExtensionField.class);
+    }
+
+    private void validateExtensionFieldDefinition(CeExtensionFieldBo bo) {
+        CeExtensionModuleRegistry.ModuleDefinition module = CeExtensionModuleRegistry.require(bo.getModuleCode());
+        CeExtensionModuleRegistry.validateValueType(bo.getValueType());
+        String fieldCode = normalizeFieldCode(bo.getFieldCode());
+        if (!fieldCode.matches(FIELD_CODE_PATTERN)) {
+            throw new ServiceException("extension field code must start with a letter and contain only letters, numbers, and underscores");
         }
+        if (module.isReservedField(fieldCode)) {
+            throw new ServiceException("extension field code cannot override original field: " + fieldCode);
+        }
+        CeExtensionField existing = extensionFieldMapper.selectOne(new LambdaQueryWrapper<CeExtensionField>()
+            .eq(CeExtensionField::getModuleCode, bo.getModuleCode())
+            .eq(CeExtensionField::getFieldCode, fieldCode)
+            .ne(bo.getId() != null, CeExtensionField::getId, bo.getId()), false);
+        if (existing != null) {
+            throw new ServiceException("extension field code already exists in module: " + fieldCode);
+        }
+    }
+
+    private String normalizeFieldCode(String fieldCode) {
+        return StringUtils.trimToEmpty(fieldCode).toLowerCase(Locale.ROOT);
     }
 }

@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.carbon.enterprise.vendor.client.CeVendorAnnouncementOpenClient;
 import org.dromara.carbon.enterprise.activity.domain.CeActivityData;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
+import org.dromara.carbon.enterprise.factor.domain.CeFactorCacheVersion;
 import org.dromara.carbon.enterprise.factor.domain.CeFactorConfirmation;
 import org.dromara.carbon.enterprise.report.domain.CeReportTemplateFile;
 import org.dromara.carbon.enterprise.activity.domain.bo.CeActivityDataBo;
@@ -16,6 +17,7 @@ import org.dromara.carbon.enterprise.license.domain.vo.CeLicenseStateVo;
 import org.dromara.carbon.enterprise.workbench.domain.vo.CeWorkbenchOverviewVo;
 import org.dromara.carbon.enterprise.activity.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
+import org.dromara.carbon.enterprise.factor.mapper.CeFactorCacheVersionMapper;
 import org.dromara.carbon.enterprise.factor.mapper.CeFactorConfirmationMapper;
 import org.dromara.carbon.enterprise.report.mapper.CeReportTemplateFileMapper;
 import org.dromara.carbon.enterprise.shared.service.ICeActivityDataService;
@@ -55,6 +57,7 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
     private final ICeLicenseStateService licenseStateService;
     private final CeActivityDataMapper activityDataMapper;
     private final CeEmissionSourceMapper emissionSourceMapper;
+    private final CeFactorCacheVersionMapper factorCacheVersionMapper;
     private final CeFactorConfirmationMapper factorConfirmationMapper;
     private final CeReportTemplateFileMapper reportTemplateFileMapper;
     private final CeVendorAnnouncementOpenClient vendorAnnouncementOpenClient;
@@ -70,16 +73,18 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
         List<CeActivityData> activities = listActivities(dashboard);
         List<CeEmissionSource> sources = emissionSourceMapper.selectList(Wrappers.<CeEmissionSource>lambdaQuery());
         List<CeFactorConfirmation> factors = listLatestFactors();
+        CeFactorCacheVersion latestSyncedFactor = latestSyncedFactor();
+        String latestSyncedFactorVersion = latestSyncedFactor == null ? null : latestSyncedFactor.getVersionCode();
         List<CeReportTemplateFile> templates = listLatestTemplates();
 
         BigDecimal totalEmission = totalEmission(activities);
         CeWorkbenchOverviewVo overview = new CeWorkbenchOverviewVo();
         overview.setCurrentPeriod(period);
-        overview.setStatusCards(statusCards(licenseState, dashboard, totalEmission, latestFactorVersion(factors)));
+        overview.setStatusCards(statusCards(licenseState, dashboard, totalEmission, latestSyncedFactorVersion));
         overview.setCycleStages(cycleStages(dashboard, latestTemplateName(templates)));
         overview.setScopeEmissions(scopeEmissions(activities, sources, totalEmission));
-        overview.setTodoItems(todoItems(licenseState, dashboard, latestTemplateName(templates), latestFactorVersion(factors)));
-        overview.setRecentActivities(recentActivities(licenseState, dashboard, factors, activities));
+        overview.setTodoItems(todoItems(licenseState, dashboard, latestTemplateName(templates), latestSyncedFactorVersion));
+        overview.setRecentActivities(recentActivities(licenseState, dashboard, factors, activities, latestSyncedFactor));
         overview.setSystemNotices(systemNotices(licenseState));
         return overview;
     }
@@ -111,6 +116,12 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
             .stream()
             .limit(20)
             .toList();
+    }
+
+    private CeFactorCacheVersion latestSyncedFactor() {
+        return factorCacheVersionMapper.selectOne(Wrappers.<CeFactorCacheVersion>lambdaQuery()
+            .orderByDesc(CeFactorCacheVersion::getSyncedTime)
+            .orderByDesc(CeFactorCacheVersion::getId), false);
     }
 
     private List<CeWorkbenchOverviewVo.MetricCard> statusCards(CeLicenseStateVo licenseState,
@@ -196,16 +207,18 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
     private List<CeWorkbenchOverviewVo.RecentActivity> recentActivities(CeLicenseStateVo licenseState,
                                                                         CeActivityDataValidationDashboardVo dashboard,
                                                                         List<CeFactorConfirmation> factors,
-                                                                        List<CeActivityData> activities) {
+                                                                        List<CeActivityData> activities,
+                                                                        CeFactorCacheVersion latestSyncedFactor) {
+        String latestSyncedFactorVersion = latestSyncedFactor == null ? null : latestSyncedFactor.getVersionCode();
         return List.of(
                 recentActivity(isLicenseValid(licenseState) ? "授权校验通过" : "授权状态待确认",
                     licenseState == null ? null : licenseState.getLastVerifiedTime(),
                     licenseState == null || licenseState.getValidTo() == null ? null : "有效期至 " + licenseState.getValidTo(),
                     isLicenseValid(licenseState) ? "ok" : ""),
-                recentActivity(StringUtils.isBlank(latestFactorVersion(factors)) ? "暂无因子库更新" : "因子库已更新",
-                    latestFactorTime(factors),
-                    StringUtils.isBlank(latestFactorVersion(factors)) ? null : "当前版本 " + latestFactorVersion(factors),
-                    StringUtils.isBlank(latestFactorVersion(factors)) ? "" : "ok"),
+                recentActivity(StringUtils.isBlank(latestSyncedFactorVersion) ? "暂无因子库更新" : "因子库已更新",
+                    latestSyncedFactor == null ? latestFactorTime(factors) : latestSyncedFactor.getSyncedTime(),
+                    StringUtils.isBlank(latestSyncedFactorVersion) ? null : "当前版本 " + latestSyncedFactorVersion,
+                    StringUtils.isBlank(latestSyncedFactorVersion) ? "" : "ok"),
                 recentActivity(defaultInt(dashboard.getSubmittedItems()) > 0 ? "录入保存" : "暂无本期录入动态",
                     latestActivityTime(activities),
                     defaultInt(dashboard.getSubmittedItems()) > 0 ? "已录入 " + dashboard.getSubmittedItems() + " 项" : null,
