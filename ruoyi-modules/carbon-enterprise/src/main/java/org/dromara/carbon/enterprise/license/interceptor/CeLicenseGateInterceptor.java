@@ -52,7 +52,7 @@ public class CeLicenseGateInterceptor implements HandlerInterceptor {
 
         R<CeLicenseGateBlockedResponse> payload = new R<>();
         payload.setCode(HttpStatus.FORBIDDEN);
-        payload.setMsg("enterprise license gate denied access");
+        payload.setMsg("企业授权网关拒绝访问");
         payload.setData(CeLicenseGateBlockedResponse.from(result));
         response.setStatus(HttpStatus.FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -79,7 +79,7 @@ public class CeLicenseGateInterceptor implements HandlerInterceptor {
         try {
             response.getWriter().write(objectMapper.writeValueAsString(payload));
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to serialize enterprise license gate response", e);
+            throw new IllegalStateException("企业授权网关响应序列化失败", e);
         }
     }
 }

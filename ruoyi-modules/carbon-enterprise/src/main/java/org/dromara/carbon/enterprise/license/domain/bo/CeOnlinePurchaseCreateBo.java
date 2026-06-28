@@ -9,13 +9,13 @@ import lombok.Data;
 @Data
 public class CeOnlinePurchaseCreateBo {
 
-    @NotBlank(message = "packageId cannot be blank")
+    @NotBlank(message = "授权套餐不能为空")
     private String packageId;
 
-    @NotBlank(message = "payChannel cannot be blank")
+    @NotBlank(message = "支付渠道不能为空")
     private String payChannel;
 
-    @NotBlank(message = "customerName cannot be blank")
+    @NotBlank(message = "客户名称不能为空")
     private String customerName;
 
     private String customerCode;

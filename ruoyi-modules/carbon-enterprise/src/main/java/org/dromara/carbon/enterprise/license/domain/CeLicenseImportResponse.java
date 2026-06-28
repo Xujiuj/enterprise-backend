@@ -14,33 +14,35 @@ public class CeLicenseImportResponse {
 
     private final String message;
 
+    private final String syncMessage;
+
     private final CeLicenseImportStateResponse licenseState;
 
     public static CeLicenseImportResponse from(CeLicenseImportResult result) {
         String status = result.getStatus();
-        return new CeLicenseImportResponse(result.isValid(), status, messageForStatus(status),
+        return new CeLicenseImportResponse(result.isValid(), status, messageForStatus(status), result.getSyncMessage(),
             CeLicenseImportStateResponse.from(result.getLicenseState()));
     }
 
     public static CeLicenseImportResponse publicKeyUnavailable() {
         return new CeLicenseImportResponse(false, "PUBLIC_KEY_UNAVAILABLE", messageForStatus("PUBLIC_KEY_UNAVAILABLE"),
-            null);
+            null, null);
     }
 
     private static String messageForStatus(String status) {
         return switch (status) {
-            case "VALID" -> "license is valid";
-            case "MALFORMED_LICENSE" -> "license content is malformed";
-            case "UNSUPPORTED_SCHEMA" -> "license schema is unsupported";
-            case "UNSUPPORTED_ALGORITHM" -> "license algorithm is unsupported";
-            case "SIGNATURE_INVALID" -> "license signature is invalid";
-            case "KEY_ID_MISMATCH" -> "license key id is inconsistent";
-            case "NOT_YET_VALID" -> "license is not valid yet";
-            case "EXPIRED" -> "license has expired";
-            case "INSTALL_ID_MISMATCH" -> "license installId does not match local installId";
-            case "CLOCK_ROLLBACK" -> "system time is earlier than the last observed license verification time";
-            case "PUBLIC_KEY_UNAVAILABLE" -> "enterprise license public key is unavailable";
-            default -> "license import failed";
+            case "VALID" -> "授权文件校验通过";
+            case "MALFORMED_LICENSE" -> "授权文件内容格式不正确";
+            case "UNSUPPORTED_SCHEMA" -> "授权文件版本不受支持";
+            case "UNSUPPORTED_ALGORITHM" -> "授权文件签名算法不受支持";
+            case "SIGNATURE_INVALID" -> "授权文件签名校验失败";
+            case "KEY_ID_MISMATCH" -> "授权文件签名密钥不一致";
+            case "NOT_YET_VALID" -> "授权尚未到生效时间";
+            case "EXPIRED" -> "授权已过期";
+            case "INSTALL_ID_MISMATCH" -> "授权文件的部署指纹与本机不匹配";
+            case "CLOCK_ROLLBACK" -> "系统时间早于最近授权校验时间";
+            case "PUBLIC_KEY_UNAVAILABLE" -> "企业端授权公钥不可用";
+            default -> "授权导入失败";
         };
     }
 }

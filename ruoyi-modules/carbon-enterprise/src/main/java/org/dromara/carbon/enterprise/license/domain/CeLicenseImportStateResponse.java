@@ -15,6 +15,10 @@ public class CeLicenseImportStateResponse {
 
     private final String customerId;
 
+    private final Long packageId;
+
+    private final String packageName;
+
     private final String installId;
 
     private final String keyId;
@@ -27,6 +31,14 @@ public class CeLicenseImportStateResponse {
 
     private final Date validTo;
 
+    private final Date lastVerifiedTime;
+
+    private final Date maxObservedTime;
+
+    private final String featureCodes;
+
+    private final String currentSummary;
+
     private final String licenseStatus;
 
     public static CeLicenseImportStateResponse from(CeLicenseState state) {
@@ -36,12 +48,18 @@ public class CeLicenseImportStateResponse {
         return new CeLicenseImportStateResponse(
             state.getLicenseId(),
             state.getCustomerId(),
+            state.getPackageId(),
+            state.getPackageName(),
             state.getInstallId(),
             state.getKeyId(),
             state.getAlgorithm(),
             state.getSchemaVersion(),
             state.getValidFrom(),
             state.getValidTo(),
+            state.getLastVerifiedTime(),
+            state.getMaxObservedTime(),
+            state.getFeatureCodes(),
+            state.getCurrentSummary(),
             state.getLicenseStatus()
         );
     }

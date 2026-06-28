@@ -30,7 +30,7 @@ public class CeLicenseGateController extends BaseController {
 
     @SaCheckPermission("enterprise:licenseState:query")
     @GetMapping("/current")
-    public R<CeLicenseGateResponse> current(@NotBlank(message = "expectedInstallId cannot be blank")
+    public R<CeLicenseGateResponse> current(@NotBlank(message = "部署指纹不能为空")
                                             @RequestParam String expectedInstallId,
                                             @RequestParam(required = false) String featureCode) {
         CeLicenseGateResult result = StringUtils.isBlank(featureCode)

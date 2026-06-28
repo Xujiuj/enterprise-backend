@@ -10,14 +10,14 @@ import lombok.Data;
 @Data
 public class CeLicenseImportRequest {
 
-    @NotBlank(message = "licenseContent cannot be blank")
+    @NotBlank(message = "授权文件内容不能为空")
     private String licenseContent;
 
-    @NotBlank(message = "expectedInstallId cannot be blank")
+    @NotBlank(message = "部署指纹不能为空")
     private String expectedInstallId;
 
     @JsonAnySetter
     public void rejectUnknownField(String fieldName, Object value) {
-        throw new IllegalArgumentException("unsupported license import request field: " + fieldName);
+        throw new IllegalArgumentException("授权导入请求包含不支持的字段：" + fieldName);
     }
 }

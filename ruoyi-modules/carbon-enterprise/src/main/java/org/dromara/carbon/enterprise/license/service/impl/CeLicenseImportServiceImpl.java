@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.carbon.enterprise.dimension.domain.CeDimensionSyncResponse;
+import org.dromara.carbon.enterprise.factor.domain.CeFactorSyncResponse;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseState;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseEnvelope;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseImportResult;
@@ -62,7 +64,7 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
             byte[] canonicalPayload = objectMapper.writeValueAsString(envelope.getPayload())
                 .getBytes(StandardCharsets.UTF_8);
             if (!verifySignature(publicKeyPem, canonicalPayload, envelope.getSignature())) {
-                return CeLicenseImportResult.invalid("SIGNATURE_INVALID", "license signature is invalid");
+                return CeLicenseImportResult.invalid("SIGNATURE_INVALID", "授权文件签名校验失败");
             }
 
             CeLicensePayload payload = objectMapper.treeToValue(envelope.getPayload(), CeLicensePayload.class);
@@ -76,22 +78,22 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
             Date validTo = parseInstant(payload.getValidTo(), "validTo");
 
             if (checkedAt.before(validFrom)) {
-                return CeLicenseImportResult.invalid("NOT_YET_VALID", "license is not valid yet");
+                return CeLicenseImportResult.invalid("NOT_YET_VALID", "授权尚未到生效时间");
             }
             if (checkedAt.after(validTo)) {
-                return CeLicenseImportResult.invalid("EXPIRED", "license has expired");
+                return CeLicenseImportResult.invalid("EXPIRED", "授权已过期");
             }
             String effectiveInstallId = resolveEffectiveInstallId(payload.getInstallId(), expectedInstallId);
             if (!Objects.equals(expectedInstallId, effectiveInstallId)) {
-                return CeLicenseImportResult.invalid("INSTALL_ID_MISMATCH", "license installId does not match local installId");
+                return CeLicenseImportResult.invalid("INSTALL_ID_MISMATCH", "授权文件的部署指纹与本机不匹配");
             }
             if (maxObservedTime != null && checkedAt.before(maxObservedTime)) {
-                return CeLicenseImportResult.invalid("CLOCK_ROLLBACK", "system time is earlier than max observed time");
+                return CeLicenseImportResult.invalid("CLOCK_ROLLBACK", "系统时间早于最近授权校验时间");
             }
 
             return CeLicenseImportResult.valid(buildLicenseState(envelope, payload, effectiveInstallId, canonicalPayload, validFrom, validTo, checkedAt, maxObservedTime));
         } catch (Exception e) {
-            return CeLicenseImportResult.invalid("MALFORMED_LICENSE", e.getMessage());
+            return CeLicenseImportResult.invalid("MALFORMED_LICENSE", "授权文件内容格式不正确");
         }
     }
 
@@ -103,37 +105,46 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
         if (result.isValid()) {
             licenseStateMapper.insert(result.getLicenseState());
 
-            // 触发维度数据同步（失败不阻断 License 导入）
+            String dimensionSyncMessage;
             try {
-                dimensionSyncService.syncAllVendorDimensions();
-                log.info("License import succeeded, dimension sync completed");
+                List<CeDimensionSyncResponse> dimensionResults = dimensionSyncService.syncAllVendorDimensions();
+                int successDimensions = (int) dimensionResults.stream().filter(CeDimensionSyncResponse::isSuccess).count();
+                int syncedRows = dimensionResults.stream().mapToInt(CeDimensionSyncResponse::getSyncedCount).sum();
+                dimensionSyncMessage = "维度数据同步完成：" + successDimensions + " 类维度，" + syncedRows + " 条记录";
+                log.info("授权导入成功，{}", dimensionSyncMessage);
             } catch (Exception e) {
-                log.warn("License import succeeded but dimension sync failed", e);
+                dimensionSyncMessage = "维度数据同步失败，请稍后在维度管理中手动同步";
+                log.warn("授权导入成功，但维度数据同步失败", e);
             }
 
-            // 触发因子数据同步（失败不阻断 License 导入）
+            String factorSyncMessage;
             try {
-                factorSyncService.syncCurrentLicenseFactors();
-                log.info("License import succeeded, factor sync completed");
+                CeFactorSyncResponse factorResult = factorSyncService.syncCurrentLicenseFactors();
+                factorSyncMessage = "因子数据同步完成：版本 " + StringUtils.blankToDefault(factorResult.getVersionCode(), "-")
+                    + "，" + factorResult.getRecordCount() + " 条记录"
+                    + (factorResult.isChanged() ? "，已有更新" : "，无新增变更");
+                log.info("授权导入成功，{}", factorSyncMessage);
             } catch (Exception e) {
-                log.warn("License import succeeded but factor sync failed", e);
+                factorSyncMessage = "因子数据同步失败，请稍后在因子管理中手动同步";
+                log.warn("授权导入成功，但因子数据同步失败", e);
             }
+            result = result.withSyncMessage("授权已导入。厂商端同步结果：" + dimensionSyncMessage + "；" + factorSyncMessage + "。");
         }
         return result;
     }
 
     private CeLicenseImportResult validateEnvelope(CeLicenseEnvelope envelope) {
         if (envelope == null) {
-            return CeLicenseImportResult.invalid("MALFORMED_LICENSE", "license envelope is empty");
+            return CeLicenseImportResult.invalid("MALFORMED_LICENSE", "授权文件内容为空");
         }
         if (!SCHEMA_VERSION.equals(envelope.getSchemaVersion())) {
-            return CeLicenseImportResult.invalid("UNSUPPORTED_SCHEMA", "unsupported license schemaVersion");
+            return CeLicenseImportResult.invalid("UNSUPPORTED_SCHEMA", "授权文件版本不受支持");
         }
         if (!ALGORITHM.equals(envelope.getAlgorithm())) {
-            return CeLicenseImportResult.invalid("UNSUPPORTED_ALGORITHM", "unsupported license algorithm");
+            return CeLicenseImportResult.invalid("UNSUPPORTED_ALGORITHM", "授权文件签名算法不受支持");
         }
         if (StringUtils.isBlank(envelope.getKeyId()) || envelope.getPayload() == null || StringUtils.isBlank(envelope.getSignature())) {
-            return CeLicenseImportResult.invalid("MALFORMED_LICENSE", "license envelope misses required fields");
+            return CeLicenseImportResult.invalid("MALFORMED_LICENSE", "授权文件缺少必要字段");
         }
         return CeLicenseImportResult.valid(null);
     }
@@ -145,10 +156,10 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
             payload.getIssuedAt(), payload.getIssuer(), payload.getKeyId())
             || payload.getFeatures() == null || payload.getFeatures().isEmpty()
             || payload.getTemplateEntitlements() == null || payload.getTemplateEntitlements().isEmpty()) {
-            return CeLicenseImportResult.invalid("MALFORMED_LICENSE", "license payload misses required fields");
+            return CeLicenseImportResult.invalid("MALFORMED_LICENSE", "授权载荷缺少必要字段");
         }
         if (!Objects.equals(envelope.getKeyId(), payload.getKeyId())) {
-            return CeLicenseImportResult.invalid("KEY_ID_MISMATCH", "envelope keyId does not match payload keyId");
+            return CeLicenseImportResult.invalid("KEY_ID_MISMATCH", "授权文件签名密钥不一致");
         }
         return CeLicenseImportResult.valid(null);
     }
@@ -173,7 +184,7 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
         try {
             return Date.from(Instant.parse(value));
         } catch (Exception e) {
-            throw new IllegalArgumentException(fieldName + " must be ISO-8601 UTC", e);
+            throw new IllegalArgumentException(fieldName + " 必须是 ISO-8601 UTC 时间", e);
         }
     }
 
@@ -216,12 +227,12 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
     }
 
     private String buildCurrentSummary(CeLicensePayload payload) {
-        return "customerName=" + payload.getCustomerName()
-            + ";packageId=" + (payload.getPackageId() == null ? "" : payload.getPackageId())
-            + ";packageName=" + StringUtils.blankToDefault(payload.getPackageName(), "")
-            + ";edition=" + payload.getEdition()
-            + ";features=" + String.join(",", payload.getFeatures())
-            + ";templateEntitlements=" + payload.getTemplateEntitlements().size();
+        return "客户=" + payload.getCustomerName()
+            + "；授权套餐编号=" + (payload.getPackageId() == null ? "" : payload.getPackageId())
+            + "；授权套餐=" + StringUtils.blankToDefault(payload.getPackageName(), "")
+            + "；版本=" + payload.getEdition()
+            + "；功能=" + String.join(",", payload.getFeatures())
+            + "；模板授权数=" + payload.getTemplateEntitlements().size();
     }
 
     private Date laterOf(Date left, Date right) {

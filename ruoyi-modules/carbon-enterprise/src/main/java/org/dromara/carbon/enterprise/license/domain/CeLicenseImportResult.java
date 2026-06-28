@@ -17,11 +17,17 @@ public class CeLicenseImportResult {
 
     private final CeLicenseState licenseState;
 
+    private final String syncMessage;
+
     public static CeLicenseImportResult valid(CeLicenseState licenseState) {
-        return new CeLicenseImportResult(true, "VALID", "license is valid", licenseState);
+        return new CeLicenseImportResult(true, "VALID", "授权文件校验通过", licenseState, null);
     }
 
     public static CeLicenseImportResult invalid(String status, String message) {
-        return new CeLicenseImportResult(false, status, message, null);
+        return new CeLicenseImportResult(false, status, message, null, null);
+    }
+
+    public CeLicenseImportResult withSyncMessage(String syncMessage) {
+        return new CeLicenseImportResult(valid, status, message, licenseState, syncMessage);
     }
 }

@@ -52,7 +52,7 @@ public class CeLicenseStateController extends BaseController {
      */
     @SaCheckPermission("enterprise:licenseState:query")
     @GetMapping("/{id}")
-    public R<CeLicenseStateVo> getInfo(@NotNull(message = "id cannot be null") @PathVariable Long id) {
+    public R<CeLicenseStateVo> getInfo(@NotNull(message = "授权状态ID不能为空") @PathVariable Long id) {
         return R.ok(licenseStateService.queryById(id));
     }
 }

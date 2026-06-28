@@ -42,13 +42,13 @@ public class CeLicenseGateResponse {
 
     private static String messageForReason(String reason) {
         return switch (reason) {
-            case "VALID" -> "license is valid";
-            case "EXPIRED" -> "license has expired";
-            case "CLOCK_ROLLBACK" -> "system time is earlier than the last observed license verification time";
-            case "INSTALL_ID_MISMATCH" -> "license installId does not match local installId";
-            case "FEATURE_NOT_ENABLED" -> "license does not include the required feature";
-            case "NO_VALID_LICENSE" -> "no valid enterprise license is currently available";
-            default -> "enterprise license gate denied access";
+            case "VALID" -> "当前授权有效";
+            case "EXPIRED" -> "授权已过期";
+            case "CLOCK_ROLLBACK" -> "系统时间早于最近授权校验时间";
+            case "INSTALL_ID_MISMATCH" -> "授权文件的部署指纹与本机不匹配";
+            case "FEATURE_NOT_ENABLED" -> "当前授权未包含所需功能";
+            case "NO_VALID_LICENSE" -> "当前没有可用的企业授权";
+            default -> "企业授权网关拒绝访问";
         };
     }
 }

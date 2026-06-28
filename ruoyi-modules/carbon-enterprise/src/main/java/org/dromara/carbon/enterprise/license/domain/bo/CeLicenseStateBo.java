@@ -22,35 +22,35 @@ public class CeLicenseStateBo implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    @NotNull(message = "id cannot be null", groups = { EditGroup.class })
+    @NotNull(message = "授权状态ID不能为空", groups = { EditGroup.class })
     private Long id;
 
-    @NotBlank(message = "licenseId cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "授权编号不能为空", groups = { AddGroup.class, EditGroup.class })
     private String licenseId;
 
-    @NotBlank(message = "customerId cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "客户标识不能为空", groups = { AddGroup.class, EditGroup.class })
     private String customerId;
 
     private Long packageId;
 
     private String packageName;
 
-    @NotBlank(message = "installId cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "部署指纹不能为空", groups = { AddGroup.class, EditGroup.class })
     private String installId;
 
-    @NotBlank(message = "keyId cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "签名密钥不能为空", groups = { AddGroup.class, EditGroup.class })
     private String keyId;
 
-    @NotBlank(message = "algorithm cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "签名算法不能为空", groups = { AddGroup.class, EditGroup.class })
     private String algorithm;
 
-    @NotBlank(message = "schemaVersion cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "授权文件版本不能为空", groups = { AddGroup.class, EditGroup.class })
     private String schemaVersion;
 
-    @NotNull(message = "validFrom cannot be null", groups = { AddGroup.class, EditGroup.class })
+    @NotNull(message = "有效期开始时间不能为空", groups = { AddGroup.class, EditGroup.class })
     private Date validFrom;
 
-    @NotNull(message = "validTo cannot be null", groups = { AddGroup.class, EditGroup.class })
+    @NotNull(message = "有效期结束时间不能为空", groups = { AddGroup.class, EditGroup.class })
     private Date validTo;
 
     private Date lastVerifiedTime;
