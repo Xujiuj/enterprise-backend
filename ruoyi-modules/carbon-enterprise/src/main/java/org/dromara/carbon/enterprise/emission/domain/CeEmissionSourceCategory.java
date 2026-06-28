@@ -1,6 +1,7 @@
 package org.dromara.carbon.enterprise.emission.domain;
 
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -18,7 +19,7 @@ public class CeEmissionSourceCategory implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /** 主键 */
-    @TableId(value = "id")
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
     /** 分类代理键 */
