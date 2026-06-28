@@ -446,7 +446,7 @@ VALUES
 
     (900150, N'5 强度管理', 0, 6, N'intensity', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'chart', N'强度管理目录'),
     (900151, N'501 碳排放强度分母维度表', 900150, 1, N'intensity-denominator', N'enterprise/dimension/index', N'{"code":"intensity-denominator"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'form', N'碳排放强度分母维度表'),
-    (900152, N'502 强度目标表', 900150, 2, N'intensity-target', N'enterprise/intensityMetric/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:intensityMetric:list', N'chart', N'强度目标表'),
+    (900152, N'502 强度目标表', 900150, 2, N'intensity-target', N'enterprise/dimension/index', N'{"code":"intensity-target"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'chart', N'强度目标表'),
     (900153, N'503 分母事实表', 900150, 3, N'denominator-fact', N'enterprise/dimension/index', N'{"code":"denominator-fact"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'form', N'分母事实表'),
     (900154, N'504 碳排放强度容忍率参数表', 900150, 4, N'intensity-tolerance', N'enterprise/dimension/index', N'{"code":"intensity-tolerance"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'chart', N'碳排放强度容忍率参数表'),
 

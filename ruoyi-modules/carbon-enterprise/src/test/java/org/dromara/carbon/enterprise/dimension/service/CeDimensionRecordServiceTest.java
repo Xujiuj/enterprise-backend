@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.dromara.carbon.enterprise.dimension.domain.bo.CeDimensionRecordBo;
 import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
+import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionSqlProvider;
 import org.dromara.carbon.enterprise.dimension.service.impl.CeDimensionRecordServiceImpl;
 import org.dromara.carbon.enterprise.license.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.vendor.client.CeVendorDimensionOpenClient;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
@@ -105,6 +107,8 @@ class CeDimensionRecordServiceTest {
         bo.setDimensionCode("company");
         bo.setRecordCode("COMP-001");
         bo.setRecordName("Demo Company");
+        bo.setParentCode("FAC-001");
+        bo.setFactoryName("Demo Factory");
         bo.setStatus("1");
         bo.setActiveFlag("Y");
         when(dimensionProjectionMapper.insertByDimensionCode(any())).thenReturn(1);
@@ -112,6 +116,84 @@ class CeDimensionRecordServiceTest {
         service.insertByBo(bo);
 
         verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record -> "N".equals(record.getActiveFlag())));
+    }
+
+    @Test
+    void companyInsertRejectsMissingFactoryCodeBeforeDatabaseConstraint() {
+        CeDimensionRecordBo bo = new CeDimensionRecordBo();
+        bo.setDimensionCode("company");
+        bo.setRecordCode("COMP-001");
+        bo.setRecordName("Demo Company");
+        bo.setFactoryName("Demo Factory");
+
+        ServiceException exception = assertThrows(ServiceException.class, () -> service.insertByBo(bo));
+
+        assertEquals("工厂编号不能为空", exception.getMessage());
+        verify(dimensionProjectionMapper, never()).insertByDimensionCode(any());
+    }
+
+    @Test
+    void intensityDenominatorRejectsMissingBusinessFieldsBeforeDatabaseConstraint() {
+        CeDimensionRecordBo bo = new CeDimensionRecordBo();
+        bo.setDimensionCode("intensity-denominator");
+        bo.setRecordCode("RULE-001");
+        bo.setRecordName("制造工厂");
+        bo.setDenominatorType("产量");
+
+        ServiceException exception = assertThrows(ServiceException.class, () -> service.insertByBo(bo));
+
+        assertEquals("分母度量名称不能为空", exception.getMessage());
+        verify(dimensionProjectionMapper, never()).insertByDimensionCode(any());
+    }
+
+    @Test
+    void intensityDenominatorNormalizesEnabledFlagBeforeWrite() {
+        CeDimensionRecordBo bo = new CeDimensionRecordBo();
+        bo.setDimensionCode("intensity-denominator");
+        bo.setRecordCode("RULE-001");
+        bo.setRecordName("制造工厂");
+        bo.setDenominatorType("产量");
+        bo.setDenominatorMetricName("产品产量");
+        bo.setIntensityUnitDisplay("tCO2e/吨");
+        bo.setEnabledText("否");
+        when(dimensionProjectionMapper.insertByDimensionCode(any())).thenReturn(1);
+
+        service.insertByBo(bo);
+
+        verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record -> "0".equals(record.getEnabledText())));
+    }
+
+    @Test
+    void intensityTargetRejectsMissingTargetValueBeforeDatabaseConstraint() {
+        CeDimensionRecordBo bo = new CeDimensionRecordBo();
+        bo.setDimensionCode("intensity-target");
+        bo.setRecordCode("制造工厂");
+        bo.setRecordName("2026");
+
+        ServiceException exception = assertThrows(ServiceException.class, () -> service.insertByBo(bo));
+
+        assertEquals("强度目标值不能为空", exception.getMessage());
+        verify(dimensionProjectionMapper, never()).insertByDimensionCode(any());
+    }
+
+    @Test
+    void companyWriteSqlBindsNullableDatesAsVarcharBeforeConvertingToSqlServerDate() {
+        String insertSql = new CeDimensionProjectionSqlProvider().insertByDimensionCode();
+        String updateSql = new CeDimensionProjectionSqlProvider().updateByDimensionCode();
+
+        assertTrue(insertSql.contains("try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, ''), 23)"));
+        assertTrue(insertSql.contains("try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, ''), 23)"));
+        assertTrue(updateSql.contains("try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, ''), 23)"));
+        assertTrue(updateSql.contains("try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, ''), 23)"));
+    }
+
+    @Test
+    void intensityEnabledSqlUsesStableNumericFlagInsteadOfChineseText() {
+        String insertSql = new CeDimensionProjectionSqlProvider().insertByDimensionCode();
+        String updateSql = new CeDimensionProjectionSqlProvider().updateByDimensionCode();
+
+        assertTrue(insertSql.contains("case when #{record.enabledText} = '0' or #{record.status} = '1' then 0 else 1 end"));
+        assertTrue(updateSql.contains("case when #{record.enabledText} = '0' or #{record.status} = '1' then 0 else 1 end"));
     }
 
     private CeDimensionRecordVo localCompany() {

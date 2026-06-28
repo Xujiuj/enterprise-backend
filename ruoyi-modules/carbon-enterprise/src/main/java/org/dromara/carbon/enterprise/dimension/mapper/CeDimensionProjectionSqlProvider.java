@@ -257,7 +257,7 @@ public class CeDimensionProjectionSqlProvider {
                        denominator_type as denominator_type,
                        denominator_metric_name as denominator_metric_name,
                        intensity_unit_display as intensity_unit_display,
-                       case when enabled_flag = 1 then '是' else '否' end as enabled_text,
+                       case when enabled_flag = 1 then '1' else '0' end as enabled_text,
                        id as sort_order,
                        case when enabled_flag = 1 then '0' else '1' end as status,
                        create_time,
@@ -315,7 +315,7 @@ public class CeDimensionProjectionSqlProvider {
                        null as parent_code,
                        industry_section as industry_section,
                        cast(tolerance_rate as char) as tolerance_rate,
-                       case when enabled_flag = 1 then '是' else '否' end as enabled_text,
+                       case when enabled_flag = 1 then '1' else '0' end as enabled_text,
                        id as sort_order,
                        case when enabled_flag = 1 then '0' else '1' end as status,
                        create_time,
@@ -368,7 +368,8 @@ public class CeDimensionProjectionSqlProvider {
                   #{record.industryDivisionCode}, #{record.industryDivisionName},
                   #{record.industryGroupCode}, #{record.industryGroupName},
                   #{record.industryClassCode}, #{record.industryClassName},
-                  #{record.effectiveDate}, #{record.expiryDate},
+                  try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, ''), 23),
+                  try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, ''), 23),
                   case when #{record.status} = '1' then 'N' else coalesce(#{record.activeFlag}, 'Y') end,
                   #{record.remark}
                 )
@@ -411,7 +412,7 @@ public class CeDimensionProjectionSqlProvider {
                 ) values (
                   #{record.recordCode}, #{record.recordName}, #{record.denominatorType},
                   #{record.denominatorMetricName}, #{record.intensityUnitDisplay},
-                  case when #{record.enabledText} = '否' or #{record.status} = '1' then 0 else 1 end,
+                  case when #{record.enabledText} = '0' or #{record.status} = '1' then 0 else 1 end,
                   #{record.remark}
                 )
               </when>
@@ -438,7 +439,7 @@ public class CeDimensionProjectionSqlProvider {
                   tolerance_key, industry_section, tolerance_rate, enabled_flag, remark
                 ) values (
                   #{record.recordCode}, #{record.recordName}, #{record.toleranceRate},
-                  case when #{record.enabledText} = '否' or #{record.status} = '1' then 0 else 1 end,
+                  case when #{record.enabledText} = '0' or #{record.status} = '1' then 0 else 1 end,
                   #{record.remark}
                 )
               </when>
@@ -472,8 +473,8 @@ public class CeDimensionProjectionSqlProvider {
                        industry_group_name = #{record.industryGroupName},
                        industry_class_code = #{record.industryClassCode},
                        industry_class_name = #{record.industryClassName},
-                       effective_date = #{record.effectiveDate},
-                       expiry_date = #{record.expiryDate},
+                       effective_date = try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, ''), 23),
+                       expiry_date = try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, ''), 23),
                        is_active = case when #{record.status} = '1' then 'N' else coalesce(#{record.activeFlag}, 'Y') end,
                        update_time = SYSDATETIME(),
                        remark = #{record.remark}
@@ -532,7 +533,7 @@ public class CeDimensionProjectionSqlProvider {
                        denominator_type = #{record.denominatorType},
                        denominator_metric_name = #{record.denominatorMetricName},
                        intensity_unit_display = #{record.intensityUnitDisplay},
-                       enabled_flag = case when #{record.enabledText} = '否' or #{record.status} = '1' then 0 else 1 end,
+                       enabled_flag = case when #{record.enabledText} = '0' or #{record.status} = '1' then 0 else 1 end,
                        update_time = SYSDATETIME(),
                        remark = #{record.remark}
                  where id = #{record.id}
@@ -568,7 +569,7 @@ public class CeDimensionProjectionSqlProvider {
                    set tolerance_key = #{record.recordCode},
                        industry_section = #{record.recordName},
                        tolerance_rate = #{record.toleranceRate},
-                       enabled_flag = case when #{record.enabledText} = '否' or #{record.status} = '1' then 0 else 1 end,
+                       enabled_flag = case when #{record.enabledText} = '0' or #{record.status} = '1' then 0 else 1 end,
                        update_time = SYSDATETIME(),
                        remark = #{record.remark}
                  where id = #{record.id}

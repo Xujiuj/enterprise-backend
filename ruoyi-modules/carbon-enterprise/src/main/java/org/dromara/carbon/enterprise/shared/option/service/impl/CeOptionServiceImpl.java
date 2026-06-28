@@ -521,7 +521,18 @@ public class CeOptionServiceImpl implements ICeOptionService {
         if ("status".equals(field)) {
             return labelForStatus(value);
         }
+        if ("enabledText".equals(field)) {
+            return labelForEnabledFlag(value);
+        }
         return labelForRaw(value);
+    }
+
+    private String labelForEnabledFlag(Object value) {
+        String normalized = normalizeValue(value);
+        if ("0".equals(normalized) || "否".equals(normalized) || "停用".equals(normalized) || "false".equalsIgnoreCase(normalized)) {
+            return "停用";
+        }
+        return "启用";
     }
 
     private void validateDimensionOptionRequest(String dimensionCode, String field) {

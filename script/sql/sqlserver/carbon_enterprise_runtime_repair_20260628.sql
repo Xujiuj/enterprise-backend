@@ -232,5 +232,17 @@ BEGIN
 END;
 GO
 
+IF OBJECT_ID(N'dbo.sys_menu', N'U') IS NOT NULL
+BEGIN
+    UPDATE dbo.sys_menu
+       SET component = N'enterprise/dimension/index',
+           query_param = N'{"code":"intensity-target"}',
+           perms = N'enterprise:dimension:list',
+           update_time = SYSDATETIME()
+     WHERE menu_id = 900152
+       AND path = N'intensity-target';
+END;
+GO
+
 SELECT N'enterprise_runtime_repair_20260628_ok' AS result;
 GO

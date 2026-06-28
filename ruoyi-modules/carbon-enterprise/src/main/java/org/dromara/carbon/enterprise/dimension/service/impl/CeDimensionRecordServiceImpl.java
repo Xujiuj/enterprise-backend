@@ -103,14 +103,14 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     @Override
     public Boolean insertByBo(CeDimensionRecordBo bo) {
         validateEditableDimensionCode(bo.getDimensionCode());
-        normalizeCompanyRecord(bo);
+        normalizeEditableRecord(bo);
         return dimensionProjectionMapper.insertByDimensionCode(bo) > 0;
     }
 
     @Override
     public Boolean updateByBo(CeDimensionRecordBo bo) {
         validateEditableDimensionCode(bo.getDimensionCode());
-        normalizeCompanyRecord(bo);
+        normalizeEditableRecord(bo);
         return dimensionProjectionMapper.updateByDimensionCode(bo) > 0;
     }
 
@@ -167,14 +167,70 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         return StringUtils.isNotBlank(value) && value.contains(query);
     }
 
+    private void normalizeEditableRecord(CeDimensionRecordBo bo) {
+        normalizeCompanyRecord(bo);
+        normalizeIntensityDenominatorRecord(bo);
+        normalizeIntensityTargetRecord(bo);
+        normalizeIntensityToleranceRecord(bo);
+    }
+
     private void normalizeCompanyRecord(CeDimensionRecordBo bo) {
         if (!"company".equals(bo.getDimensionCode())) {
             return;
+        }
+        if (StringUtils.isBlank(bo.getParentCode())) {
+            throw new ServiceException("工厂编号不能为空");
+        }
+        if (StringUtils.isBlank(bo.getFactoryName())) {
+            throw new ServiceException("工厂名称不能为空");
         }
         if (StringUtils.isBlank(bo.getCompanySk())) {
             bo.setCompanySk(buildCompanySk(bo));
         }
         bo.setActiveFlag("1".equals(bo.getStatus()) ? "N" : "Y");
+    }
+
+    private void normalizeIntensityDenominatorRecord(CeDimensionRecordBo bo) {
+        if (!"intensity-denominator".equals(bo.getDimensionCode())) {
+            return;
+        }
+        requireNotBlank(bo.getRecordCode(), "分母规则Key不能为空");
+        requireNotBlank(bo.getRecordName(), "工厂类型不能为空");
+        requireNotBlank(bo.getDenominatorType(), "分母类型不能为空");
+        requireNotBlank(bo.getDenominatorMetricName(), "分母度量名称不能为空");
+        requireNotBlank(bo.getIntensityUnitDisplay(), "强度单位展示不能为空");
+        bo.setEnabledText(normalizeEnabledFlag(bo.getEnabledText(), bo.getStatus()));
+    }
+
+    private void normalizeIntensityTargetRecord(CeDimensionRecordBo bo) {
+        if (!"intensity-target".equals(bo.getDimensionCode())) {
+            return;
+        }
+        requireNotBlank(bo.getRecordCode(), "工厂类型不能为空");
+        requireNotBlank(bo.getRecordName(), "年份不能为空");
+        requireNotBlank(bo.getTargetValue(), "强度目标值不能为空");
+        requireNotBlank(bo.getUnitName(), "单位不能为空");
+    }
+
+    private void normalizeIntensityToleranceRecord(CeDimensionRecordBo bo) {
+        if (!"intensity-tolerance".equals(bo.getDimensionCode())) {
+            return;
+        }
+        bo.setEnabledText(normalizeEnabledFlag(bo.getEnabledText(), bo.getStatus()));
+    }
+
+    private void requireNotBlank(String value, String message) {
+        if (StringUtils.isBlank(value)) {
+            throw new ServiceException(message);
+        }
+    }
+
+    private String normalizeEnabledFlag(String enabledText, String status) {
+        String value = StringUtils.trimToEmpty(enabledText);
+        if ("0".equals(value) || "否".equals(value) || "停用".equals(value) || "false".equalsIgnoreCase(value) || "1".equals(status)) {
+            return "0";
+        }
+        return "1";
     }
 
     private String buildCompanySk(CeDimensionRecordBo bo) {
