@@ -232,7 +232,7 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
             announcementCacheExpiry = now + 30_000L;
             return notices;
         } catch (RuntimeException e) {
-            log.error("获取厂商公告失败，licenseId={}", licenseState.getLicenseId(), e);
+            log.warn("获取厂商公告失败，licenseId={}，已降级为本地提示", licenseState.getLicenseId(), e);
             List<CeWorkbenchOverviewVo.SystemNotice> fallback = List.of(systemNoticeUnavailable());
             if (announcementCache == null) {
                 announcementCache = new ArrayList<>(fallback);
