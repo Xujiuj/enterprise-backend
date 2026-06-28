@@ -99,6 +99,21 @@ class CeDimensionRecordServiceTest {
         ));
     }
 
+    @Test
+    void companyStatusOverridesActiveFlag() {
+        CeDimensionRecordBo bo = new CeDimensionRecordBo();
+        bo.setDimensionCode("company");
+        bo.setRecordCode("COMP-001");
+        bo.setRecordName("Demo Company");
+        bo.setStatus("1");
+        bo.setActiveFlag("Y");
+        when(dimensionProjectionMapper.insertByDimensionCode(any())).thenReturn(1);
+
+        service.insertByBo(bo);
+
+        verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record -> "N".equals(record.getActiveFlag())));
+    }
+
     private CeDimensionRecordVo localCompany() {
         CeDimensionRecordVo record = new CeDimensionRecordVo();
         record.setId(1L);

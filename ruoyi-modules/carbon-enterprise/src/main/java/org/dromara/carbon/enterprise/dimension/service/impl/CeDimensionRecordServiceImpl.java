@@ -174,9 +174,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         if (StringUtils.isBlank(bo.getCompanySk())) {
             bo.setCompanySk(buildCompanySk(bo));
         }
-        if (StringUtils.isBlank(bo.getActiveFlag())) {
-            bo.setActiveFlag("1".equals(bo.getStatus()) ? "N" : "Y");
-        }
+        bo.setActiveFlag("1".equals(bo.getStatus()) ? "N" : "Y");
     }
 
     private String buildCompanySk(CeDimensionRecordBo bo) {
