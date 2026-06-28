@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,6 +56,17 @@ class CeLicenseImportControllerTest {
     }
 
     @Test
+    void returnsCurrentInstallIdAsDataField() throws Exception {
+        when(installIdProvider.getExpectedInstallId()).thenReturn(EXPECTED_INSTALL_ID);
+
+        mockMvc.perform(get("/enterprise/license-import/install-id"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code", is(200)))
+            .andExpect(jsonPath("$.msg", is("操作成功")))
+            .andExpect(jsonPath("$.data.expectedInstallId", is(EXPECTED_INSTALL_ID)));
+    }
+
+    @Test
     void importsLicenseWithConfiguredPublicKey() throws Exception {
         when(publicKeyProvider.getPublicKeyPem()).thenReturn(CONFIGURED_PUBLIC_KEY);
         when(licenseImportService.importLicense(eq(LICENSE_CONTENT), eq(CONFIGURED_PUBLIC_KEY),
@@ -67,7 +79,7 @@ class CeLicenseImportControllerTest {
             .andExpect(jsonPath("$.code", is(200)))
             .andExpect(jsonPath("$.data.valid", is(true)))
             .andExpect(jsonPath("$.data.status", is("VALID")))
-            .andExpect(jsonPath("$.data.message", is("license is valid")))
+            .andExpect(jsonPath("$.data.message", is("授权文件校验通过")))
             .andExpect(jsonPath("$.data.licenseState.licenseId", is("LIC-TEST-VALID-001")))
             .andExpect(jsonPath("$.data.licenseState.customerId", is("CUST-001")))
             .andExpect(jsonPath("$.data.licenseState.installId", is(EXPECTED_INSTALL_ID)))
@@ -76,8 +88,8 @@ class CeLicenseImportControllerTest {
             .andExpect(jsonPath("$.data.licenseState.schemaVersion", is("license.v1")))
             .andExpect(jsonPath("$.data.licenseState.licenseStatus", is("VALID")))
             .andExpect(jsonPath("$.data.licenseState.id").doesNotExist())
-            .andExpect(jsonPath("$.data.licenseState.lastVerifiedTime").doesNotExist())
-            .andExpect(jsonPath("$.data.licenseState.maxObservedTime").doesNotExist());
+            .andExpect(jsonPath("$.data.licenseState.lastVerifiedTime", is(1780531200000L)))
+            .andExpect(jsonPath("$.data.licenseState.maxObservedTime", is(1780531200000L)));
 
         verify(licenseImportService).importLicense(eq(LICENSE_CONTENT), eq(CONFIGURED_PUBLIC_KEY),
             eq(EXPECTED_INSTALL_ID), any(Date.class));
@@ -111,7 +123,7 @@ class CeLicenseImportControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code", is(400)))
-            .andExpect(jsonPath("$.msg", is("\u8bf7\u6c42\u53c2\u6570\u683c\u5f0f\u9519\u8bef\uff0c\u8bf7\u68c0\u67e5\u540e\u91cd\u8bd5")));
+            .andExpect(jsonPath("$.msg", is("请求参数格式错误：授权导入请求包含不支持的字段：publicKeyPem")));
 
         verify(licenseImportService, never()).importLicense(any(), any(), any(), any());
     }
@@ -143,7 +155,7 @@ class CeLicenseImportControllerTest {
                 .content(requestJson(" ", EXPECTED_INSTALL_ID)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code", is(500)))
-            .andExpect(jsonPath("$.msg", is("licenseContent cannot be blank")));
+            .andExpect(jsonPath("$.msg", is("授权文件内容不能为空")));
 
         verify(licenseImportService, never()).importLicense(any(), any(), any(), any());
     }
@@ -155,7 +167,7 @@ class CeLicenseImportControllerTest {
                 .content(requestJson(LICENSE_CONTENT, " ")))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code", is(500)))
-            .andExpect(jsonPath("$.msg", is("expectedInstallId cannot be blank")));
+            .andExpect(jsonPath("$.msg", is("部署指纹不能为空")));
 
         verify(licenseImportService, never()).importLicense(any(), any(), any(), any());
     }
@@ -197,10 +209,10 @@ class CeLicenseImportControllerTest {
 
     private String expectedMessage(String status) {
         return switch (status) {
-            case "SIGNATURE_INVALID" -> "license signature is invalid";
-            case "EXPIRED" -> "license has expired";
-            case "INSTALL_ID_MISMATCH" -> "license installId does not match local installId";
-            case "CLOCK_ROLLBACK" -> "system time is earlier than the last observed license verification time";
+            case "SIGNATURE_INVALID" -> "授权文件签名校验失败";
+            case "EXPIRED" -> "授权已过期";
+            case "INSTALL_ID_MISMATCH" -> "授权文件的部署指纹与本机不匹配";
+            case "CLOCK_ROLLBACK" -> "系统时间早于最近授权校验时间";
             default -> "license import failed";
         };
     }

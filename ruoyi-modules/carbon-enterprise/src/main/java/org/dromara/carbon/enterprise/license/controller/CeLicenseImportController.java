@@ -2,6 +2,7 @@ package org.dromara.carbon.enterprise.license.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
+import org.dromara.carbon.enterprise.license.domain.CeLicenseInstallIdResponse;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseImportRequest;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseImportResponse;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseImportResult;
@@ -33,8 +34,8 @@ public class CeLicenseImportController extends BaseController {
     private final org.dromara.carbon.enterprise.license.service.CeLicenseInstallIdProvider installIdProvider;
 
     @GetMapping("/install-id")
-    public R<String> currentInstallId() {
-        return R.ok(installIdProvider.getExpectedInstallId());
+    public R<CeLicenseInstallIdResponse> currentInstallId() {
+        return R.ok(new CeLicenseInstallIdResponse(installIdProvider.getExpectedInstallId()));
     }
 
     @SaCheckPermission("enterprise:licenseImport:import")
