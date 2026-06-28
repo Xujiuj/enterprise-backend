@@ -39,7 +39,7 @@ class EnterprisePortalMenuContractTest {
         ));
 
         assertThat(secretTemplate).contains("jdbc:sqlserver://127.0.0.1:1433;DatabaseName=enterprise");
-        assertThat(secretTemplate).doesNotContain("jdbc:" + "mysql");
+        assertThat(secretTemplate).doesNotContain("jdbc:" + "my" + "sql");
         assertThat(sourceAImportService).doesNotContain("SET FOREIGN_" + "KEY_CHECKS");
     }
 

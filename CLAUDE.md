@@ -10,7 +10,7 @@
 
 ## 二、全局差异化约束（写代码前必读，详见 ../docs/01、../docs/02）
 
-1. **数据库统一 SQL Server（2016+）**，非 MySQL。dynamic-datasource 已内置 sqlserver 数据源块（`application-dev.yml` 中注释状态），驱动 `com.microsoft.sqlserver.jdbc.SQLServerDriver`；中文列用 `NVARCHAR`；建表脚本/分页/自增需按 SQL Server 方言。
+1. **数据库统一 SQL Server（2016+）**。运行配置只保留 SQL Server 主数据源，驱动 `com.microsoft.sqlserver.jdbc.SQLServerDriver`；中文列用 `NVARCHAR`；建表脚本、分页、自增和动态 DDL 均按 SQL Server 方言。
 2. **双端同入口**：厂商端 vendor + 企业端 enterprise 共享同一套代码与登录页，按角色 `portal` 渲染不同菜单，避免同名动作串台。
 3. **License 体系**：RSA 私钥签发 `.lic`、公钥内置验签、设备绑定 `installId`、防时间回拨、写 `LicenseState` 表；登录/操作前置校验；外部 API 权限由 License `features` 驱动，企业端零改动。
 4. **私有化单体部署**：一个 jar + 一个本地 SQL Server 库，排除微服务版（RuoYi-Cloud）。

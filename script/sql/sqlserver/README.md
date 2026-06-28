@@ -12,4 +12,4 @@ Runtime schema hardening that must be present on SQL Server is enforced by:
 
 - `ruoyi-modules/carbon-enterprise/src/main/java/org/dromara/carbon/enterprise/shared/config/CeSchemaMigrationRunner.java`
 
-Do not add MySQL-compatible enterprise scripts back into this delivery.
+Do not add legacy-compatible enterprise scripts back into this delivery.

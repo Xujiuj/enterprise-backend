@@ -51,7 +51,7 @@ public class MybatisDecryptInterceptor implements Interceptor {
                 this.decryptHandler(parameterObject);
             }
         }
-        // 获取执行mysql执行结果
+        // 获取 SQL 执行结果
         Object result = invocation.proceed();
         if (result == null) {
             return null;

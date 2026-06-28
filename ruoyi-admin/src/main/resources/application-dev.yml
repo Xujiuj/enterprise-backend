@@ -20,24 +20,6 @@ spring:
           url: ${ENTERPRISE_DB_URL:jdbc:sqlserver://127.0.0.1:1433;DatabaseName=enterprise;encrypt=false;trustServerCertificate=true;SelectMethod=cursor}
           username: ${ENTERPRISE_DB_USERNAME:sa}
           password: ${ENTERPRISE_DB_PASSWORD:}
-#        oracle:
-#          type: ${spring.datasource.type}
-#          driverClassName: oracle.jdbc.OracleDriver
-#          url: jdbc:oracle:thin:@//localhost:1521/XE
-#          username: ROOT
-#          password: root
-#        postgres:
-#          type: ${spring.datasource.type}
-#          driverClassName: org.postgresql.Driver
-#          url: jdbc:postgresql://localhost:5432/postgres?useUnicode=true&characterEncoding=utf8&useSSL=true&autoReconnect=true&reWriteBatchedInserts=true
-#          username: root
-#          password: root
-#        sqlserver:
-#          type: ${spring.datasource.type}
-#          driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
-#          url: jdbc:sqlserver://localhost:1433;DatabaseName=tempdb;SelectMethod=cursor;encrypt=false;rewriteBatchedStatements=true
-#          username: SA
-#          password: root
       hikari:
         # 最大连接池数量
         maxPoolSize: 20
