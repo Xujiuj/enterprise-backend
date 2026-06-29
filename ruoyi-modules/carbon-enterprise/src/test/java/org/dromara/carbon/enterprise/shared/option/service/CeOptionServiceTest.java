@@ -59,6 +59,7 @@ class CeOptionServiceTest {
         initializeEntityLambdaCache(CeIntensityMetricMapper.class, CeIntensityMetric.class);
         initializeEntityLambdaCache(CeIntensityDenominatorFactMapper.class, CeIntensityDenominatorFact.class);
         initializeEntityLambdaCache(CeEmissionSourceMapper.class, CeEmissionSource.class);
+        initializeEntityLambdaCache(CeEmissionSourceCategoryMapper.class, org.dromara.carbon.enterprise.emission.domain.CeEmissionSourceCategory.class);
         initializeEntityLambdaCache(CeFactorCacheRecordMapper.class, CeFactorCacheRecord.class);
         initializeEntityLambdaCache(CeGreenPowerCertificateMapper.class, CeGreenPowerCertificate.class);
     }
@@ -99,6 +100,116 @@ class CeOptionServiceTest {
         var options = service.listOptions("factory-code", null);
 
         assertThat(options).isEmpty();
+    }
+
+    @Test
+    void companyCodeOptionsCarryCompanyRecordForAutofill() {
+        CeCompanyFactory factory = new CeCompanyFactory();
+        factory.setCompanyCode("C001");
+        factory.setCompanyName("A公司");
+        factory.setFactoryCode("F001");
+        factory.setFactoryName("一厂");
+        when(companyFactoryMapper.selectList(any())).thenReturn(List.of(factory));
+        when(activityDataMapper.selectList(any())).thenReturn(List.of());
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of());
+
+        var options = service.listOptions("company-code", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("C001");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("companyCode", "C001")
+            .containsEntry("companyName", "A公司")
+            .containsEntry("factoryCode", "F001")
+            .containsEntry("factoryName", "一厂");
+    }
+
+    @Test
+    void factoryNameOptionsCarryCompanyFactoryRecordForAutofill() {
+        CeCompanyFactory factory = new CeCompanyFactory();
+        factory.setCompanyCode("C001");
+        factory.setCompanyName("Company A");
+        factory.setFactoryCode("F001");
+        factory.setFactoryName("Factory One");
+        when(companyFactoryMapper.selectList(any())).thenReturn(List.of(factory));
+        when(activityDataMapper.selectList(any())).thenReturn(List.of());
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of());
+        when(greenPowerCertificateMapper.selectList(any())).thenReturn(List.of());
+
+        var options = service.listOptions("factory-name", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("Factory One");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("companyCode", "C001")
+            .containsEntry("companyName", "Company A")
+            .containsEntry("factoryCode", "F001")
+            .containsEntry("factoryName", "Factory One");
+    }
+
+    @Test
+    void sourceCategoryOptionsCarryScopeFieldsForAutofill() {
+        var categoryMapper = mock(CeEmissionSourceCategoryMapper.class);
+        service = new CeOptionServiceImpl(
+            activityDataMapper,
+            companyFactoryMapper,
+            emissionSourceMapper,
+            categoryMapper,
+            greenPowerCertificateMapper,
+            denominatorFactMapper,
+            mock(CeFactorCacheRecordMapper.class),
+            mock(CeFactorConfirmationMapper.class),
+            intensityMetricMapper,
+            mock(CeReportTemplateFileMapper.class),
+            mock(CeCaptureBatchMapper.class),
+            mock(CeLicenseStateMapper.class),
+            dimensionProjectionMapper
+        );
+        var category = new org.dromara.carbon.enterprise.emission.domain.CeEmissionSourceCategory();
+        category.setCategorySk("CAT-1");
+        category.setGhgScope("范围1");
+        category.setGhgScopeCategory("固定燃烧");
+        when(categoryMapper.selectList(any())).thenReturn(List.of(category));
+        when(activityDataMapper.selectList(any())).thenReturn(List.of());
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of());
+        when(greenPowerCertificateMapper.selectList(any())).thenReturn(List.of());
+
+        var options = service.listOptions("source-category-key", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("CAT-1");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("sourceCategoryKey", "CAT-1")
+            .containsEntry("scopeName", "范围1")
+            .containsEntry("scopeSubcategory", "固定燃烧");
+    }
+
+    @Test
+    void emissionSourceCodeOptionsCarrySourceRecordForAutofill() {
+        CeEmissionSource source = emissionSource("ES-001", "柴油", "A公司", "一厂", "cat-a");
+        source.setResponsibleDept("生产部");
+        source.setDataSource("台账");
+        source.setFactorKey(null);
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of(source));
+
+        var options = service.listOptions("emission-source-code", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("ES-001");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("companyCode", "A公司-CODE")
+            .containsEntry("companyName", "A公司")
+            .containsEntry("factoryName", "一厂")
+            .containsEntry("sourceCategoryKey", "cat-a")
+            .containsEntry("sourceIdentificationCode", "ES-001")
+            .containsEntry("sourceIdentificationName", "柴油识别")
+            .containsEntry("emissionSourceName", "柴油")
+            .containsEntry("responsibleDept", "生产部")
+            .containsEntry("dataSource", "台账");
     }
 
     @Test

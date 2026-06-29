@@ -97,7 +97,17 @@ public class CeOptionServiceImpl implements ICeOptionService {
         "activeFlag",
         "ghgScope",
         "ghgScopeCategory",
+        "baseYear",
+        "baseYearKey",
+        "description",
+        "isCurrent",
         "currentBaseFlag",
+        "emissionSourceNameEn",
+        "fuelMaterialCategory",
+        "sourceUnit",
+        "applicableScope",
+        "factorSource",
+        "factorUnit",
         "factorVersion",
         "divisionCode",
         "divisionName",
@@ -128,7 +138,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
         List<CeOptionVo> options = new ArrayList<>();
         switch (optionCode) {
             case "company-code" -> {
-                collectDistinctWithLabel(options, companyFactoryMapper, CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName);
+                collectCompanyCodeOptions(options);
                 collectDistinctWithLabel(options, activityDataMapper, CeActivityData::getCompanyCode, CeActivityData::getCompanyName);
                 collectDistinctWithLabel(options, emissionSourceMapper, CeEmissionSource::getCompanyCode, CeEmissionSource::getCompanyName);
             }
@@ -138,9 +148,8 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 collectDistinct(options, emissionSourceMapper, CeEmissionSource::getCompanyName, this::labelForRaw);
             }
             case "factory-code" -> {
-                collectDistinctWithLabel(options, companyFactoryMapper, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName);
+                collectCompanyFactoryCodeOptions(options);
                 collectDistinctWithLabel(options, activityDataMapper, CeActivityData::getFactoryCode, CeActivityData::getFactoryName);
-                collectDistinctWithLabel(options, emissionSourceMapper, CeEmissionSource::getCompanyCode, CeEmissionSource::getFactoryName);
                 collectDistinctWithLabel(
                     options,
                     greenPowerCertificateMapper,
@@ -149,7 +158,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 );
             }
             case "factory-name" -> {
-                collectDistinct(options, companyFactoryMapper, CeCompanyFactory::getFactoryName, this::labelForRaw);
+                collectCompanyFactoryNameOptions(options);
                 collectDistinct(options, activityDataMapper, CeActivityData::getFactoryName, this::labelForRaw);
                 collectDistinct(options, emissionSourceMapper, CeEmissionSource::getFactoryName, this::labelForRaw);
                 collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getFactoryName, this::labelForRaw);
@@ -182,12 +191,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 collectDistinct(options, activityDataMapper, CeActivityData::getResponsibleDept, this::labelForRaw);
                 collectDistinct(options, emissionSourceMapper, CeEmissionSource::getResponsibleDept, this::labelForRaw);
             }
-            case "emission-source-code" -> collectDistinct(
-                options,
-                emissionSourceMapper,
-                CeEmissionSource::getSourceIdentificationCode,
-                this::labelForRaw
-            );
+            case "emission-source-code" -> collectEmissionSourceCodeOptions(options);
             case "data-source" -> {
                 collectDistinct(options, activityDataMapper, CeActivityData::getDataSource, this::labelForRaw);
                 collectDistinct(options, emissionSourceMapper, CeEmissionSource::getDataSource, this::labelForRaw);
@@ -276,6 +280,39 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
+    private void collectCompanyCodeOptions(List<CeOptionVo> target) {
+        List<CeCompanyFactory> rows = companyFactoryMapper.selectList(new LambdaQueryWrapper<CeCompanyFactory>()
+            .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName)
+            .isNotNull(CeCompanyFactory::getCompanyCode)
+            .orderByAsc(CeCompanyFactory::getCompanyCode)
+            .orderByAsc(CeCompanyFactory::getFactoryCode));
+        for (CeCompanyFactory row : rows) {
+            addOption(target, labelWithName(row.getCompanyCode(), row.getCompanyName()), row.getCompanyCode(), companyFactoryRecord(row));
+        }
+    }
+
+    private void collectCompanyFactoryCodeOptions(List<CeOptionVo> target) {
+        List<CeCompanyFactory> rows = companyFactoryMapper.selectList(new LambdaQueryWrapper<CeCompanyFactory>()
+            .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName)
+            .isNotNull(CeCompanyFactory::getFactoryCode)
+            .orderByAsc(CeCompanyFactory::getCompanyCode)
+            .orderByAsc(CeCompanyFactory::getFactoryCode));
+        for (CeCompanyFactory row : rows) {
+            addOption(target, labelWithName(row.getFactoryCode(), row.getFactoryName()), row.getFactoryCode(), companyFactoryRecord(row));
+        }
+    }
+
+    private void collectCompanyFactoryNameOptions(List<CeOptionVo> target) {
+        List<CeCompanyFactory> rows = companyFactoryMapper.selectList(new LambdaQueryWrapper<CeCompanyFactory>()
+            .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName)
+            .isNotNull(CeCompanyFactory::getFactoryName)
+            .orderByAsc(CeCompanyFactory::getCompanyCode)
+            .orderByAsc(CeCompanyFactory::getFactoryCode));
+        for (CeCompanyFactory row : rows) {
+            addOption(target, labelWithName(row.getFactoryName(), row.getFactoryCode()), row.getFactoryName(), companyFactoryRecord(row));
+        }
+    }
+
     private void collectSourceCategoryOptions(List<CeOptionVo> target) {
         List<CeEmissionSourceCategory> rows = emissionSourceCategoryMapper.selectList(new LambdaQueryWrapper<CeEmissionSourceCategory>()
             .select(
@@ -293,6 +330,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 .reduce((left, right) -> left + " / " + right)
                 .orElse(normalizeValue(row.getCategorySk()));
             Map<String, Object> record = new LinkedHashMap<>();
+            record.put("sourceCategoryKey", row.getCategorySk());
             record.put("scopeName", row.getGhgScope());
             record.put("scopeSubcategory", row.getGhgScopeCategory());
             addOption(target, label, row.getCategorySk(), record);
@@ -320,12 +358,30 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
+    private void collectEmissionSourceCodeOptions(List<CeOptionVo> target) {
+        List<CeEmissionSource> rows = selectEnabledEmissionSources(new CeOptionQueryBo());
+        Map<String, String> factorNameCache = loadFactorDisplayNameCache(rows);
+        for (CeEmissionSource row : rows) {
+            String label = labelWithName(row.getSourceIdentificationCode(), row.getSourceIdentificationName());
+            addOption(target, label, row.getSourceIdentificationCode(), emissionSourceRecord(row, factorNameCache));
+        }
+    }
+
     private void collectDimensionStatusOptions(List<CeOptionVo> target) {
         for (String dimensionCode : ALLOWED_DIMENSION_CODES) {
             for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
                 addOption(target, labelForStatus(record.getStatus()), record.getStatus());
             }
         }
+    }
+
+    private String labelWithName(Object value, Object name) {
+        String rawValue = normalizeValue(value);
+        String rawName = normalizeValue(name);
+        if (StringUtils.isBlank(rawName) || rawName.equals(rawValue)) {
+            return rawValue;
+        }
+        return rawValue + " / " + rawName;
     }
 
     private void collectIntensityTargetOptions(List<CeOptionVo> target) {
@@ -394,6 +450,15 @@ public class CeOptionServiceImpl implements ICeOptionService {
             }
         }
         target.addAll(optionsByCode.values());
+    }
+
+    private Map<String, Object> companyFactoryRecord(CeCompanyFactory factory) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("companyCode", factory.getCompanyCode());
+        record.put("companyName", factory.getCompanyName());
+        record.put("factoryCode", factory.getFactoryCode());
+        record.put("factoryName", factory.getFactoryName());
+        return record;
     }
 
     private List<CeEmissionSource> selectEnabledEmissionSources(CeOptionQueryBo query) {
@@ -494,7 +559,8 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
         for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
             Object value = dimensionValue(record, field);
-            addOption(target, labelForDimensionField(field, value), value, dimensionRecordMap(record));
+            String normalizedValue = normalizeValue(value);
+            addOption(target, labelForDimensionField(field, normalizedValue), normalizedValue, dimensionRecordMap(record));
         }
     }
 
@@ -529,24 +595,97 @@ public class CeOptionServiceImpl implements ICeOptionService {
 
     private Map<String, Object> dimensionRecordMap(CeDimensionRecordVo record) {
         Map<String, Object> values = new LinkedHashMap<>();
-        values.put("recordCode", record.getRecordCode());
-        values.put("recordName", record.getRecordName());
-        values.put("parentCode", record.getParentCode());
-        values.put("companySk", record.getCompanySk());
-        values.put("factoryName", record.getFactoryName());
-        values.put("provinceCode", record.getProvinceCode());
-        values.put("provinceName", record.getProvinceName());
-        values.put("factoryType", record.getFactoryType());
-        values.put("industrySectionCode", record.getIndustrySectionCode());
-        values.put("industrySectionName", record.getIndustrySectionName());
-        values.put("industryDivisionCode", record.getIndustryDivisionCode());
-        values.put("industryDivisionName", record.getIndustryDivisionName());
-        values.put("industryGroupCode", record.getIndustryGroupCode());
-        values.put("industryGroupName", record.getIndustryGroupName());
-        values.put("industryClassCode", record.getIndustryClassCode());
-        values.put("industryClassName", record.getIndustryClassName());
-        values.put("activeFlag", record.getActiveFlag());
-        values.put("status", record.getStatus());
+        values.put("recordCode", normalizeValue(record.getRecordCode()));
+        values.put("recordName", normalizeValue(record.getRecordName()));
+        values.put("parentCode", normalizeValue(record.getParentCode()));
+        values.put("companySk", normalizeValue(record.getCompanySk()));
+        values.put("factoryName", normalizeValue(record.getFactoryName()));
+        values.put("provinceCode", normalizeValue(record.getProvinceCode()));
+        values.put("provinceName", normalizeValue(record.getProvinceName()));
+        values.put("factoryType", normalizeValue(record.getFactoryType()));
+        values.put("industrySectionCode", normalizeValue(record.getIndustrySectionCode()));
+        values.put("industrySectionName", normalizeValue(record.getIndustrySectionName()));
+        values.put("industryDivisionCode", normalizeValue(record.getIndustryDivisionCode()));
+        values.put("industryDivisionName", normalizeValue(record.getIndustryDivisionName()));
+        values.put("industryGroupCode", normalizeValue(record.getIndustryGroupCode()));
+        values.put("industryGroupName", normalizeValue(record.getIndustryGroupName()));
+        values.put("industryClassCode", normalizeValue(record.getIndustryClassCode()));
+        values.put("industryClassName", normalizeValue(record.getIndustryClassName()));
+        values.put("activeFlag", normalizeValue(record.getActiveFlag()));
+        values.put("levelType", normalizeValue(record.getLevelType()));
+        values.put("categorySk", normalizeValue(record.getCategorySk()));
+        values.put("businessKey", normalizeValue(record.getBusinessKey()));
+        values.put("categoryNameEn", normalizeValue(record.getCategoryNameEn()));
+        values.put("ghgScope", normalizeValue(record.getGhgScope()));
+        values.put("ghgScopeCategorySort", normalizeValue(record.getGhgScopeCategorySort()));
+        values.put("ghgScopeCategory", normalizeValue(record.getGhgScopeCategory()));
+        values.put("ghgScopeEn", normalizeValue(record.getGhgScopeEn()));
+        values.put("ghgScopeCategoryEn", normalizeValue(record.getGhgScopeCategoryEn()));
+        values.put("isoCategory", normalizeValue(record.getIsoCategory()));
+        values.put("isoCategoryEn", normalizeValue(record.getIsoCategoryEn()));
+        values.put("isoCategoryDescription", normalizeValue(record.getIsoCategoryDescription()));
+        values.put("isoCategoryDescriptionEn", normalizeValue(record.getIsoCategoryDescriptionEn()));
+        values.put("isoCustomSubcategory", normalizeValue(record.getIsoCustomSubcategory()));
+        values.put("gbScopeCategory", normalizeValue(record.getGbScopeCategory()));
+        values.put("gbSubcategory", normalizeValue(record.getGbSubcategory()));
+        values.put("currentFlag", normalizeValue(record.getCurrentFlag()));
+        values.put("versionNo", normalizeValue(record.getVersionNo()));
+        values.put("unifiedStandardCategory", normalizeValue(record.getUnifiedStandardCategory()));
+        values.put("baseYear", normalizeValue(record.getBaseYear()));
+        values.put("baseYearKey", normalizeValue(record.getBaseYearKey()));
+        values.put("description", normalizeValue(record.getDescription()));
+        values.put("isCurrent", normalizeValue(record.getIsCurrent()));
+        values.put("currentBaseFlag", normalizeValue(record.getCurrentBaseFlag()));
+        values.put("emissionSourceNameEn", normalizeValue(record.getEmissionSourceNameEn()));
+        values.put("fuelMaterialCategory", normalizeValue(record.getFuelMaterialCategory()));
+        values.put("sourceUnit", normalizeValue(record.getSourceUnit()));
+        values.put("co2", normalizeValue(record.getCo2()));
+        values.put("ch4", normalizeValue(record.getCh4()));
+        values.put("n2o", normalizeValue(record.getN2o()));
+        values.put("hfcs", normalizeValue(record.getHfcs()));
+        values.put("pfcs", normalizeValue(record.getPfcs()));
+        values.put("sf6", normalizeValue(record.getSf6()));
+        values.put("nf3", normalizeValue(record.getNf3()));
+        values.put("applicableScope", normalizeValue(record.getApplicableScope()));
+        values.put("factorSource", normalizeValue(record.getFactorSource()));
+        values.put("gwpCh4", normalizeValue(record.getGwpCh4()));
+        values.put("gwpN2o", normalizeValue(record.getGwpN2o()));
+        values.put("gwpHfcs", normalizeValue(record.getGwpHfcs()));
+        values.put("gwpPfcs", normalizeValue(record.getGwpPfcs()));
+        values.put("gwpSf6", normalizeValue(record.getGwpSf6()));
+        values.put("gwpNf3", normalizeValue(record.getGwpNf3()));
+        values.put("factorGwp", normalizeValue(record.getFactorGwp()));
+        values.put("factorUnit", normalizeValue(record.getFactorUnit()));
+        values.put("factorVersion", normalizeValue(record.getFactorVersion()));
+        values.put("divisionCode", normalizeValue(record.getDivisionCode()));
+        values.put("divisionName", normalizeValue(record.getDivisionName()));
+        values.put("regionName", normalizeValue(record.getRegionName()));
+        values.put("provinceFactor", normalizeValue(record.getProvinceFactor()));
+        values.put("regionFactor", normalizeValue(record.getRegionFactor()));
+        values.put("nationalFactor", normalizeValue(record.getNationalFactor()));
+        values.put("nonFossilExcludedFactor", normalizeValue(record.getNonFossilExcludedFactor()));
+        values.put("nationalFossilPowerFactor", normalizeValue(record.getNationalFossilPowerFactor()));
+        values.put("effectiveYear", normalizeValue(record.getEffectiveYear()));
+        values.put("scopeKey", normalizeValue(record.getScopeKey()));
+        values.put("scopeName", normalizeValue(record.getScopeName()));
+        values.put("gasNameEn", normalizeValue(record.getGasNameEn()));
+        values.put("gwpValue", normalizeValue(record.getGwpValue()));
+        values.put("gwpVersion", normalizeValue(record.getGwpVersion()));
+        values.put("chemicalFormula", normalizeValue(record.getChemicalFormula()));
+        values.put("denominatorType", normalizeValue(record.getDenominatorType()));
+        values.put("denominatorMetricName", normalizeValue(record.getDenominatorMetricName()));
+        values.put("intensityUnitDisplay", normalizeValue(record.getIntensityUnitDisplay()));
+        values.put("enabledText", normalizeValue(record.getEnabledText()));
+        values.put("targetYear", normalizeValue(record.getTargetYear()));
+        values.put("targetValue", normalizeValue(record.getTargetValue()));
+        values.put("unitName", normalizeValue(record.getUnitName()));
+        values.put("factYear", normalizeValue(record.getFactYear()));
+        values.put("factMonth", normalizeValue(record.getFactMonth()));
+        values.put("denominatorValue", normalizeValue(record.getDenominatorValue()));
+        values.put("dataSource", normalizeValue(record.getDataSource()));
+        values.put("industrySection", normalizeValue(record.getIndustrySection()));
+        values.put("toleranceRate", normalizeValue(record.getToleranceRate()));
+        values.put("status", normalizeValue(record.getStatus()));
         return values;
     }
 
@@ -598,7 +737,17 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "activeFlag" -> record.getActiveFlag();
             case "ghgScope" -> record.getGhgScope();
             case "ghgScopeCategory" -> record.getGhgScopeCategory();
+            case "baseYear" -> record.getBaseYear();
+            case "baseYearKey" -> record.getBaseYearKey();
+            case "description" -> record.getDescription();
+            case "isCurrent" -> record.getIsCurrent();
             case "currentBaseFlag" -> record.getCurrentBaseFlag();
+            case "emissionSourceNameEn" -> record.getEmissionSourceNameEn();
+            case "fuelMaterialCategory" -> record.getFuelMaterialCategory();
+            case "sourceUnit" -> record.getSourceUnit();
+            case "applicableScope" -> record.getApplicableScope();
+            case "factorSource" -> record.getFactorSource();
+            case "factorUnit" -> record.getFactorUnit();
             case "factorVersion" -> record.getFactorVersion();
             case "divisionCode" -> record.getDivisionCode();
             case "divisionName" -> record.getDivisionName();
