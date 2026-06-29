@@ -50,6 +50,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     private static final Set<String> ALLOWED_LOCAL_PROJECTION_CODES = Set.of(
         "admin-division",
         "company",
+        "industry",
         "emission-source-category",
         "base-year",
         "ef-factor",
@@ -65,6 +66,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private static final Set<String> ENTERPRISE_EDITABLE_DIMENSION_CODES = Set.of(
         "company",
+        "industry",
         "base-year",
         "ef-factor",
         "ef-electricity-version",
@@ -169,6 +171,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private void normalizeEditableRecord(CeDimensionRecordBo bo) {
         normalizeCompanyRecord(bo);
+        normalizeIndustryRecord(bo);
         normalizeIntensityDenominatorRecord(bo);
         normalizeIntensityTargetRecord(bo);
         normalizeIntensityToleranceRecord(bo);
@@ -188,6 +191,31 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
             bo.setCompanySk(buildCompanySk(bo));
         }
         bo.setActiveFlag("1".equals(bo.getStatus()) ? "N" : "Y");
+    }
+
+    private void normalizeIndustryRecord(CeDimensionRecordBo bo) {
+        if (!"industry".equals(bo.getDimensionCode())) {
+            return;
+        }
+        if (StringUtils.isBlank(bo.getIndustryClassCode()) && StringUtils.isNotBlank(bo.getRecordCode())) {
+            bo.setIndustryClassCode(bo.getRecordCode());
+        }
+        if (StringUtils.isBlank(bo.getIndustryClassName()) && StringUtils.isNotBlank(bo.getRecordName())) {
+            bo.setIndustryClassName(bo.getRecordName());
+        }
+        requireNotBlank(bo.getIndustrySectionCode(), "行业门类代码不能为空");
+        requireNotBlank(bo.getIndustrySectionName(), "行业门类名称不能为空");
+        requireIndustryPair(bo.getIndustryDivisionCode(), bo.getIndustryDivisionName(), "行业大类");
+        requireIndustryPair(bo.getIndustryGroupCode(), bo.getIndustryGroupName(), "行业中类");
+        requireIndustryPair(bo.getIndustryClassCode(), bo.getIndustryClassName(), "行业小类");
+    }
+
+    private void requireIndustryPair(String code, String name, String label) {
+        if (StringUtils.isBlank(code) && StringUtils.isBlank(name)) {
+            return;
+        }
+        requireNotBlank(code, label + "代码不能为空");
+        requireNotBlank(name, label + "名称不能为空");
     }
 
     private void normalizeIntensityDenominatorRecord(CeDimensionRecordBo bo) {

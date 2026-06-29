@@ -470,13 +470,13 @@ class CeOptionServiceTest {
 
     @Test
     void dimensionFieldOptionsUseFieldValueLabelsExceptStatus() {
-        CeDimensionRecordVo company = new CeDimensionRecordVo();
-        company.setIndustrySectionCode("C");
-        company.setIndustrySectionName("制造业");
+        CeDimensionRecordVo industry = new CeDimensionRecordVo();
+        industry.setIndustrySectionCode("C");
+        industry.setIndustrySectionName("制造业");
         CeDimensionRecordVo energy = new CeDimensionRecordVo();
         energy.setIndustrySectionCode("D");
         energy.setIndustrySectionName("电力、热力、燃气及水生产和供应业");
-        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(company));
+        when(dimensionProjectionMapper.selectByDimensionCode("industry")).thenReturn(List.of(industry));
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
         query.setField("industrySectionCode");
@@ -496,10 +496,10 @@ class CeOptionServiceTest {
 
     @Test
     void companyIndustryNameOptionsCarryPairedCodeAndName() {
-        CeDimensionRecordVo company = new CeDimensionRecordVo();
-        company.setIndustryDivisionCode("26");
-        company.setIndustryDivisionName("化学原料和化学制品制造业");
-        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(company));
+        CeDimensionRecordVo industry = new CeDimensionRecordVo();
+        industry.setIndustryDivisionCode("26");
+        industry.setIndustryDivisionName("化学原料和化学制品制造业");
+        when(dimensionProjectionMapper.selectByDimensionCode("industry")).thenReturn(List.of(industry));
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
         query.setField("industryDivisionName");
@@ -522,8 +522,12 @@ class CeOptionServiceTest {
     }
 
     @Test
-    void companyIndustryOptionsDoNotFallBackToReferenceCatalog() {
-        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of());
+    void companyIndustryOptionsDoNotFallBackToCompanyRowsOrReferenceCatalog() {
+        CeDimensionRecordVo company = new CeDimensionRecordVo();
+        company.setIndustryClassCode("2611");
+        company.setIndustryClassName("无机酸制造");
+        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(company));
+        when(dimensionProjectionMapper.selectByDimensionCode("industry")).thenReturn(List.of());
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
         query.setField("industryClassCode");
@@ -540,7 +544,7 @@ class CeOptionServiceTest {
         chemical.setIndustrySectionName("制造业");
         chemical.setIndustryDivisionCode("26");
         chemical.setIndustryDivisionName("化学原料和化学制品制造业");
-        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(chemical));
+        when(dimensionProjectionMapper.selectByDimensionCode("industry")).thenReturn(List.of(chemical));
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
         query.setField("industryDivisionCode");
@@ -625,9 +629,9 @@ class CeOptionServiceTest {
 
     @Test
     void dimensionFieldOptionsAcceptLegacyFieldNameParameter() {
-        CeDimensionRecordVo company = new CeDimensionRecordVo();
-        company.setIndustrySectionCode("C");
-        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(company));
+        CeDimensionRecordVo industry = new CeDimensionRecordVo();
+        industry.setIndustrySectionCode("C");
+        when(dimensionProjectionMapper.selectByDimensionCode("industry")).thenReturn(List.of(industry));
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
         query.setFieldName("industrySectionCode");

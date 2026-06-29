@@ -66,6 +66,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
     private static final Set<String> ALLOWED_DIMENSION_CODES = Set.of(
         "admin-division",
         "company",
+        "industry",
         "emission-source-category",
         "base-year",
         "ef-factor",
@@ -752,7 +753,11 @@ public class CeOptionServiceImpl implements ICeOptionService {
             return;
         }
         if ("company".equals(dimensionCode) && companyIndustryPair(field) != null) {
-            collectCompanyIndustryOptions(target, field);
+            collectIndustryOptions(target, field);
+            return;
+        }
+        if ("industry".equals(dimensionCode) && companyIndustryPair(field) != null) {
+            collectIndustryOptions(target, field);
             return;
         }
         for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
@@ -772,7 +777,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
-    private void collectCompanyIndustryOptions(List<CeOptionVo> target, String field) {
+    private void collectIndustryOptions(List<CeOptionVo> target, String field) {
         String pairedField = companyIndustryPair(field);
         if (pairedField == null) {
             return;
@@ -780,7 +785,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
         boolean codeSelected = field.endsWith("Code");
         String codeField = codeSelected ? field : pairedField;
         String nameField = codeSelected ? pairedField : field;
-        for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode("company")) {
+        for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode("industry")) {
             String code = normalizeValue(dimensionValue(record, codeField));
             String name = normalizeValue(dimensionValue(record, nameField));
             Object value = codeSelected ? code : name;

@@ -87,6 +87,28 @@ public class CeDimensionProjectionSqlProvider {
                   from ce_company_factory
                  order by company_code, factory_code
                 """;
+            case "industry" -> """
+                select id,
+                       'industry' as dimension_code,
+                       coalesce(nullif(industry_class_code, ''), nullif(industry_group_code, ''), nullif(industry_division_code, ''), industry_section_code) as record_code,
+                       coalesce(nullif(industry_class_name, ''), nullif(industry_group_name, ''), nullif(industry_division_name, ''), industry_section_name) as record_name,
+                       coalesce(nullif(industry_group_code, ''), nullif(industry_division_code, ''), nullif(industry_section_code, '')) as parent_code,
+                       industry_section_code as industry_section_code,
+                       industry_section_name as industry_section_name,
+                       industry_division_code as industry_division_code,
+                       industry_division_name as industry_division_name,
+                       industry_group_code as industry_group_code,
+                       industry_group_name as industry_group_name,
+                       industry_class_code as industry_class_code,
+                       industry_class_name as industry_class_name,
+                       coalesce(sort_order, id) as sort_order,
+                       coalesce(status, '0') as status,
+                       create_time,
+                       update_time,
+                       remark
+                  from ce_industry_classification
+                 order by coalesce(sort_order, id), industry_section_code, industry_division_code, industry_group_code, industry_class_code
+                """;
             case "emission-source-category" -> """
                 select id,
                        'emission-source-category' as dimension_code,
@@ -374,6 +396,21 @@ public class CeDimensionProjectionSqlProvider {
                   #{record.remark}
                 )
               </when>
+              <when test="record.dimensionCode == 'industry'">
+                insert into ce_industry_classification (
+                  industry_section_code, industry_section_name,
+                  industry_division_code, industry_division_name,
+                  industry_group_code, industry_group_name,
+                  industry_class_code, industry_class_name,
+                  status, sort_order, remark
+                ) values (
+                  #{record.industrySectionCode}, #{record.industrySectionName},
+                  #{record.industryDivisionCode}, #{record.industryDivisionName},
+                  #{record.industryGroupCode}, #{record.industryGroupName},
+                  #{record.industryClassCode}, #{record.industryClassName},
+                  coalesce(#{record.status}, '0'), try_convert(int, nullif(#{record.sortOrder,jdbcType=VARCHAR}, '')), #{record.remark}
+                )
+              </when>
               <when test="record.dimensionCode == 'base-year'">
                 insert into ce_base_year (
                   factory_code, factory_name, base_year, enabled_flag, remark
@@ -476,6 +513,22 @@ public class CeDimensionProjectionSqlProvider {
                        effective_date = try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, ''), 23),
                        expiry_date = try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, ''), 23),
                        is_active = case when #{record.status} = '1' then 'N' else coalesce(#{record.activeFlag}, 'Y') end,
+                       update_time = SYSDATETIME(),
+                       remark = #{record.remark}
+                 where id = #{record.id}
+              </when>
+              <when test="record.dimensionCode == 'industry'">
+                update ce_industry_classification
+                   set industry_section_code = #{record.industrySectionCode},
+                       industry_section_name = #{record.industrySectionName},
+                       industry_division_code = #{record.industryDivisionCode},
+                       industry_division_name = #{record.industryDivisionName},
+                       industry_group_code = #{record.industryGroupCode},
+                       industry_group_name = #{record.industryGroupName},
+                       industry_class_code = #{record.industryClassCode},
+                       industry_class_name = #{record.industryClassName},
+                       status = coalesce(#{record.status}, '0'),
+                       sort_order = try_convert(int, nullif(#{record.sortOrder,jdbcType=VARCHAR}, '')),
                        update_time = SYSDATETIME(),
                        remark = #{record.remark}
                  where id = #{record.id}
@@ -585,6 +638,7 @@ public class CeDimensionProjectionSqlProvider {
     public String deleteByDimensionCodeAndId(Map<String, Object> params) {
         return switch ((String) params.get("dimensionCode")) {
             case "company" -> "delete from ce_company_factory where id = #{id}";
+            case "industry" -> "delete from ce_industry_classification where id = #{id}";
             case "base-year" -> "delete from ce_base_year where id = #{id}";
             case "ef-factor" -> "delete from ce_ef_factor where id = #{id}";
             case "ef-electricity-version" -> "delete from ce_electricity_factor_version_map where id = #{id}";
