@@ -6,6 +6,75 @@ SET QUOTED_IDENTIFIER ON;
 SET NOCOUNT ON;
 GO
 
+IF OBJECT_ID(N'dbo.sys_menu', N'U') IS NOT NULL
+BEGIN
+    IF EXISTS (SELECT 1 FROM dbo.sys_menu WHERE menu_id = 900161)
+    BEGIN
+        UPDATE dbo.sys_menu
+           SET menu_name = N'Content',
+               parent_id = 900160,
+               order_num = 1,
+               path = N'content',
+               component = N'enterprise/reports/index',
+               perms = N'enterprise:reports:view',
+               icon = N'chart',
+               remark = N'Content',
+               update_time = SYSDATETIME()
+         WHERE menu_id = 900161;
+    END;
+
+    IF EXISTS (SELECT 1 FROM dbo.sys_menu WHERE menu_id = 900164)
+    BEGIN
+        UPDATE dbo.sys_menu
+           SET menu_name = N'温室气体核算报表',
+               parent_id = 900160,
+               order_num = 2,
+               path = N'powerbi-report',
+               component = N'enterprise/reports/powerbi',
+               perms = N'enterprise:reports:view',
+               icon = N'chart',
+               remark = N'Power BI温室气体核算报表',
+               update_time = SYSDATETIME()
+         WHERE menu_id = 900164;
+    END
+    ELSE IF EXISTS (SELECT 1 FROM dbo.sys_menu WHERE menu_id = 900160)
+    BEGIN
+        INSERT INTO dbo.sys_menu
+            (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, remark, create_time)
+        VALUES
+            (900164, N'温室气体核算报表', 900160, 2, N'powerbi-report', N'enterprise/reports/powerbi', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'chart', N'Power BI温室气体核算报表', SYSDATETIME());
+    END;
+
+    UPDATE dbo.sys_menu
+       SET order_num = 3,
+           update_time = SYSDATETIME()
+     WHERE menu_id = 900162;
+
+    UPDATE dbo.sys_menu
+       SET order_num = 4,
+           update_time = SYSDATETIME()
+     WHERE menu_id = 900163;
+END;
+GO
+
+IF OBJECT_ID(N'dbo.sys_role_menu', N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.sys_role', N'U') IS NOT NULL
+   AND OBJECT_ID(N'dbo.sys_menu', N'U') IS NOT NULL
+BEGIN
+    INSERT INTO dbo.sys_role_menu (role_id, menu_id)
+    SELECT role.role_id, 900164
+      FROM dbo.sys_role role
+     WHERE role.role_id IN (1, 900001, 900002, 900005)
+       AND EXISTS (SELECT 1 FROM dbo.sys_menu WHERE menu_id = 900164)
+       AND NOT EXISTS (
+           SELECT 1
+             FROM dbo.sys_role_menu existing
+            WHERE existing.role_id = role.role_id
+              AND existing.menu_id = 900164
+       );
+END;
+GO
+
 IF OBJECT_ID(N'dbo.ce_report_content', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ce_report_content (

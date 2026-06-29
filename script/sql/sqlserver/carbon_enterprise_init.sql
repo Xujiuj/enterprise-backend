@@ -452,8 +452,9 @@ VALUES
 
     (900160, N'报表管理', 0, 7, N'report-management', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'chart', N'报表管理目录'),
     (900161, N'Content', 900160, 1, N'content', N'enterprise/reports/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'chart', N'Content'),
-    (900162, N'数据验证', 900160, 2, N'data-validation', N'enterprise/dataValidation/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:dataValidation:view', N'validCode', N'数据验证'),
-    (900163, N'报表模板下载', 900160, 3, N'report-template-download', N'enterprise/reportTemplateFile/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reportTemplateFile:list', N'download', N'报表模板下载'),
+    (900164, N'温室气体核算报表', 900160, 2, N'powerbi-report', N'enterprise/reports/powerbi', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'chart', N'Power BI温室气体核算报表'),
+    (900162, N'数据验证', 900160, 3, N'data-validation', N'enterprise/dataValidation/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:dataValidation:view', N'validCode', N'数据验证'),
+    (900163, N'报表模板下载', 900160, 4, N'report-template-download', N'enterprise/reportTemplateFile/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reportTemplateFile:list', N'download', N'报表模板下载'),
 
     (900230, N'日志', 0, 9, N'log', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'log', N'日志目录'),
     (900231, N'操作日志', 900230, 1, N'operlog', N'monitor/operlog/index', N'', 1, 0, N'C', N'0', N'0', N'monitor:operlog:list', N'form', N'操作日志'),
@@ -676,7 +677,7 @@ SELECT 900002, menu_id
     900107, 900249, 900250, 900254, 900255, 900256, 900272,
     900110, 900175, 900176,
     900120, 900121, 900122, 900123, 900124, 900125, 900200, 900201, 900205, 900206, 900207, 900208,
-    900160, 900161, 900162, 900163, 900240, 900241, 900242, 900243, 900244, 900245, 900246, 900247, 900248,
+    900160, 900161, 900164, 900162, 900163, 900240, 900241, 900242, 900243, 900244, 900245, 900246, 900247, 900248,
     900268, 900269, 900270, 900271,
     900230, 900231, 900232
  );
@@ -712,7 +713,7 @@ SELECT 900005, menu_id
   FROM @menus
  WHERE menu_id IN (
     900106,
-    900160, 900161, 900162, 900163, 900240, 900241, 900243, 900244, 900245,
+    900160, 900161, 900164, 900162, 900163, 900240, 900241, 900243, 900244, 900245,
     900246, 900247, 900248, 900269, 900270, 900271
  );
 
