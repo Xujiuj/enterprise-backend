@@ -160,7 +160,7 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
             return result;
         }
 
-        clearSourceAData();
+        clearSourceAData(data);
         writeAll(data, result);
         validateDatabaseRelationships(result);
         result.setImported(result.getErrors().isEmpty());
@@ -293,11 +293,11 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
     }
 
     private boolean isActivitySheet(String fileName, List<Map<String, Object>> rows) {
-        if (!fileName.contains("活动数据表") || rows.isEmpty()) {
+        if (rows.isEmpty()) {
             return false;
         }
         Set<String> headers = rows.get(0).keySet();
-        return headers.contains("排放源识别编号")
+        return containsAny(headers, "排放源识别编号", "FK_排放源识别编号", "PK_排放源识别编号")
             && headers.contains("年度")
             && headers.contains("月份")
             && headers.contains("活动数据");
@@ -308,30 +308,29 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         Set<String> factoryCodes = keySet(data.companyRows, row -> text(row.get("BK_工厂编号")));
         Set<String> categoryKeys = keySet(data.categoryRows, row -> text(row.get("SK_排放源分类")));
         Set<String> factorKeys = keySet(data.efFactorRows, row -> text(row.get("SK_排放因子")));
-        Set<String> sourceCodes = keySet(data.emissionRows, row -> text(row.get("排放源识别编号")));
+        Set<String> sourceCodes = keySet(data.emissionRows, this::sourceCode);
         Map<String, Map<String, Object>> sourceByCode = sourceByCode(data);
 
         requireNoDuplicate(result, "admin.primary", data.adminRows, row -> text(row.get("行政区划代码")));
         requireNoDuplicate(result, "company.factory", data.companyRows, row -> text(row.get("BK_工厂编号")));
         requireNoDuplicate(result, "category.primary", data.categoryRows, row -> text(row.get("SK_排放源分类")));
-        requireNoDuplicate(result, "factor.primary", data.efFactorRows, row -> text(row.get("SK_排放因子")));
-        requireNoDuplicate(result, "emission-source.primary", data.emissionRows, row -> text(row.get("排放源识别编号")));
+        requireNoDuplicate(result, "emission-source.primary", data.emissionRows, this::sourceCode);
         requireNoDuplicate(result, "activity.composite", data.activityRows,
-            row -> text(row.get("排放源识别编号")) + "|" + text(row.get("年度")) + "|" + text(row.get("月份")));
+            row -> sourceCode(row) + "|" + text(row.get("年度")) + "|" + text(row.get("月份")));
         requireNoDuplicate(result, "denominator-fact.composite", data.denominatorFactRows,
             row -> text(row.get("工厂编号")) + "|" + text(row.get("年份")) + "|" + text(row.get("月份")) + "|" + text(row.get("分母度量名称")));
 
         countOrphans(result, "company.province", data.companyRows, row -> text(row.get("省份编码")), adminCodes);
-        countOrphans(result, "emission-source.company", data.emissionRows, row -> text(row.get("公司编号")), factoryCodes);
-        countOrphans(result, "emission-source.category", data.emissionRows, row -> text(row.get("排放源分类")), categoryKeys);
-        countOrphans(result, "activity.source", data.activityRows, row -> text(row.get("排放源识别编号")), sourceCodes);
-        countOrphans(result, "activity.company", data.activityRows, row -> text(row.get("公司编号")), factoryCodes);
-        countOrphans(result, "activity.category", data.activityRows, row -> text(row.get("排放源分类")), categoryKeys);
+        countOrphans(result, "emission-source.company", data.emissionRows, this::companyCode, factoryCodes);
+        countOrphans(result, "emission-source.category", data.emissionRows, this::sourceCategoryKey, categoryKeys);
+        countOrphans(result, "activity.source", data.activityRows, this::sourceCode, sourceCodes);
+        countOrphans(result, "activity.company", data.activityRows, row -> text(value(row, "公司编号", "FK_公司编号", "工厂编号", "FK_工厂编号")), factoryCodes);
+        countOrphans(result, "activity.category", data.activityRows, this::sourceCategoryKey, categoryKeys);
         countOrphans(result, "green-power.factory", data.greenPowerRows, row -> text(row.get("FK_工厂编号")), factoryCodes);
         countOrphans(result, "green-power.category", data.greenPowerRows, row -> text(row.get("排放源分类")), categoryKeys);
         countOrphans(result, "denominator-fact.factory", data.denominatorFactRows, row -> text(row.get("工厂编号")), factoryCodes);
 
-        Set<String> nonEfEmissionFactors = nonEfFactors(data.emissionRows, row -> text(row.get("排放因子")), factorKeys);
+        Set<String> nonEfEmissionFactors = nonEfFactors(data.emissionRows, this::factorKey, factorKeys);
         Set<String> nonEfActivityFactors = nonEfFactors(data.activityRows, row -> activityFactorKey(row, sourceByCode, factorKeys), factorKeys);
         Set<String> nonEfGreenFactors = nonEfFactors(data.greenPowerRows, row -> text(row.get("排放因子")), factorKeys);
         if (!nonEfEmissionFactors.isEmpty()) {
@@ -360,15 +359,41 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         }
     }
 
-    private void clearSourceAData() {
+    private void clearSourceAData(SourceAData data) {
         jdbcTemplate.update("""
             DELETE FROM ce_extension_field_value
             WHERE owner_table_code = 'ce_activity_data'
               AND owner_record_id IN (SELECT id FROM ce_activity_data WHERE remark = ?)
             """, MARK);
+        deleteByKeys("ce_activity_data", "source_identification_code", keySet(data.activityRows, this::sourceCode));
+        deleteByKeys("ce_green_power_certificate", "factory_code", keySet(data.greenPowerRows, row -> text(row.get("FK_工厂编号"))));
+        deleteByKeys("ce_intensity_denominator_fact", "factory_code", keySet(data.denominatorFactRows, row -> text(row.get("工厂编号"))));
+        deleteByKeys("ce_emission_source", "source_identification_code", keySet(data.emissionRows, this::sourceCode));
+        deleteByKeys("ce_ef_factor", "factor_sk", keySet(data.efFactorRows, row -> text(row.get("SK_排放因子"))));
+        deleteByKeys("ce_base_year", "factory_code", keySet(data.companyRows, row -> text(row.get("BK_工厂编号"))));
+        deleteByKeys("ce_emission_source_category", "category_sk", keySet(data.categoryRows, row -> text(row.get("SK_排放源分类"))));
+        deleteByKeys("ce_company_factory", "factory_code", keySet(data.companyRows, row -> text(row.get("BK_工厂编号"))));
+        deleteByKeys("ce_admin_division", "division_code", keySet(data.adminRows, row -> text(row.get("行政区划代码"))));
+        deleteByKeys("ce_electricity_factor", "version_province_code", keySet(data.electricityFactorRows, row -> text(row.get("PK_因子版本省份代码"))));
+        deleteByKeys("ce_electricity_factor_version_map", "effective_year", keySet(data.electricityVersionRows, row -> text(row.get("年份"))));
+        deleteByKeys("ce_fuel_factor_calc", "calc_key", keySet(data.fuelFactorRows, this::fuelFactorCalcKey));
+        deleteByKeys("ce_electricity_factor_scope", "scope_key", keySet(data.electricityScopeRows, row -> text(row.get("因子口径Key"))));
+        deleteByKeys("ce_greenhouse_gas", "gas_code", keySet(data.greenhouseGasRows, row -> text(row.get("GasKey"))));
+        deleteByKeys("ce_intensity_denominator_rule", "denominator_rule_key", keySet(data.denominatorRuleRows, row -> text(row.get("分母维度Key"))));
+        deleteByKeys("ce_intensity_target", "factory_type", keySet(data.intensityTargetRows, row -> text(row.get("工厂类型"))));
+        deleteByKeys("ce_intensity_tolerance", "tolerance_key", keySet(data.intensityToleranceRows, row -> text(row.get("容忍率Key"))));
         for (String table : DELETE_ORDER) {
             jdbcTemplate.update("DELETE FROM " + table + " WHERE remark = ?", MARK);
         }
+    }
+
+    private void deleteByKeys(String table, String column, Set<String> keys) {
+        if (keys.isEmpty()) {
+            return;
+        }
+        String placeholders = keys.stream().map(key -> "?").collect(Collectors.joining(", "));
+        jdbcTemplate.update("DELETE FROM " + table + " WHERE " + column + " IN (" + placeholders + ")",
+            keys.toArray(new Object[0]));
     }
 
     private void writeAll(SourceAData data, CeSourceAImportResult result) {
@@ -415,11 +440,13 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
                 .filter(row -> row.get(0) != null && row.get(2) != null)
                 .toList());
 
+        List<Map<String, Object>> efFactorRows = uniqueRows(result, "factor.primary", data.efFactorRows,
+            row -> text(row.get("SK_排放因子")));
         insertRows(result, "ce_ef_factor", List.of(
                 "factor_sk", "emission_source_name", "emission_source_name_en", "fuel_material_category", "source_unit",
                 "co2", "ch4", "n2o", "hfcs", "pfcs", "sf6", "nf3", "applicable_scope", "factor_source",
                 "gwp_ch4", "gwp_n2o", "gwp_hfcs", "gwp_pfcs", "gwp_sf6", "gwp_nf3", "factor_gwp", "factor_unit", "remark"),
-            mapRows(data.efFactorRows, row -> values(row.get("SK_排放因子"), row.get("排放源"), row.get("排放源_EN"),
+            mapRows(efFactorRows, row -> values(row.get("SK_排放因子"), row.get("排放源"), row.get("排放源_EN"),
                 row.get("燃料/物质类别"), row.get("排放源单位"), decimal(row.get("CO2")), decimal(row.get("CH4")), decimal(row.get("N2O")),
                 decimal(row.get("HFCs")), decimal(row.get("PFCs")), decimal(row.get("SF6")), decimal(row.get("NF3")), row.get("适用范围"),
                 row.get("因子来源"), decimal(row.get("GWP_CH4")), decimal(row.get("GWP_N2O")), decimal(row.get("GWP_HFCs")),
@@ -458,34 +485,40 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
     }
 
     private void insertEmissionRows(SourceAData data, CeSourceAImportResult result) {
+        Map<String, String> factorUnits = factorUnits(data);
         insertRows(result, "ce_emission_source", List.of("company_code", "company_name", "factory_code", "factory_name", "source_category_key",
                 "scope_name", "scope_subcategory", "source_identification_code", "source_identification_name", "emission_source_name",
-                "responsible_dept", "data_source", "factor_key", "enabled_flag", "remark"),
-            mapRows(data.emissionRows, row -> values(row.get("公司编号"), row.get("公司名称"), row.get("公司编号"), row.get("工厂"), row.get("排放源分类"),
-                row.get("范围"), row.get("范围子类别"), row.get("排放源识别编号"), row.get("排放源识别"), row.get("排放源"),
-                row.get("负责部门"), row.get("数据来源"), row.get("排放因子"), 1, MARK)));
+                "responsible_dept", "data_source", "factor_key", "source_unit", "enabled_flag", "remark"),
+            mapRows(data.emissionRows, row -> {
+                String factorKey = factorKey(row);
+                return values(companyCode(row), value(row, "公司名称", "公司"), companyCode(row), row.get("工厂"), sourceCategoryKey(row),
+                    row.get("范围"), row.get("范围子类别"), sourceCode(row), row.get("排放源识别"), row.get("排放源"),
+                    row.get("负责部门"), row.get("数据来源"), factorKey, factorUnits.get(factorKey), 1, MARK);
+            }));
     }
 
     private void insertActivityRows(SourceAData data, CeSourceAImportResult result) {
         Map<String, Map<String, Object>> sourceByCode = sourceByCode(data);
         Map<String, Long> sourceIdsByCode = currentEmissionSourceIds();
+        Map<String, String> factorUnits = factorUnits(data);
         insertRows(result, "ce_activity_data", List.of("emission_source_id", "activity_period", "source_sheet_code", "source_identification_code", "company_code", "company_name",
                 "factory_code", "factory_name", "source_category_key", "scope_name", "scope_subcategory", "source_identification_name", "emission_source_name",
                 "activity_unit", "activity_year", "activity_month", "activity_date", "activity_value", "responsible_dept", "data_source",
                 "source_remark", "factor_key", "data_status", "remark"),
             mapRows(data.activityRows, row -> {
-                String sourceCode = text(row.get("排放源识别编号"));
+                String sourceCode = sourceCode(row);
                 Map<String, Object> source = sourceByCode.getOrDefault(sourceCode, Map.of());
                 Integer year = integer(row.get("年度"));
                 Integer month = integer(row.get("月份"));
-                String companyCode = text(first(row.get("公司编号"), source.get("公司编号")));
+                String companyCode = text(first(value(row, "公司编号", "FK_公司编号", "工厂编号", "FK_工厂编号"), companyCode(source)));
+                String rowFactorKey = activityFactorKey(row, sourceByCode, keySet(data.efFactorRows, factor -> text(factor.get("SK_排放因子"))));
                 return values(sourceIdsByCode.get(sourceKey(companyCode, sourceCode)), activityPeriod(year, month), "source-a-activity", sourceCode, companyCode,
-                    first(row.get("公司名称"), source.get("公司名称")), companyCode, first(row.get("工厂"), source.get("工厂")),
-                    first(row.get("排放源分类"), source.get("排放源分类")), first(row.get("范围"), source.get("范围")),
+                    first(value(row, "公司名称", "公司"), value(source, "公司名称", "公司")), companyCode, first(row.get("工厂"), source.get("工厂")),
+                    first(sourceCategoryKey(row), sourceCategoryKey(source)), first(row.get("范围"), source.get("范围")),
                     first(row.get("范围子类别"), source.get("范围子类别")), first(row.get("排放源识别"), source.get("排放源识别")),
-                    first(row.get("排放源"), source.get("排放源")), row.get("单位"), year, month, sqlDate(first(row.get("日期"), firstDay(year, month))),
+                    first(row.get("排放源"), source.get("排放源")), first(row.get("单位"), factorUnits.get(rowFactorKey)), year, month, sqlDate(first(row.get("日期"), firstDay(year, month))),
                     decimal(row.get("活动数据")), first(row.get("负责部门"), source.get("负责部门")), first(row.get("数据来源"), source.get("数据来源")),
-                    row.get("备注"), activityFactorKey(row, sourceByCode, keySet(data.efFactorRows, factor -> text(factor.get("SK_排放因子")))), "submitted", MARK);
+                    row.get("备注"), rowFactorKey, "submitted", MARK);
             }));
     }
 
@@ -513,9 +546,9 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
                 "certificate_code", "issuing_org", "purchase_date", "expiry_date", "power_grid_region", "offset_power_source", "data_source",
                 "source_remark", "emission_source_name", "factor_key", "proof_status", "remark"),
             mapRows(data.greenPowerRows, row -> values(row.get("FK_工厂编号"), row.get("工厂名称"), integer(row.get("年度")), integer(row.get("月份")),
-                row.get("排放源分类"), row.get("范围"), row.get("范围子类别"), row.get("电力类型"), row.get("电力类型说明"),
+                sourceCategoryKey(row), row.get("范围"), row.get("范围子类别"), row.get("电力类型"), row.get("电力类型说明"),
                 decimal(row.get("数量_kWh")), row.get("证书编号"), row.get("证书签发机构"), sqlDate(row.get("购买日期")), sqlDate(row.get("到期日期")),
-                row.get("对应电网区域"), row.get("抵消电力来源"), row.get("数据来源"), row.get("备注"), row.get("排放源"), row.get("排放因子"),
+                row.get("对应电网区域"), row.get("抵消电力来源"), row.get("数据来源"), row.get("备注"), row.get("排放源"), factorKey(row),
                 "verified", MARK)));
     }
 
@@ -609,6 +642,25 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         }
     }
 
+    private List<Map<String, Object>> uniqueRows(CeSourceAImportResult result, String code, List<Map<String, Object>> rows,
+                                                 Function<Map<String, Object>, String> keyResolver) {
+        List<Map<String, Object>> uniqueRows = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        int duplicateRows = 0;
+        for (Map<String, Object> row : rows) {
+            String key = keyResolver.apply(row);
+            if (StringUtils.isBlank(key) || seen.add(key)) {
+                uniqueRows.add(row);
+            } else {
+                duplicateRows++;
+            }
+        }
+        if (duplicateRows > 0) {
+            result.issue("warn", code, "Duplicate Source(A) factor keys were de-duplicated by first occurrence", duplicateRows);
+        }
+        return uniqueRows;
+    }
+
     private void countOrphans(CeSourceAImportResult result, String code, List<Map<String, Object>> rows,
                               Function<Map<String, Object>, String> keyResolver, Set<String> parentKeys) {
         int count = (int) rows.stream()
@@ -631,24 +683,24 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
 
     private Map<String, Map<String, Object>> sourceByCode(SourceAData data) {
         return data.emissionRows.stream()
-            .filter(row -> StringUtils.isNotBlank(text(row.get("排放源识别编号"))))
-            .collect(Collectors.toMap(row -> text(row.get("排放源识别编号")), Function.identity(), (left, right) -> left, LinkedHashMap::new));
+            .filter(row -> StringUtils.isNotBlank(sourceCode(row)))
+            .collect(Collectors.toMap(this::sourceCode, Function.identity(), (left, right) -> left, LinkedHashMap::new));
     }
 
     private String activityFactorKey(Map<String, Object> row, Map<String, Map<String, Object>> sourceByCode, Set<String> factorKeys) {
-        String activityFactor = text(row.get("排放因子"));
+        String activityFactor = factorKey(row);
         if (isKnownFactorKey(activityFactor, factorKeys)) {
             return activityFactor;
         }
-        Map<String, Object> source = sourceByCode.get(text(row.get("排放源识别编号")));
-        return text(first(source == null ? null : source.get("排放因子"), row.get("排放因子")));
+        Map<String, Object> source = sourceByCode.get(sourceCode(row));
+        return text(first(source == null ? null : factorKey(source), activityFactor));
     }
 
     private int invalidActivityFactorRows(List<Map<String, Object>> rows, Map<String, Map<String, Object>> sourceByCode, Set<String> factorKeys) {
         return (int) rows.stream().filter(row -> {
-            String activityFactor = text(row.get("排放因子"));
-            Map<String, Object> source = sourceByCode.get(text(row.get("排放源识别编号")));
-            String sourceFactor = source == null ? null : text(source.get("排放因子"));
+            String activityFactor = factorKey(row);
+            Map<String, Object> source = sourceByCode.get(sourceCode(row));
+            String sourceFactor = source == null ? null : factorKey(source);
             return StringUtils.isNotBlank(activityFactor)
                 && StringUtils.isNotBlank(sourceFactor)
                 && !isKnownFactorKey(activityFactor, factorKeys)
@@ -658,6 +710,45 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
 
     private boolean isKnownFactorKey(String factorKey, Set<String> factorKeys) {
         return StringUtils.isNotBlank(factorKey) && (factorKeys.contains(factorKey) || GRID_FACTOR_KEYS.contains(factorKey));
+    }
+
+    private boolean containsAny(Set<String> headers, String... names) {
+        return Arrays.stream(names).anyMatch(headers::contains);
+    }
+
+    private Object value(Map<String, Object> row, String... names) {
+        for (String name : names) {
+            Object value = row.get(name);
+            if (StringUtils.isNotBlank(text(value))) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String companyCode(Map<String, Object> row) {
+        return text(value(row, "公司编号", "FK_公司编号", "工厂编号", "FK_工厂编号"));
+    }
+
+    private String sourceCategoryKey(Map<String, Object> row) {
+        return text(value(row, "排放源分类", "FK_排放源分类"));
+    }
+
+    private String sourceCode(Map<String, Object> row) {
+        return text(value(row, "排放源识别编号", "PK_排放源识别编号", "FK_排放源识别编号"));
+    }
+
+    private String factorKey(Map<String, Object> row) {
+        return text(value(row, "排放因子", "FK_排放因子"));
+    }
+
+    private Map<String, String> factorUnits(SourceAData data) {
+        Map<String, String> units = data.efFactorRows.stream()
+            .filter(row -> StringUtils.isNotBlank(text(row.get("SK_排放因子"))))
+            .collect(Collectors.toMap(row -> text(row.get("SK_排放因子")), row -> text(row.get("排放源单位")),
+                (left, right) -> left, LinkedHashMap::new));
+        GRID_FACTOR_KEYS.forEach(key -> units.putIfAbsent(key, "kWh"));
+        return units;
     }
 
     private List<List<Object>> mapRows(List<Map<String, Object>> rows, Function<Map<String, Object>, List<Object>> mapper) {
