@@ -29,6 +29,8 @@ import org.dromara.carbon.enterprise.intensity.mapper.CeIntensityMetricMapper;
 import org.dromara.carbon.enterprise.license.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.report.mapper.CeReportTemplateFileMapper;
 import org.dromara.carbon.enterprise.shared.option.service.impl.CeOptionServiceImpl;
+import org.dromara.system.domain.SysDept;
+import org.dromara.system.mapper.SysDeptMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -53,6 +55,7 @@ class CeOptionServiceTest {
     private CeDimensionProjectionMapper dimensionProjectionMapper;
     private CeFactorCacheRecordMapper factorCacheRecordMapper;
     private CeFactorConfirmationMapper factorConfirmationMapper;
+    private SysDeptMapper sysDeptMapper;
     private CeOptionServiceImpl service;
 
     @BeforeAll
@@ -66,6 +69,7 @@ class CeOptionServiceTest {
         initializeEntityLambdaCache(CeFactorCacheRecordMapper.class, CeFactorCacheRecord.class);
         initializeEntityLambdaCache(CeFactorConfirmationMapper.class, CeFactorConfirmation.class);
         initializeEntityLambdaCache(CeGreenPowerCertificateMapper.class, CeGreenPowerCertificate.class);
+        initializeEntityLambdaCache(SysDeptMapper.class, SysDept.class);
     }
 
     @BeforeEach
@@ -79,6 +83,7 @@ class CeOptionServiceTest {
         dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
         factorCacheRecordMapper = mock(CeFactorCacheRecordMapper.class);
         factorConfirmationMapper = mock(CeFactorConfirmationMapper.class);
+        sysDeptMapper = mock(SysDeptMapper.class);
         service = new CeOptionServiceImpl(
             activityDataMapper,
             companyFactoryMapper,
@@ -92,7 +97,8 @@ class CeOptionServiceTest {
             mock(CeReportTemplateFileMapper.class),
             mock(CeCaptureBatchMapper.class),
             mock(CeLicenseStateMapper.class),
-            dimensionProjectionMapper
+            dimensionProjectionMapper,
+            sysDeptMapper
         );
     }
 
@@ -156,6 +162,31 @@ class CeOptionServiceTest {
     }
 
     @Test
+    void responsibleDeptOptionsComeFromSystemDeptAndHistoricalBusinessRows() {
+        SysDept dept = new SysDept();
+        dept.setDeptId(10L);
+        dept.setParentId(1L);
+        dept.setDeptName("Production");
+        dept.setStatus("0");
+        CeActivityData activity = new CeActivityData();
+        activity.setResponsibleDept("EHS");
+        CeEmissionSource source = new CeEmissionSource();
+        source.setResponsibleDept("Production");
+        when(sysDeptMapper.selectList(any())).thenReturn(List.of(dept));
+        when(activityDataMapper.selectObjs(any())).thenReturn(List.of(activity.getResponsibleDept()));
+        when(emissionSourceMapper.selectObjs(any())).thenReturn(List.of(source.getResponsibleDept()));
+
+        var options = service.listOptions("responsible-dept", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("EHS", "Production");
+        assertThat(options.get(1).getRecord())
+            .containsEntry("deptId", 10L)
+            .containsEntry("deptName", "Production");
+    }
+
+    @Test
     void sourceCategoryOptionsCarryScopeFieldsForAutofill() {
         var categoryMapper = mock(CeEmissionSourceCategoryMapper.class);
         service = new CeOptionServiceImpl(
@@ -171,7 +202,8 @@ class CeOptionServiceTest {
             mock(CeReportTemplateFileMapper.class),
             mock(CeCaptureBatchMapper.class),
             mock(CeLicenseStateMapper.class),
-            dimensionProjectionMapper
+            dimensionProjectionMapper,
+            sysDeptMapper
         );
         var category = new org.dromara.carbon.enterprise.emission.domain.CeEmissionSourceCategory();
         category.setCategorySk("CAT-1");

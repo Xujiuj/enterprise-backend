@@ -36,6 +36,8 @@ import org.dromara.carbon.enterprise.report.mapper.CeReportTemplateFileMapper;
 import org.dromara.carbon.enterprise.shared.service.ICeOptionService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.system.domain.SysDept;
+import org.dromara.system.mapper.SysDeptMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -131,6 +133,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
     private final CeCaptureBatchMapper captureBatchMapper;
     private final CeLicenseStateMapper licenseStateMapper;
     private final CeDimensionProjectionMapper dimensionProjectionMapper;
+    private final SysDeptMapper sysDeptMapper;
 
     @Override
     public List<CeOptionVo> listOptions(String optionCode, CeOptionQueryBo query) {
@@ -188,6 +191,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 );
             }
             case "responsible-dept" -> {
+                collectSystemDeptOptions(options);
                 collectDistinct(options, activityDataMapper, CeActivityData::getResponsibleDept, this::labelForRaw);
                 collectDistinct(options, emissionSourceMapper, CeEmissionSource::getResponsibleDept, this::labelForRaw);
             }
@@ -408,6 +412,17 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
+    private void collectSystemDeptOptions(List<CeOptionVo> target) {
+        for (SysDept dept : sysDeptMapper.selectList(new LambdaQueryWrapper<SysDept>()
+            .select(SysDept::getDeptId, SysDept::getParentId, SysDept::getDeptName, SysDept::getStatus)
+            .eq(SysDept::getStatus, "0")
+            .isNotNull(SysDept::getDeptName)
+            .orderByAsc(SysDept::getOrderNum)
+            .orderByAsc(SysDept::getDeptId))) {
+            addOption(target, labelForRaw(dept.getDeptName()), dept.getDeptName(), systemDeptRecord(dept));
+        }
+    }
+
     private String labelWithName(Object value, Object name) {
         String rawValue = normalizeValue(value);
         String rawName = normalizeValue(name);
@@ -491,6 +506,15 @@ public class CeOptionServiceImpl implements ICeOptionService {
         record.put("companyName", factory.getCompanyName());
         record.put("factoryCode", factory.getFactoryCode());
         record.put("factoryName", factory.getFactoryName());
+        return record;
+    }
+
+    private Map<String, Object> systemDeptRecord(SysDept dept) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("deptId", dept.getDeptId());
+        record.put("parentId", dept.getParentId());
+        record.put("deptName", normalizeValue(dept.getDeptName()));
+        record.put("status", normalizeValue(dept.getStatus()));
         return record;
     }
 

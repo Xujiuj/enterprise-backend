@@ -40,6 +40,11 @@
         </dependency>
 
         <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-system</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>cn.idev.excel</groupId>
             <artifactId>fastexcel</artifactId>
         </dependency>
