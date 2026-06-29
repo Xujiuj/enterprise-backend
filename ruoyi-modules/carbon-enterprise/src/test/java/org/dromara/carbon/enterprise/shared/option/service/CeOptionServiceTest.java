@@ -84,6 +84,7 @@ class CeOptionServiceTest {
         factorCacheRecordMapper = mock(CeFactorCacheRecordMapper.class);
         factorConfirmationMapper = mock(CeFactorConfirmationMapper.class);
         sysDeptMapper = mock(SysDeptMapper.class);
+        when(dimensionProjectionMapper.selectByDimensionCode(any())).thenReturn(List.of());
         service = new CeOptionServiceImpl(
             activityDataMapper,
             companyFactoryMapper,
@@ -306,6 +307,7 @@ class CeOptionServiceTest {
 
     @Test
     void factorKeyOptionsComeFromCacheAndConfirmationTables() {
+        when(dimensionProjectionMapper.selectByDimensionCode("ef-factor")).thenReturn(List.of());
         CeFactorCacheRecord cache = new CeFactorCacheRecord();
         cache.setFactorKey("KEY-DIESEL");
         cache.setFactorCode("FC-DIESEL");
@@ -337,10 +339,49 @@ class CeOptionServiceTest {
     }
 
     @Test
+    void factorKeyOptionsIncludeEfFactorDimensionRecords() {
+        CeDimensionRecordVo factor = new CeDimensionRecordVo();
+        factor.setRecordCode("EF-201-DIESEL");
+        factor.setRecordName("Diesel combustion");
+        factor.setEmissionSourceNameEn("Diesel combustion EN");
+        factor.setFuelMaterialCategory("Diesel");
+        factor.setSourceUnit("t");
+        factor.setApplicableScope("Scope 1");
+        factor.setFactorSource("Source A");
+        factor.setFactorUnit("kgCO2e/t");
+        when(dimensionProjectionMapper.selectByDimensionCode("ef-factor")).thenReturn(List.of(factor));
+        when(factorCacheRecordMapper.selectList(any())).thenReturn(List.of());
+        when(factorConfirmationMapper.selectList(any())).thenReturn(List.of());
+
+        var options = service.listOptions("factor-key", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("EF-201-DIESEL");
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getLabel()))
+            .containsExactly("EF-201-DIESEL / Diesel combustion (kgCO2e/t)");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("factorKey", "EF-201-DIESEL")
+            .containsEntry("factorCode", "EF-201-DIESEL")
+            .containsEntry("factorName", "Diesel combustion")
+            .containsEntry("emissionSourceName", "Diesel combustion")
+            .containsEntry("emissionSourceNameEn", "Diesel combustion EN")
+            .containsEntry("fuelMaterialCategory", "Diesel")
+            .containsEntry("sourceUnit", "t")
+            .containsEntry("applicableScope", "Scope 1")
+            .containsEntry("factorSource", "Source A")
+            .containsEntry("factorUnit", "kgCO2e/t");
+    }
+
+    @Test
     void dimensionFieldOptionsUseFieldValueLabelsExceptStatus() {
         CeDimensionRecordVo company = new CeDimensionRecordVo();
         company.setIndustrySectionCode("C");
         company.setIndustrySectionName("制造业");
+        CeDimensionRecordVo energy = new CeDimensionRecordVo();
+        energy.setIndustrySectionCode("D");
+        energy.setIndustrySectionName("电力、热力、燃气及水生产和供应业");
         when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(company));
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
@@ -350,13 +391,36 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .containsExactly("C");
+            .containsExactly("C / 制造业");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
             .containsExactly("C");
         assertThat(options.get(0).getRecord())
             .containsEntry("industrySectionCode", "C")
             .containsEntry("industrySectionName", "制造业");
+    }
+
+    @Test
+    void companyIndustryNameOptionsCarryPairedCodeAndName() {
+        CeDimensionRecordVo company = new CeDimensionRecordVo();
+        company.setIndustryDivisionCode("26");
+        company.setIndustryDivisionName("化学原料和化学制品制造业");
+        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(company));
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setField("industryDivisionName");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getLabel()))
+            .containsExactly("化学原料和化学制品制造业 / 26");
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("化学原料和化学制品制造业");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("industryDivisionCode", "26")
+            .containsEntry("industryDivisionName", "化学原料和化学制品制造业");
     }
 
     @Test

@@ -373,6 +373,13 @@ public class CeOptionServiceImpl implements ICeOptionService {
     }
 
     private void collectFactorKeyOptions(List<CeOptionVo> target) {
+        for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode("ef-factor")) {
+            String value = normalizeValue(record.getRecordCode());
+            if (StringUtils.isBlank(value)) {
+                continue;
+            }
+            addOption(target, factorOptionLabel(value, record.getRecordName(), record.getEmissionSourceNameEn(), record.getFactorUnit()), value, efFactorRecord(record));
+        }
         for (CeFactorCacheRecord row : factorCacheRecordMapper.selectList(new LambdaQueryWrapper<CeFactorCacheRecord>()
             .select(
                 CeFactorCacheRecord::getFactorKey,
@@ -551,6 +558,21 @@ public class CeOptionServiceImpl implements ICeOptionService {
         return record;
     }
 
+    private Map<String, Object> efFactorRecord(CeDimensionRecordVo row) {
+        Map<String, Object> record = dimensionRecordMap(row);
+        record.put("factorKey", normalizeValue(row.getRecordCode()));
+        record.put("factorCode", normalizeValue(row.getRecordCode()));
+        record.put("factorName", normalizeValue(row.getRecordName()));
+        record.put("emissionSourceName", normalizeValue(row.getRecordName()));
+        record.put("emissionSourceNameEn", normalizeValue(row.getEmissionSourceNameEn()));
+        record.put("fuelMaterialCategory", normalizeValue(row.getFuelMaterialCategory()));
+        record.put("sourceUnit", normalizeValue(row.getSourceUnit()));
+        record.put("applicableScope", normalizeValue(row.getApplicableScope()));
+        record.put("factorSource", normalizeValue(row.getFactorSource()));
+        record.put("factorUnit", normalizeValue(row.getFactorUnit()));
+        return record;
+    }
+
     private List<CeEmissionSource> selectEnabledEmissionSources(CeOptionQueryBo query) {
         LambdaQueryWrapper<CeEmissionSource> wrapper = new LambdaQueryWrapper<CeEmissionSource>()
             .eq(CeEmissionSource::getEnabledFlag, Boolean.TRUE)
@@ -638,6 +660,19 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
         // 特殊处理
         cache.putIfAbsent("电力因子表", "电力因子表");
+        for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode("ef-factor")) {
+            String key = normalizeValue(record.getRecordCode());
+            if (StringUtils.isBlank(key) || !factorKeys.contains(key)) {
+                continue;
+            }
+            String name = Stream.of(record.getRecordName(), record.getEmissionSourceNameEn())
+                .map(this::normalizeValue)
+                .filter(StringUtils::isNotBlank)
+                .findFirst()
+                .orElse(key);
+            String unit = normalizeValue(record.getFactorUnit());
+            cache.putIfAbsent(key, StringUtils.isNotBlank(unit) ? name + " (" + unit + ")" : name);
+        }
         return cache;
     }
 
@@ -645,6 +680,10 @@ public class CeOptionServiceImpl implements ICeOptionService {
         validateDimensionOptionRequest(dimensionCode, field);
         if ("company".equals(dimensionCode) && ("provinceCode".equals(field) || "provinceName".equals(field))) {
             collectCompanyProvinceOptions(target, field);
+            return;
+        }
+        if ("company".equals(dimensionCode) && companyIndustryPair(field) != null) {
+            collectCompanyIndustryOptions(target, field);
             return;
         }
         for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
@@ -662,6 +701,37 @@ public class CeOptionServiceImpl implements ICeOptionService {
             String label = provinceOptionLabel(field, provinceCode, provinceName);
             addOption(target, label, value, provinceRecordMap(record, provinceCode, provinceName));
         }
+    }
+
+    private void collectCompanyIndustryOptions(List<CeOptionVo> target, String field) {
+        String pairedField = companyIndustryPair(field);
+        if (pairedField == null) {
+            return;
+        }
+        boolean codeSelected = field.endsWith("Code");
+        String codeField = codeSelected ? field : pairedField;
+        String nameField = codeSelected ? pairedField : field;
+        for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode("company")) {
+            String code = normalizeValue(dimensionValue(record, codeField));
+            String name = normalizeValue(dimensionValue(record, nameField));
+            Object value = codeSelected ? code : name;
+            String label = codeSelected ? labelWithName(code, name) : labelWithName(name, code);
+            addOption(target, label, value, dimensionRecordMap(record));
+        }
+    }
+
+    private String companyIndustryPair(String field) {
+        return switch (field) {
+            case "industrySectionCode" -> "industrySectionName";
+            case "industrySectionName" -> "industrySectionCode";
+            case "industryDivisionCode" -> "industryDivisionName";
+            case "industryDivisionName" -> "industryDivisionCode";
+            case "industryGroupCode" -> "industryGroupName";
+            case "industryGroupName" -> "industryGroupCode";
+            case "industryClassCode" -> "industryClassName";
+            case "industryClassName" -> "industryClassCode";
+            default -> null;
+        };
     }
 
     private String provinceOptionLabel(String field, String provinceCode, String provinceName) {
