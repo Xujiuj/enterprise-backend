@@ -293,6 +293,59 @@ class CeOptionServiceTest {
     }
 
     @Test
+    void activityEntryOptionsCarrySourceRecordAndFallbackUnitFromEfFactorByName() {
+        CeEmissionSource source = emissionSource("111", "333", "Company A", "Factory One", "cat-a");
+        source.setSourceUnit(null);
+        source.setFactorKey("1");
+        CeDimensionRecordVo factor = new CeDimensionRecordVo();
+        factor.setRecordCode("2");
+        factor.setRecordName("333");
+        factor.setFactorUnit("kg");
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of(source));
+        when(factorCacheRecordMapper.selectList(any())).thenReturn(List.of());
+        when(dimensionProjectionMapper.selectByDimensionCode("ef-factor")).thenReturn(List.of(factor));
+
+        var options = service.listOptions("activity-entry-source-factory", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("Factory One");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("companyName", "Company A")
+            .containsEntry("factoryName", "Factory One")
+            .containsEntry("scopeName", "范围1")
+            .containsEntry("scopeSubcategory", "子类1")
+            .containsEntry("sourceIdentificationName", "333识别")
+            .containsEntry("emissionSourceName", "333")
+            .containsEntry("sourceUnit", "kg")
+            .containsEntry("factorKey", "1");
+    }
+
+    @Test
+    void activityEntryEmissionSourceNameFallsBackToEfFactorUnitWhenSourceUnitIsEmpty() {
+        CeEmissionSource source = emissionSource("111", "333", "Company A", "Factory One", "cat-a");
+        source.setSourceUnit(null);
+        source.setFactorKey("1");
+        CeDimensionRecordVo factor = new CeDimensionRecordVo();
+        factor.setRecordCode("2");
+        factor.setRecordName("333");
+        factor.setFactorUnit("kg");
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of(source));
+        when(factorCacheRecordMapper.selectList(any())).thenReturn(List.of());
+        when(dimensionProjectionMapper.selectByDimensionCode("ef-factor")).thenReturn(List.of(factor));
+
+        var options = service.listOptions("activity-entry-emission-source-name", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("333");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("sourceIdentificationCode", "111")
+            .containsEntry("sourceUnit", "kg")
+            .containsEntry("factorKey", "1");
+    }
+
+    @Test
     void intensityRuleCodeOptionsComeFromEnterpriseBusinessTables() {
         when(intensityMetricMapper.selectObjs(any())).thenReturn(List.of("RULE-A", "RULE-B"));
         when(denominatorFactMapper.selectObjs(any())).thenReturn(List.of("RULE-B", "RULE-C"));

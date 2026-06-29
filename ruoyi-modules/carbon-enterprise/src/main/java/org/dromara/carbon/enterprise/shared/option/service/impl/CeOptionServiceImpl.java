@@ -38,13 +38,8 @@ import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.system.domain.SysDept;
 import org.dromara.system.mapper.SysDeptMapper;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -67,7 +62,6 @@ import java.util.stream.Stream;
 public class CeOptionServiceImpl implements ICeOptionService {
 
     private static final String DIMENSION_FIELD_OPTION = "dimension-field";
-    private static final String INDUSTRY_RESOURCE = "enterprise-options/gbt4754-2017-industry.csv";
 
     private static final List<Map<String, String>> SOURCE_A_COMPANY_REFERENCE_ROWS = List.of(
         Map.of(
@@ -418,9 +412,10 @@ public class CeOptionServiceImpl implements ICeOptionService {
     private void collectEmissionSourceCodeOptions(List<CeOptionVo> target) {
         List<CeEmissionSource> rows = selectEnabledEmissionSources(new CeOptionQueryBo());
         Map<String, String> factorNameCache = loadFactorDisplayNameCache(rows);
+        Map<String, String> efFactorUnitCache = loadEfFactorActivityUnitCache(rows);
         for (CeEmissionSource row : rows) {
             String label = labelWithName(row.getSourceIdentificationCode(), row.getSourceIdentificationName());
-            addOption(target, label, row.getSourceIdentificationCode(), emissionSourceRecord(row, factorNameCache));
+            addOption(target, label, row.getSourceIdentificationCode(), emissionSourceRecord(row, factorNameCache, efFactorUnitCache));
         }
     }
 
@@ -511,8 +506,11 @@ public class CeOptionServiceImpl implements ICeOptionService {
 
     private void collectEmissionSourceFieldOptions(List<CeOptionVo> target, SFunction<CeEmissionSource, ?> valueColumn,
                                                    CeOptionQueryBo query) {
-        for (CeEmissionSource row : selectEnabledEmissionSources(query)) {
-            addOption(target, labelForRaw(valueColumn.apply(row)), valueColumn.apply(row));
+        List<CeEmissionSource> rows = selectEnabledEmissionSources(query);
+        Map<String, String> factorNameCache = loadFactorDisplayNameCache(rows);
+        Map<String, String> efFactorUnitCache = loadEfFactorActivityUnitCache(rows);
+        for (CeEmissionSource row : rows) {
+            addOption(target, labelForRaw(valueColumn.apply(row)), valueColumn.apply(row), emissionSourceRecord(row, factorNameCache, efFactorUnitCache));
         }
     }
 
@@ -520,12 +518,13 @@ public class CeOptionServiceImpl implements ICeOptionService {
         Map<String, CeOptionVo> optionsByLabel = new LinkedHashMap<>();
         List<CeEmissionSource> rows = selectEnabledEmissionSources(query);
         Map<String, String> factorNameCache = loadFactorDisplayNameCache(rows);
+        Map<String, String> efFactorUnitCache = loadEfFactorActivityUnitCache(rows);
         for (CeEmissionSource row : rows) {
             String label = emissionSourceLabel(row);
             if (StringUtils.isBlank(label)) {
                 continue;
             }
-            optionsByLabel.putIfAbsent(label, new CeOptionVo(label, label, emissionSourceRecord(row, factorNameCache)));
+            optionsByLabel.putIfAbsent(label, new CeOptionVo(label, label, emissionSourceRecord(row, factorNameCache, efFactorUnitCache)));
         }
         target.addAll(optionsByLabel.values());
     }
@@ -536,6 +535,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
         log.info("[Leaf选项] 查询到 {} 条排放源记录, 查询条件: company={}, factory={}, category={}",
             rows.size(), query.getCompanyName(), query.getFactoryName(), query.getSourceCategoryKey());
         Map<String, String> factorNameCache = loadFactorDisplayNameCache(rows);
+        Map<String, String> efFactorUnitCache = loadEfFactorActivityUnitCache(rows);
         boolean firstRow = true;
         for (CeEmissionSource row : rows) {
             String value = normalizeValue(row.getSourceIdentificationCode());
@@ -543,7 +543,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             if (StringUtils.isBlank(value) || StringUtils.isBlank(label)) {
                 continue;
             }
-            Map<String, Object> record = emissionSourceRecord(row, factorNameCache);
+            Map<String, Object> record = emissionSourceRecord(row, factorNameCache, efFactorUnitCache);
             if (firstRow) {
                 log.info("[Leaf选项] 首条记录: code={}, name={}, scope={}, unit={}, factor={}, factorDisplay={}",
                     value, row.getEmissionSourceName(), row.getScopeName(),
@@ -658,7 +658,8 @@ public class CeOptionServiceImpl implements ICeOptionService {
             .orElse("");
     }
 
-    private Map<String, Object> emissionSourceRecord(CeEmissionSource source, Map<String, String> factorNameCache) {
+    private Map<String, Object> emissionSourceRecord(CeEmissionSource source, Map<String, String> factorNameCache,
+                                                     Map<String, String> efFactorUnitCache) {
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("id", source.getId());
         record.put("companyCode", source.getCompanyCode());
@@ -674,9 +675,70 @@ public class CeOptionServiceImpl implements ICeOptionService {
         record.put("dataSource", source.getDataSource());
         record.put("factorKey", source.getFactorKey());
         record.put("factorDisplayName", factorNameCache.getOrDefault(normalizeValue(source.getFactorKey()), source.getFactorKey()));
-        record.put("sourceUnit", source.getSourceUnit());
+        record.put("sourceUnit", emissionSourceUnit(source, efFactorUnitCache));
         record.put("enabledFlag", source.getEnabledFlag());
         return record;
+    }
+
+    private String emissionSourceUnit(CeEmissionSource source, Map<String, String> efFactorUnitCache) {
+        String sourceUnit = normalizeValue(source.getSourceUnit());
+        if (StringUtils.isNotBlank(sourceUnit)) {
+            return sourceUnit;
+        }
+        String factorKeyUnit = efFactorUnitCache.get(factorCacheKey(source.getFactorKey()));
+        if (StringUtils.isNotBlank(factorKeyUnit)) {
+            return factorKeyUnit;
+        }
+        return efFactorUnitCache.getOrDefault(nameCacheKey(source.getEmissionSourceName()), sourceUnit);
+    }
+
+    private Map<String, String> loadEfFactorActivityUnitCache(List<CeEmissionSource> sources) {
+        Set<String> factorKeys = sources.stream()
+            .map(CeEmissionSource::getFactorKey)
+            .map(this::normalizeValue)
+            .filter(StringUtils::isNotBlank)
+            .collect(java.util.stream.Collectors.toSet());
+        Set<String> sourceNames = sources.stream()
+            .map(CeEmissionSource::getEmissionSourceName)
+            .map(this::normalizeValue)
+            .filter(StringUtils::isNotBlank)
+            .collect(java.util.stream.Collectors.toSet());
+        if (factorKeys.isEmpty() && sourceNames.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+
+        Map<String, String> cache = new LinkedHashMap<>();
+        for (CeDimensionRecordVo factor : dimensionProjectionMapper.selectByDimensionCode("ef-factor")) {
+            String activityUnit = efFactorActivityUnit(factor);
+            if (StringUtils.isBlank(activityUnit)) {
+                continue;
+            }
+            String factorKey = normalizeValue(factor.getRecordCode());
+            if (factorKeys.contains(factorKey)) {
+                cache.putIfAbsent(factorCacheKey(factorKey), activityUnit);
+            }
+            String sourceName = normalizeValue(factor.getRecordName());
+            if (sourceNames.contains(sourceName)) {
+                cache.putIfAbsent(nameCacheKey(sourceName), activityUnit);
+            }
+        }
+        return cache;
+    }
+
+    private String efFactorActivityUnit(CeDimensionRecordVo factor) {
+        String sourceUnit = normalizeValue(factor.getSourceUnit());
+        if (StringUtils.isNotBlank(sourceUnit)) {
+            return sourceUnit;
+        }
+        return normalizeValue(factor.getFactorUnit());
+    }
+
+    private String factorCacheKey(Object factorKey) {
+        return "factor:" + normalizeValue(factorKey);
+    }
+
+    private String nameCacheKey(Object emissionSourceName) {
+        return "name:" + normalizeValue(emissionSourceName);
     }
 
     /**
@@ -787,55 +849,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
     }
 
     private List<Map<String, String>> gbIndustryRows() {
-        ClassPathResource resource = new ClassPathResource(INDUSTRY_RESOURCE);
-        if (!resource.exists()) {
-            log.warn("GB/T 4754-2017 industry option resource not found: {}", INDUSTRY_RESOURCE);
-            return List.of();
-        }
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
-            String headerLine = reader.readLine();
-            if (StringUtils.isBlank(headerLine)) {
-                return List.of();
-            }
-            List<String> headers = parseCsvLine(headerLine);
-            List<Map<String, String>> rows = new ArrayList<>();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                List<String> values = parseCsvLine(line);
-                Map<String, String> row = new LinkedHashMap<>();
-                for (int i = 0; i < headers.size(); i++) {
-                    row.put(headers.get(i), i < values.size() ? values.get(i) : "");
-                }
-                rows.add(row);
-            }
-            return rows;
-        } catch (IOException e) {
-            throw new ServiceException("读取国民经济行业分类选项失败");
-        }
-    }
-
-    private List<String> parseCsvLine(String line) {
-        List<String> values = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean quoted = false;
-        for (int i = 0; i < line.length(); i++) {
-            char ch = line.charAt(i);
-            if (ch == '"') {
-                if (quoted && i + 1 < line.length() && line.charAt(i + 1) == '"') {
-                    current.append('"');
-                    i++;
-                } else {
-                    quoted = !quoted;
-                }
-            } else if (ch == ',' && !quoted) {
-                values.add(current.toString());
-                current.setLength(0);
-            } else {
-                current.append(ch);
-            }
-        }
-        values.add(current.toString());
-        return values;
+        return CeCompanyIndustryCatalog.rows();
     }
 
     private String companyIndustryPair(String field) {
@@ -1088,7 +1102,36 @@ public class CeOptionServiceImpl implements ICeOptionService {
         String value = normalizeValue(candidate.getValue());
         String candidateLabel = normalizeValue(candidate.getLabel());
         String existingLabel = normalizeValue(existing.getLabel());
+        if (hasRicherIndustryHierarchy(candidate, existing)) {
+            return true;
+        }
         return existingLabel.equals(value) && StringUtils.isNotBlank(candidateLabel) && !candidateLabel.equals(value);
+    }
+
+    private boolean hasRicherIndustryHierarchy(CeOptionVo candidate, CeOptionVo existing) {
+        return industryHierarchyScore(candidate.getRecord()) > industryHierarchyScore(existing.getRecord());
+    }
+
+    private int industryHierarchyScore(Map<String, Object> record) {
+        if (record == null || record.isEmpty()) {
+            return 0;
+        }
+        int score = 0;
+        for (String field : List.of(
+            "industrySectionCode",
+            "industrySectionName",
+            "industryDivisionCode",
+            "industryDivisionName",
+            "industryGroupCode",
+            "industryGroupName",
+            "industryClassCode",
+            "industryClassName"
+        )) {
+            if (StringUtils.isNotBlank(normalizeValue(record.get(field)))) {
+                score++;
+            }
+        }
+        return score;
     }
 
     private int compareOptionValue(String left, String right) {

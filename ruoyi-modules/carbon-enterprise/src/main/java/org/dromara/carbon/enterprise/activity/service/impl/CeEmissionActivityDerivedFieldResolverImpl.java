@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityResolvedRow;
+import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
+import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityDerivedFieldResolver;
 import org.dromara.common.core.utils.StringUtils;
@@ -21,6 +23,7 @@ import java.util.Optional;
 public class CeEmissionActivityDerivedFieldResolverImpl implements ICeEmissionActivityDerivedFieldResolver {
 
     private final CeEmissionSourceMapper emissionSourceMapper;
+    private final CeDimensionProjectionMapper dimensionProjectionMapper;
 
     @Override
     public Optional<CeEmissionActivityResolvedRow> resolve(String emissionSourceCode) {
@@ -80,8 +83,41 @@ public class CeEmissionActivityDerivedFieldResolverImpl implements ICeEmissionAc
         row.setScopeSubcategory(source.getScopeSubcategory());
         row.setEmissionSourceIdentity(source.getSourceIdentificationName());
         row.setEmissionSourceName(source.getEmissionSourceName());
-        row.setUnit(source.getSourceUnit());
+        row.setUnit(resolveActivityUnit(source));
         row.setEmissionFactorCode(source.getFactorKey());
         return row;
+    }
+
+    private String resolveActivityUnit(CeEmissionSource source) {
+        String sourceUnit = normalize(source.getSourceUnit());
+        if (StringUtils.isNotBlank(sourceUnit)) {
+            return sourceUnit;
+        }
+        for (CeDimensionRecordVo factor : dimensionProjectionMapper.selectByDimensionCode("ef-factor")) {
+            if (matchesFactor(source, factor)) {
+                String factorSourceUnit = normalize(factor.getSourceUnit());
+                if (StringUtils.isNotBlank(factorSourceUnit)) {
+                    return factorSourceUnit;
+                }
+                String factorUnit = normalize(factor.getFactorUnit());
+                if (StringUtils.isNotBlank(factorUnit)) {
+                    return factorUnit;
+                }
+            }
+        }
+        return sourceUnit;
+    }
+
+    private boolean matchesFactor(CeEmissionSource source, CeDimensionRecordVo factor) {
+        String factorKey = normalize(source.getFactorKey());
+        if (StringUtils.isNotBlank(factorKey) && factorKey.equals(normalize(factor.getRecordCode()))) {
+            return true;
+        }
+        String sourceName = normalize(source.getEmissionSourceName());
+        return StringUtils.isNotBlank(sourceName) && sourceName.equals(normalize(factor.getRecordName()));
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim();
     }
 }
