@@ -58,7 +58,7 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
     @Override
     public Boolean insertByBo(CeEmissionSourceBo bo) {
         validateForeignKeys(bo);
-        CeEmissionSource add = MapstructUtils.convert(bo, CeEmissionSource.class);
+        CeEmissionSource add = toEntity(bo);
         if (add.getEnabledFlag() == null) {
             add.setEnabledFlag(Boolean.TRUE);
         }
@@ -72,13 +72,17 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
     @Override
     public Boolean updateByBo(CeEmissionSourceBo bo) {
         validateForeignKeys(bo);
-        CeEmissionSource update = MapstructUtils.convert(bo, CeEmissionSource.class);
+        CeEmissionSource update = toEntity(bo);
         return emissionSourceMapper.updateById(update) > 0;
     }
 
     @Override
     public Boolean deleteByIds(Collection<Long> ids) {
         return emissionSourceMapper.deleteByIds(ids) > 0;
+    }
+
+    protected CeEmissionSource toEntity(CeEmissionSourceBo bo) {
+        return MapstructUtils.convert(bo, CeEmissionSource.class);
     }
 
     private LambdaQueryWrapper<CeEmissionSource> buildQueryWrapper(CeEmissionSourceBo bo) {
@@ -100,19 +104,36 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
 
     private void validateForeignKeys(CeEmissionSourceBo bo) {
         if (StringUtils.isNotBlank(bo.getCompanyCode())) {
-            Long count = companyFactoryMapper.selectCount(
+            List<CeCompanyFactory> companies = companyFactoryMapper.selectList(
                 new LambdaQueryWrapper<CeCompanyFactory>()
-                    .eq(CeCompanyFactory::getFactoryCode, bo.getCompanyCode()));
-            if (count == null || count == 0) {
+                    .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName)
+                    .eq(CeCompanyFactory::getCompanyCode, bo.getCompanyCode()));
+            if (companies.isEmpty()) {
                 throw new ServiceException("公司编号不存在：" + bo.getCompanyCode());
+            }
+            CeCompanyFactory company = companies.get(0);
+            if (StringUtils.isBlank(bo.getCompanyName())) {
+                bo.setCompanyName(company.getCompanyName());
             }
         }
         if (StringUtils.isNotBlank(bo.getSourceCategoryKey())) {
-            Long count = emissionSourceCategoryMapper.selectCount(
+            List<CeEmissionSourceCategory> categories = emissionSourceCategoryMapper.selectList(
                 new LambdaQueryWrapper<CeEmissionSourceCategory>()
+                    .select(
+                        CeEmissionSourceCategory::getCategorySk,
+                        CeEmissionSourceCategory::getGhgScope,
+                        CeEmissionSourceCategory::getGhgScopeCategory
+                    )
                     .eq(CeEmissionSourceCategory::getCategorySk, bo.getSourceCategoryKey()));
-            if (count == null || count == 0) {
+            if (categories.isEmpty()) {
                 throw new ServiceException("排放源分类不存在：" + bo.getSourceCategoryKey());
+            }
+            CeEmissionSourceCategory category = categories.get(0);
+            if (StringUtils.isBlank(bo.getScopeName())) {
+                bo.setScopeName(category.getGhgScope());
+            }
+            if (StringUtils.isBlank(bo.getScopeSubcategory())) {
+                bo.setScopeSubcategory(category.getGhgScopeCategory());
             }
         }
     }
