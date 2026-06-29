@@ -51,7 +51,6 @@ public class CeEmissionSourceBo implements Serializable {
 
     private String factorKey;
 
-    @NotBlank(message = "活动单位不能为空", groups = { AddGroup.class, EditGroup.class })
     private String sourceUnit;
 
     private Boolean enabledFlag;

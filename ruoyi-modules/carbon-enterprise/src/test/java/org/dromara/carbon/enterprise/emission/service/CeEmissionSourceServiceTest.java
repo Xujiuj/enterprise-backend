@@ -14,6 +14,8 @@ import org.dromara.carbon.enterprise.emission.domain.bo.CeEmissionSourceBo;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceCategoryMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.emission.service.impl.CeEmissionSourceServiceImpl;
+import org.dromara.common.core.validate.AddGroup;
+import jakarta.validation.Validation;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -94,7 +96,18 @@ class CeEmissionSourceServiceTest {
         assertThat(sourceCaptor.getValue().getCompanyName()).isEqualTo("Company A");
         assertThat(sourceCaptor.getValue().getScopeName()).isEqualTo("Scope 1");
         assertThat(sourceCaptor.getValue().getScopeSubcategory()).isEqualTo("Fixed combustion");
-        assertThat(sourceCaptor.getValue().getSourceUnit()).isEqualTo("t");
+        assertThat(sourceCaptor.getValue().getSourceUnit()).isNull();
+    }
+
+    @Test
+    void sourceAEmissionSourceIdentificationDoesNotRequireSourceUnit() {
+        try (var factory = Validation.buildDefaultValidatorFactory()) {
+            var violations = factory.getValidator().validate(validBo(), AddGroup.class);
+
+            assertThat(violations)
+                .extracting(violation -> violation.getPropertyPath().toString())
+                .doesNotContain("sourceUnit");
+        }
     }
 
     private CeEmissionSourceBo validBo() {
@@ -108,7 +121,6 @@ class CeEmissionSourceServiceTest {
         bo.setResponsibleDept("Carbon Dept");
         bo.setDataSource("22");
         bo.setFactorKey("1");
-        bo.setSourceUnit("t");
         bo.setEnabledFlag(Boolean.TRUE);
         return bo;
     }
