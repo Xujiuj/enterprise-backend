@@ -6,30 +6,6 @@ SET QUOTED_IDENTIFIER ON;
 SET NOCOUNT ON;
 GO
 
-IF OBJECT_ID(N'dbo.sys_menu', N'U') IS NOT NULL
-BEGIN
-    IF EXISTS (SELECT 1 FROM dbo.sys_menu WHERE menu_id = 900161)
-    BEGIN
-        UPDATE dbo.sys_menu
-           SET menu_name = N'温室气体核算报表',
-               path = N'content',
-               component = N'enterprise/reports/index',
-               perms = N'enterprise:reports:view',
-               icon = N'chart',
-               remark = N'Power BI 温室气体核算报表',
-               update_time = SYSDATETIME()
-         WHERE menu_id = 900161;
-    END
-    ELSE IF EXISTS (SELECT 1 FROM dbo.sys_menu WHERE menu_id = 900160)
-    BEGIN
-        INSERT INTO dbo.sys_menu
-            (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, remark, create_time)
-        VALUES
-            (900161, N'温室气体核算报表', 900160, 1, N'content', N'enterprise/reports/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'chart', N'Power BI 温室气体核算报表', SYSDATETIME());
-    END;
-END;
-GO
-
 IF OBJECT_ID(N'dbo.ce_report_content', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ce_report_content (
