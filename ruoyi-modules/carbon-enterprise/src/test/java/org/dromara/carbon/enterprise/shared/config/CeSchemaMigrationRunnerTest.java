@@ -73,6 +73,33 @@ class CeSchemaMigrationRunnerTest {
             eq(Integer.class),
             any(), any()
         )).thenReturn(1);
+        when(jdbcTemplate.update(
+            eq("""
+                IF NOT EXISTS (
+                    SELECT 1
+                      FROM ce_industry_classification
+                     WHERE industry_section_code = ?
+                       AND ISNULL(industry_division_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_group_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_class_code, '') = ISNULL(?, '')
+                )
+                INSERT INTO ce_industry_classification (
+                    industry_section_code, industry_section_name,
+                    industry_division_code, industry_division_name,
+                    industry_group_code, industry_group_name,
+                    industry_class_code, industry_class_name,
+                    sort_order, status, create_time, remark
+                )
+                VALUES (
+                    ?, ?,
+                    NULLIF(?, ''), NULLIF(?, ''),
+                    NULLIF(?, ''), NULLIF(?, ''),
+                    NULLIF(?, ''), NULLIF(?, ''),
+                    ?, N'active', SYSDATETIME(), N'Source(A) 102公司表参考数据'
+                )
+                """),
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+        )).thenReturn(1);
 
         new CeSchemaMigrationRunner(jdbcTemplate).run();
 
@@ -127,6 +154,7 @@ class CeSchemaMigrationRunnerTest {
             eq(Integer.class),
             eq("ce_template_field"), eq("target_column_code")
         );
+        verifyIndustryReferenceSeeds(jdbcTemplate);
     }
 
     @Test
@@ -172,6 +200,33 @@ class CeSchemaMigrationRunnerTest {
             eq(Integer.class),
             any(), any()
         )).thenReturn(1);
+        when(jdbcTemplate.update(
+            eq("""
+                IF NOT EXISTS (
+                    SELECT 1
+                      FROM ce_industry_classification
+                     WHERE industry_section_code = ?
+                       AND ISNULL(industry_division_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_group_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_class_code, '') = ISNULL(?, '')
+                )
+                INSERT INTO ce_industry_classification (
+                    industry_section_code, industry_section_name,
+                    industry_division_code, industry_division_name,
+                    industry_group_code, industry_group_name,
+                    industry_class_code, industry_class_name,
+                    sort_order, status, create_time, remark
+                )
+                VALUES (
+                    ?, ?,
+                    NULLIF(?, ''), NULLIF(?, ''),
+                    NULLIF(?, ''), NULLIF(?, ''),
+                    NULLIF(?, ''), NULLIF(?, ''),
+                    ?, N'active', SYSDATETIME(), N'Source(A) 102公司表参考数据'
+                )
+                """),
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+        )).thenReturn(1);
 
         new CeSchemaMigrationRunner(jdbcTemplate).run();
 
@@ -190,5 +245,36 @@ class CeSchemaMigrationRunnerTest {
                     """),
                 eq(20L), any(), any(), any(), any(), any(), any(), any(), any()
             );
+        verifyIndustryReferenceSeeds(jdbcTemplate);
+    }
+
+    private void verifyIndustryReferenceSeeds(JdbcTemplate jdbcTemplate) {
+        verify(jdbcTemplate, times(4)).update(
+            eq("""
+                IF NOT EXISTS (
+                    SELECT 1
+                      FROM ce_industry_classification
+                     WHERE industry_section_code = ?
+                       AND ISNULL(industry_division_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_group_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_class_code, '') = ISNULL(?, '')
+                )
+                INSERT INTO ce_industry_classification (
+                    industry_section_code, industry_section_name,
+                    industry_division_code, industry_division_name,
+                    industry_group_code, industry_group_name,
+                    industry_class_code, industry_class_name,
+                    sort_order, status, create_time, remark
+                )
+                VALUES (
+                    ?, ?,
+                    NULLIF(?, ''), NULLIF(?, ''),
+                    NULLIF(?, ''), NULLIF(?, ''),
+                    NULLIF(?, ''), NULLIF(?, ''),
+                    ?, N'active', SYSDATETIME(), N'Source(A) 102公司表参考数据'
+                )
+                """),
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+        );
     }
 }

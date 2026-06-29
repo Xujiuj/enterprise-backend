@@ -30,6 +30,7 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
     @Override
     public void run(String... args) {
         createIndustryClassificationTableIfMissing();
+        seedIndustryClassificationRecords();
         addColumnIfMissing("ce_emission_source", "source_unit", "NVARCHAR(64) NULL");
         addColumnIfMissing("ce_emission_source", "factory_code", "NVARCHAR(64) NULL");
         addColumnIfMissing("ce_activity_data", "emission_source_id", "BIGINT NULL");
@@ -246,6 +247,53 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         addColumnIfMissing("ce_industry_classification", "industry_path_key",
             "AS (concat(industry_section_code,'|',isnull(industry_division_code,''),'|',isnull(industry_group_code,''),'|',isnull(industry_class_code,''))) PERSISTED");
         addUniqueConstraintIfMissing("ce_industry_classification", "uk_ce_industry_classification_path", "industry_path_key");
+    }
+
+    private void seedIndustryClassificationRecords() {
+        try {
+            int inserted = 0;
+            inserted += seedIndustryClassificationRecord(1, "S", "综合管理服务", "", "", "", "", "", "");
+            inserted += seedIndustryClassificationRecord(2, "C", "制造业", "26", "化学原料和化学制品制造业", "261", "基础化学原料制造", "2614", "有机化学原料制造");
+            inserted += seedIndustryClassificationRecord(3, "D", "电力、热力、燃气及水生产和供应业", "44", "电力、热力生产和供应业", "441", "电力生产", "4411", "火力发电");
+            inserted += seedIndustryClassificationRecord(4, "C", "制造业", "30", "非金属矿物制品业", "301", "水泥、石灰和石膏制造", "3011", "水泥制造");
+            log.info("[SchemaMigration] seeded ce_industry_classification reference records, inserted={}", inserted);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] industry classification seed skipped: {}", e.getMessage());
+        }
+    }
+
+    private int seedIndustryClassificationRecord(int sortOrder,
+                                                 String sectionCode, String sectionName,
+                                                 String divisionCode, String divisionName,
+                                                 String groupCode, String groupName,
+                                                 String classCode, String className) {
+        return jdbcTemplate.update("""
+            IF NOT EXISTS (
+                SELECT 1
+                  FROM ce_industry_classification
+                 WHERE industry_section_code = ?
+                   AND ISNULL(industry_division_code, '') = ISNULL(?, '')
+                   AND ISNULL(industry_group_code, '') = ISNULL(?, '')
+                   AND ISNULL(industry_class_code, '') = ISNULL(?, '')
+            )
+            INSERT INTO ce_industry_classification (
+                industry_section_code, industry_section_name,
+                industry_division_code, industry_division_name,
+                industry_group_code, industry_group_name,
+                industry_class_code, industry_class_name,
+                sort_order, status, create_time, remark
+            )
+            VALUES (
+                ?, ?,
+                NULLIF(?, ''), NULLIF(?, ''),
+                NULLIF(?, ''), NULLIF(?, ''),
+                NULLIF(?, ''), NULLIF(?, ''),
+                ?, N'active', SYSDATETIME(), N'Source(A) 102公司表参考数据'
+            )
+            """,
+            sectionCode, divisionCode, groupCode, classCode,
+            sectionCode, sectionName, divisionCode, divisionName, groupCode, groupName, classCode, className, sortOrder
+        );
     }
 
     private void addColumnIfMissing(String tableName, String columnName, String columnDef) {
