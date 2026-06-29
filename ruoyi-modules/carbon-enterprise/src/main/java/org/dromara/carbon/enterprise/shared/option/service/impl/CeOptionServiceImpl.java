@@ -205,6 +205,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 collectDistinct(options, reportTemplateFileMapper, CeReportTemplateFile::getEnabledFlag, this::labelForBoolean);
             }
             case "factor-table-code" -> collectDistinct(options, factorCacheRecordMapper, CeFactorCacheRecord::getFactorTableCode, this::labelForRaw);
+            case "factor-key" -> collectFactorKeyOptions(options);
             case "activity-year" -> {
                 collectDistinct(options, activityDataMapper, CeActivityData::getActivityYear, this::labelForYear);
                 collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getActivityYear, this::labelForYear);
@@ -367,6 +368,38 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
+    private void collectFactorKeyOptions(List<CeOptionVo> target) {
+        for (CeFactorCacheRecord row : factorCacheRecordMapper.selectList(new LambdaQueryWrapper<CeFactorCacheRecord>()
+            .select(
+                CeFactorCacheRecord::getFactorKey,
+                CeFactorCacheRecord::getFactorCode,
+                CeFactorCacheRecord::getFactorName,
+                CeFactorCacheRecord::getEmissionSourceName,
+                CeFactorCacheRecord::getFactorUnit,
+                CeFactorCacheRecord::getEnabledFlag
+            )
+            .and(wrapper -> wrapper.isNotNull(CeFactorCacheRecord::getFactorKey).or().isNotNull(CeFactorCacheRecord::getFactorCode))
+            .orderByAsc(CeFactorCacheRecord::getFactorKey)
+            .orderByAsc(CeFactorCacheRecord::getFactorCode))) {
+            String value = StringUtils.defaultIfBlank(normalizeValue(row.getFactorKey()), normalizeValue(row.getFactorCode()));
+            if (StringUtils.isBlank(value)) {
+                continue;
+            }
+            addOption(target, factorOptionLabel(value, row.getEmissionSourceName(), row.getFactorName(), row.getFactorUnit()), value, factorCacheRecord(row));
+        }
+        for (CeFactorConfirmation row : factorConfirmationMapper.selectList(new LambdaQueryWrapper<CeFactorConfirmation>()
+            .select(
+                CeFactorConfirmation::getFactorCode,
+                CeFactorConfirmation::getFactorName,
+                CeFactorConfirmation::getFactorUnit,
+                CeFactorConfirmation::getConfirmationStatus
+            )
+            .isNotNull(CeFactorConfirmation::getFactorCode)
+            .orderByAsc(CeFactorConfirmation::getFactorCode))) {
+            addOption(target, factorOptionLabel(row.getFactorCode(), row.getFactorName(), null, row.getFactorUnit()), row.getFactorCode(), factorConfirmationRecord(row));
+        }
+    }
+
     private void collectDimensionStatusOptions(List<CeOptionVo> target) {
         for (String dimensionCode : ALLOWED_DIMENSION_CODES) {
             for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
@@ -458,6 +491,39 @@ public class CeOptionServiceImpl implements ICeOptionService {
         record.put("companyName", factory.getCompanyName());
         record.put("factoryCode", factory.getFactoryCode());
         record.put("factoryName", factory.getFactoryName());
+        return record;
+    }
+
+    private String factorOptionLabel(Object value, Object primaryName, Object fallbackName, Object unit) {
+        String rawValue = normalizeValue(value);
+        String name = Stream.of(primaryName, fallbackName)
+            .map(this::normalizeValue)
+            .filter(StringUtils::isNotBlank)
+            .findFirst()
+            .orElse("");
+        String label = labelWithName(rawValue, name);
+        String normalizedUnit = normalizeValue(unit);
+        return StringUtils.isNotBlank(normalizedUnit) ? label + " (" + normalizedUnit + ")" : label;
+    }
+
+    private Map<String, Object> factorCacheRecord(CeFactorCacheRecord row) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("factorKey", StringUtils.defaultIfBlank(normalizeValue(row.getFactorKey()), normalizeValue(row.getFactorCode())));
+        record.put("factorCode", normalizeValue(row.getFactorCode()));
+        record.put("factorName", normalizeValue(row.getFactorName()));
+        record.put("emissionSourceName", normalizeValue(row.getEmissionSourceName()));
+        record.put("factorUnit", normalizeValue(row.getFactorUnit()));
+        record.put("enabledFlag", row.getEnabledFlag());
+        return record;
+    }
+
+    private Map<String, Object> factorConfirmationRecord(CeFactorConfirmation row) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("factorKey", normalizeValue(row.getFactorCode()));
+        record.put("factorCode", normalizeValue(row.getFactorCode()));
+        record.put("factorName", normalizeValue(row.getFactorName()));
+        record.put("factorUnit", normalizeValue(row.getFactorUnit()));
+        record.put("confirmationStatus", normalizeValue(row.getConfirmationStatus()));
         return record;
     }
 
@@ -749,8 +815,8 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "factorSource" -> record.getFactorSource();
             case "factorUnit" -> record.getFactorUnit();
             case "factorVersion" -> record.getFactorVersion();
-            case "divisionCode" -> record.getDivisionCode();
-            case "divisionName" -> record.getDivisionName();
+            case "divisionCode" -> StringUtils.defaultIfBlank(record.getDivisionCode(), record.getRecordCode());
+            case "divisionName" -> StringUtils.defaultIfBlank(record.getDivisionName(), record.getRecordName());
             case "scopeKey" -> record.getScopeKey();
             case "scopeName" -> record.getScopeName();
             case "enabledText" -> record.getEnabledText();

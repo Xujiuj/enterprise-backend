@@ -9,6 +9,7 @@ import org.dromara.carbon.enterprise.activity.domain.CeActivityData;
 import org.dromara.carbon.enterprise.dimension.domain.CeCompanyFactory;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.factor.domain.CeFactorCacheRecord;
+import org.dromara.carbon.enterprise.factor.domain.CeFactorConfirmation;
 import org.dromara.carbon.enterprise.greenpower.domain.CeGreenPowerCertificate;
 import org.dromara.carbon.enterprise.intensity.domain.CeIntensityDenominatorFact;
 import org.dromara.carbon.enterprise.intensity.domain.CeIntensityMetric;
@@ -50,6 +51,8 @@ class CeOptionServiceTest {
     private CeEmissionSourceMapper emissionSourceMapper;
     private CeGreenPowerCertificateMapper greenPowerCertificateMapper;
     private CeDimensionProjectionMapper dimensionProjectionMapper;
+    private CeFactorCacheRecordMapper factorCacheRecordMapper;
+    private CeFactorConfirmationMapper factorConfirmationMapper;
     private CeOptionServiceImpl service;
 
     @BeforeAll
@@ -61,6 +64,7 @@ class CeOptionServiceTest {
         initializeEntityLambdaCache(CeEmissionSourceMapper.class, CeEmissionSource.class);
         initializeEntityLambdaCache(CeEmissionSourceCategoryMapper.class, org.dromara.carbon.enterprise.emission.domain.CeEmissionSourceCategory.class);
         initializeEntityLambdaCache(CeFactorCacheRecordMapper.class, CeFactorCacheRecord.class);
+        initializeEntityLambdaCache(CeFactorConfirmationMapper.class, CeFactorConfirmation.class);
         initializeEntityLambdaCache(CeGreenPowerCertificateMapper.class, CeGreenPowerCertificate.class);
     }
 
@@ -73,6 +77,8 @@ class CeOptionServiceTest {
         emissionSourceMapper = mock(CeEmissionSourceMapper.class);
         greenPowerCertificateMapper = mock(CeGreenPowerCertificateMapper.class);
         dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
+        factorCacheRecordMapper = mock(CeFactorCacheRecordMapper.class);
+        factorConfirmationMapper = mock(CeFactorConfirmationMapper.class);
         service = new CeOptionServiceImpl(
             activityDataMapper,
             companyFactoryMapper,
@@ -80,8 +86,8 @@ class CeOptionServiceTest {
             mock(CeEmissionSourceCategoryMapper.class),
             greenPowerCertificateMapper,
             denominatorFactMapper,
-            mock(CeFactorCacheRecordMapper.class),
-            mock(CeFactorConfirmationMapper.class),
+            factorCacheRecordMapper,
+            factorConfirmationMapper,
             intensityMetricMapper,
             mock(CeReportTemplateFileMapper.class),
             mock(CeCaptureBatchMapper.class),
@@ -267,6 +273,38 @@ class CeOptionServiceTest {
     }
 
     @Test
+    void factorKeyOptionsComeFromCacheAndConfirmationTables() {
+        CeFactorCacheRecord cache = new CeFactorCacheRecord();
+        cache.setFactorKey("KEY-DIESEL");
+        cache.setFactorCode("FC-DIESEL");
+        cache.setEmissionSourceName("Diesel combustion");
+        cache.setFactorName("Diesel factor");
+        cache.setFactorUnit("kgCO2e/t");
+        cache.setEnabledFlag(true);
+        CeFactorConfirmation confirmation = new CeFactorConfirmation();
+        confirmation.setFactorCode("FC-ELECTRICITY");
+        confirmation.setFactorName("Electricity factor");
+        confirmation.setFactorUnit("kgCO2e/MWh");
+        confirmation.setConfirmationStatus("confirmed");
+        when(factorCacheRecordMapper.selectList(any())).thenReturn(List.of(cache));
+        when(factorConfirmationMapper.selectList(any())).thenReturn(List.of(confirmation));
+
+        var options = service.listOptions("factor-key", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("FC-ELECTRICITY", "KEY-DIESEL");
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getLabel()))
+            .containsExactly("FC-ELECTRICITY / Electricity factor (kgCO2e/MWh)", "KEY-DIESEL / Diesel combustion (kgCO2e/t)");
+        assertThat(options.get(1).getRecord())
+            .containsEntry("factorKey", "KEY-DIESEL")
+            .containsEntry("factorCode", "FC-DIESEL")
+            .containsEntry("emissionSourceName", "Diesel combustion")
+            .containsEntry("factorUnit", "kgCO2e/t");
+    }
+
+    @Test
     void dimensionFieldOptionsUseFieldValueLabelsExceptStatus() {
         CeDimensionRecordVo company = new CeDimensionRecordVo();
         company.setIndustrySectionCode("C");
@@ -337,6 +375,39 @@ class CeOptionServiceTest {
         assertThat(options.get(0).getRecord())
             .containsEntry("provinceCode", "110000")
             .containsEntry("provinceName", "北京市");
+    }
+
+    @Test
+    void dimensionFieldOptionsAcceptLegacyFieldNameParameter() {
+        CeDimensionRecordVo company = new CeDimensionRecordVo();
+        company.setIndustrySectionCode("C");
+        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(company));
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setFieldName("industrySectionCode");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("C");
+    }
+
+    @Test
+    void adminDivisionCodeOptionsFallBackToRecordCode() {
+        CeDimensionRecordVo beijing = new CeDimensionRecordVo();
+        beijing.setRecordCode("110000");
+        beijing.setRecordName("Beijing");
+        when(dimensionProjectionMapper.selectByDimensionCode("admin-division")).thenReturn(List.of(beijing));
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("admin-division");
+        query.setField("divisionCode");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("110000");
     }
 
     @Test

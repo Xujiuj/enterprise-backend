@@ -12,6 +12,8 @@ public class CeOptionQueryBo {
 
     private String field;
 
+    private String fieldName;
+
     private String companyName;
 
     private String factoryName;
@@ -25,4 +27,8 @@ public class CeOptionQueryBo {
     private String sourceIdentificationName;
 
     private String emissionSourceName;
+
+    public String getField() {
+        return field == null || field.isBlank() ? fieldName : field;
+    }
 }
