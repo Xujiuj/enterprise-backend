@@ -272,6 +272,27 @@ class CeOptionServiceTest {
     }
 
     @Test
+    void activityEntryEmissionSourceNameOptionsCarryMasterRecordForEarlyValidation() {
+        CeEmissionSource source = emissionSource("ES-001", "柴油燃烧", "A公司", "一厂", "cat-a");
+        source.setSourceUnit("t");
+        source.setFactorKey("EF-201-DIESEL");
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of(source));
+        when(factorCacheRecordMapper.selectList(any())).thenReturn(List.of());
+
+        var options = service.listOptions("activity-entry-emission-source-name", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("柴油燃烧");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("sourceIdentificationCode", "ES-001")
+            .containsEntry("companyName", "A公司")
+            .containsEntry("factoryName", "一厂")
+            .containsEntry("sourceUnit", "t")
+            .containsEntry("factorKey", "EF-201-DIESEL");
+    }
+
+    @Test
     void intensityRuleCodeOptionsComeFromEnterpriseBusinessTables() {
         when(intensityMetricMapper.selectObjs(any())).thenReturn(List.of("RULE-A", "RULE-B"));
         when(denominatorFactMapper.selectObjs(any())).thenReturn(List.of("RULE-B", "RULE-C"));
@@ -448,7 +469,7 @@ class CeOptionServiceTest {
     }
 
     @Test
-    void companyIndustryOptionsFallBackToSourceACompanyReferenceRows() {
+    void companyIndustryOptionsFallBackToGbIndustryClassification() {
         when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of());
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
@@ -458,15 +479,43 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .contains("2614 / 有机化学原料制造", "3011 / 水泥制造", "4411 / 火力发电");
+            .contains("2614 / 有机化学原料制造", "3011 / 水泥制造", "4411 / 火力发电", "8052 / 足浴服务", "8053 / 养生保健服务");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .contains("2614", "3011", "4411");
+            .hasSizeGreaterThan(1300)
+            .contains("2614", "3011", "4411", "8052", "8053");
         assertThat(options)
             .anySatisfy(option -> assertThat(option.getRecord())
-                .containsEntry("source", "source-a-company")
+                .containsEntry("source", "gbt4754-2017")
                 .containsEntry("industryClassCode", "2614")
+                .containsEntry("industryGroupCode", "261")
+                .containsEntry("industryDivisionCode", "26")
+                .containsEntry("industrySectionCode", "C")
                 .containsEntry("industryClassName", "有机化学原料制造"));
+    }
+
+    @Test
+    void companyIndustryDivisionOptionsCarryParentSectionCode() {
+        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of());
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setField("industryDivisionCode");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .hasSizeGreaterThanOrEqualTo(97)
+            .contains("26", "44");
+        assertThat(options.stream()
+            .filter(option -> "26".equals(String.valueOf(option.getValue())))
+            .findFirst()
+            .orElseThrow()
+            .getRecord())
+            .containsEntry("industrySectionCode", "C")
+            .containsEntry("industrySectionName", "制造业")
+            .containsEntry("industryDivisionCode", "26")
+            .containsEntry("industryDivisionName", "化学原料和化学制品制造业");
     }
 
     @Test

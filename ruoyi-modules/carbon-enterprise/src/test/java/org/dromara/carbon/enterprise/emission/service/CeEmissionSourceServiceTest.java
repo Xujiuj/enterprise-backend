@@ -61,6 +61,7 @@ class CeEmissionSourceServiceTest {
                 source.setResponsibleDept(bo.getResponsibleDept());
                 source.setDataSource(bo.getDataSource());
                 source.setFactorKey(bo.getFactorKey());
+                source.setSourceUnit(bo.getSourceUnit());
                 source.setEnabledFlag(bo.getEnabledFlag());
                 return source;
             }
@@ -93,6 +94,7 @@ class CeEmissionSourceServiceTest {
         assertThat(sourceCaptor.getValue().getCompanyName()).isEqualTo("Company A");
         assertThat(sourceCaptor.getValue().getScopeName()).isEqualTo("Scope 1");
         assertThat(sourceCaptor.getValue().getScopeSubcategory()).isEqualTo("Fixed combustion");
+        assertThat(sourceCaptor.getValue().getSourceUnit()).isEqualTo("t");
     }
 
     private CeEmissionSourceBo validBo() {
@@ -106,6 +108,7 @@ class CeEmissionSourceServiceTest {
         bo.setResponsibleDept("Carbon Dept");
         bo.setDataSource("22");
         bo.setFactorKey("1");
+        bo.setSourceUnit("t");
         bo.setEnabledFlag(Boolean.TRUE);
         return bo;
     }

@@ -38,8 +38,13 @@ import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.system.domain.SysDept;
 import org.dromara.system.mapper.SysDeptMapper;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -62,6 +67,7 @@ import java.util.stream.Stream;
 public class CeOptionServiceImpl implements ICeOptionService {
 
     private static final String DIMENSION_FIELD_OPTION = "dimension-field";
+    private static final String INDUSTRY_RESOURCE = "enterprise-options/gbt4754-2017-industry.csv";
 
     private static final List<Map<String, String>> SOURCE_A_COMPANY_REFERENCE_ROWS = List.of(
         Map.of(
@@ -287,7 +293,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "issuing-org" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getIssuingOrg, this::labelForRaw);
             case "confirmed-by" -> collectDistinct(options, factorConfirmationMapper, CeFactorConfirmation::getConfirmedBy, this::labelForRaw);
             case "license-id" -> collectDistinct(options, licenseStateMapper, CeLicenseState::getLicenseId, this::labelForRaw);
-            case "activity-entry-emission-source-name" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getEmissionSourceName, safeQuery);
+            case "activity-entry-emission-source-name" -> collectEmissionSourceNameOptions(options, safeQuery);
             case "activity-entry-source-company" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getCompanyName, safeQuery);
             case "activity-entry-source-factory" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getFactoryName, safeQuery);
             case "activity-entry-source-scope" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getScopeName, safeQuery);
@@ -771,13 +777,65 @@ public class CeOptionServiceImpl implements ICeOptionService {
             String label = codeSelected ? labelWithName(code, name) : labelWithName(name, code);
             addOption(target, label, value, dimensionRecordMap(record));
         }
-        for (Map<String, String> record : SOURCE_A_COMPANY_REFERENCE_ROWS) {
+        for (Map<String, String> record : gbIndustryRows()) {
             String code = normalizeValue(record.get(codeField));
             String name = normalizeValue(record.get(nameField));
             Object value = codeSelected ? code : name;
             String label = codeSelected ? labelWithName(code, name) : labelWithName(name, code);
-            addOption(target, label, value, sourceAReferenceRecordMap(record));
+            addOption(target, label, value, industryRecordMap(record));
         }
+    }
+
+    private List<Map<String, String>> gbIndustryRows() {
+        ClassPathResource resource = new ClassPathResource(INDUSTRY_RESOURCE);
+        if (!resource.exists()) {
+            log.warn("GB/T 4754-2017 industry option resource not found: {}", INDUSTRY_RESOURCE);
+            return List.of();
+        }
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
+            String headerLine = reader.readLine();
+            if (StringUtils.isBlank(headerLine)) {
+                return List.of();
+            }
+            List<String> headers = parseCsvLine(headerLine);
+            List<Map<String, String>> rows = new ArrayList<>();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                List<String> values = parseCsvLine(line);
+                Map<String, String> row = new LinkedHashMap<>();
+                for (int i = 0; i < headers.size(); i++) {
+                    row.put(headers.get(i), i < values.size() ? values.get(i) : "");
+                }
+                rows.add(row);
+            }
+            return rows;
+        } catch (IOException e) {
+            throw new ServiceException("读取国民经济行业分类选项失败");
+        }
+    }
+
+    private List<String> parseCsvLine(String line) {
+        List<String> values = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char ch = line.charAt(i);
+            if (ch == '"') {
+                if (quoted && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    current.append('"');
+                    i++;
+                } else {
+                    quoted = !quoted;
+                }
+            } else if (ch == ',' && !quoted) {
+                values.add(current.toString());
+                current.setLength(0);
+            } else {
+                current.append(ch);
+            }
+        }
+        values.add(current.toString());
+        return values;
     }
 
     private String companyIndustryPair(String field) {
@@ -817,6 +875,13 @@ public class CeOptionServiceImpl implements ICeOptionService {
         Map<String, Object> values = new LinkedHashMap<>();
         record.forEach(values::put);
         values.put("source", "source-a-company");
+        return values;
+    }
+
+    private Map<String, Object> industryRecordMap(Map<String, String> record) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        record.forEach(values::put);
+        values.put("source", "gbt4754-2017");
         return values;
     }
 
