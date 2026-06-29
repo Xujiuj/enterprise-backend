@@ -11,6 +11,7 @@ import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityValidatio
 import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityValidationResult;
 import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityCaptureService;
 import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityImportValidationService;
+import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityValidationService;
 import org.dromara.common.web.handler.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -39,19 +41,35 @@ class CeEmissionActivityImportValidationControllerTest {
 
     private ICeEmissionActivityImportValidationService activityImportValidationService;
     private ICeEmissionActivityCaptureService activityCaptureService;
+    private ICeEmissionActivityValidationService activityValidationService;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         activityImportValidationService = mock(ICeEmissionActivityImportValidationService.class);
         activityCaptureService = mock(ICeEmissionActivityCaptureService.class);
+        activityValidationService = mock(ICeEmissionActivityValidationService.class);
         mockMvc = MockMvcBuilders
             .standaloneSetup(new CeEmissionActivityImportValidationController(
                 activityImportValidationService,
-                activityCaptureService
+                activityCaptureService,
+                activityValidationService
             ))
             .setControllerAdvice(new GlobalExceptionHandler())
             .build();
+    }
+
+    @Test
+    void returnsServerEntryFieldDescriptors() throws Exception {
+        when(activityValidationService.listEntryFields()).thenReturn(List.of(field("companyName", "公司名称")));
+
+        mockMvc.perform(get("/enterprise/activity-import/emission-activity/fields"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code", is(200)))
+            .andExpect(jsonPath("$.data[0].fieldCode", is("companyName")))
+            .andExpect(jsonPath("$.data[0].fieldName", is("公司名称")));
+
+        verify(activityValidationService).listEntryFields();
     }
 
     @Test
@@ -174,10 +192,7 @@ class CeEmissionActivityImportValidationControllerTest {
     }
 
     private CeEmissionActivityImportValidationRequest parsedRequest() {
-        CeEmissionActivityFieldDescriptor headerField = new CeEmissionActivityFieldDescriptor();
-        headerField.setFieldOrder(1);
-        headerField.setFieldCode("companyName");
-        headerField.setFieldName("公司名称");
+        CeEmissionActivityFieldDescriptor headerField = field("companyName", "公司名称");
 
         CeEmissionActivityFieldValue fieldValue = new CeEmissionActivityFieldValue();
         fieldValue.setFieldCode("companyName");
@@ -192,6 +207,14 @@ class CeEmissionActivityImportValidationControllerTest {
         request.setHeaderFields(List.of(headerField));
         request.setRows(List.of(row));
         return request;
+    }
+
+    private CeEmissionActivityFieldDescriptor field(String code, String name) {
+        CeEmissionActivityFieldDescriptor headerField = new CeEmissionActivityFieldDescriptor();
+        headerField.setFieldOrder(1);
+        headerField.setFieldCode(code);
+        headerField.setFieldName(name);
+        return headerField;
     }
 
 }

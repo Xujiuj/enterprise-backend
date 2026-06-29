@@ -69,8 +69,8 @@ class CeEmissionActivityValidationTest {
     }
 
     @Test
-    void validatorImplementationIsPlainClassWithNoProductionBeanRegistration() {
-        assertFalse(CeEmissionActivityValidationServiceImpl.class.isAnnotationPresent(Service.class));
+    void validatorImplementationIsProductionBean() {
+        assertTrue(CeEmissionActivityValidationServiceImpl.class.isAnnotationPresent(Service.class));
         assertFalse(CeEmissionActivityValidationServiceImpl.class.isAnnotationPresent(Component.class));
     }
 

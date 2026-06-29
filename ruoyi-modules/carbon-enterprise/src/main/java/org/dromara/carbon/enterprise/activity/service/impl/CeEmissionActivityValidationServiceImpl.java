@@ -10,6 +10,7 @@ import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityValidatio
 import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityDerivedFieldResolver;
 import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityValidationService;
 import org.dromara.common.core.utils.StringUtils;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -27,6 +28,7 @@ import java.util.Optional;
  * Row-level validator for the semantic emission_activity entry contract.
  */
 @RequiredArgsConstructor
+@Service
 public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActivityValidationService {
 
     private static final String SEVERITY_ERROR = "ERROR";

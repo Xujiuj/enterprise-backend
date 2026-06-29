@@ -3,20 +3,25 @@ package org.dromara.carbon.enterprise.activity.controller;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityCaptureResult;
+import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityFieldDescriptor;
 import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityImportValidationRequest;
 import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityImportValidationResult;
 import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityValidationRequest;
 import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityCaptureService;
 import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityImportValidationService;
+import org.dromara.carbon.enterprise.shared.service.ICeEmissionActivityValidationService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 /**
  * Import and manual-entry API for emission activity data.
@@ -29,6 +34,13 @@ public class CeEmissionActivityImportValidationController extends BaseController
 
     private final ICeEmissionActivityImportValidationService activityImportValidationService;
     private final ICeEmissionActivityCaptureService activityCaptureService;
+    private final ICeEmissionActivityValidationService activityValidationService;
+
+    @SaCheckPermission("enterprise:activityImportValidation:validate")
+    @GetMapping("/fields")
+    public R<List<CeEmissionActivityFieldDescriptor>> fields() {
+        return R.ok(activityValidationService.listEntryFields());
+    }
 
     @SaCheckPermission("enterprise:activityImportValidation:validate")
     @PostMapping("/validate")
