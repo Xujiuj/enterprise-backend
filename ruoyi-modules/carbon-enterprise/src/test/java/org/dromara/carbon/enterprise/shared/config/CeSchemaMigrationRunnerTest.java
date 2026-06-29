@@ -117,11 +117,6 @@ class CeSchemaMigrationRunnerTest {
             any(), any()
         )).thenReturn(1);
         when(jdbcTemplate.queryForObject(
-            eq("SELECT COUNT(*) FROM sys_menu WHERE menu_id = ? OR path = ?"),
-            eq(Integer.class),
-            any(), any()
-        )).thenReturn(1);
-        when(jdbcTemplate.queryForObject(
             eq("""
                 SELECT TOP 1 id
                   FROM ce_template_sheet
@@ -150,6 +145,10 @@ class CeSchemaMigrationRunnerTest {
         when(jdbcTemplate.update(
             contains("INSERT INTO ce_industry_classification"),
             any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
+        )).thenReturn(1);
+        when(jdbcTemplate.update(
+            eq("DELETE FROM sys_menu WHERE menu_id = ? OR path = ? OR menu_name = N'107 行业代码表'"),
+            any(), any()
         )).thenReturn(1);
         return jdbcTemplate;
     }
@@ -191,22 +190,32 @@ class CeSchemaMigrationRunnerTest {
             any(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
             any(), any(), any(), any(), any()
         );
-        verify(jdbcTemplate, times(4)).update(
+        verify(jdbcTemplate, times(CeGbIndustryClassification.records().size())).update(
             contains("INSERT INTO ce_industry_classification"),
             any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()
         );
         verify(jdbcTemplate).update(
             contains("INSERT INTO ce_industry_classification"),
             eq("L"), eq("72"), eq("721"), eq("7211"),
-            eq("L"), any(), eq("72"), any(), eq("721"), any(), eq("7211"), any(), eq(1)
+            eq("L"), any(), eq("72"), any(), eq("721"), any(), eq("7211"), any(), any()
         );
         verify(jdbcTemplate).update(
             contains("INSERT INTO ce_industry_classification"),
             eq("C"), eq("39"), eq("398"), eq("3985"),
-            eq("C"), any(), eq("39"), any(), eq("398"), any(), eq("3985"), any(), eq(2)
+            eq("C"), any(), eq("39"), any(), eq("398"), any(), eq("3985"), any(), any()
+        );
+        verify(jdbcTemplate).update(
+            contains("INSERT INTO ce_industry_classification"),
+            eq("D"), eq("44"), eq("441"), eq("4411"),
+            eq("D"), any(), eq("44"), any(), eq("441"), any(), eq("4411"), any(), any()
+        );
+        verify(jdbcTemplate).update(
+            contains("INSERT INTO ce_industry_classification"),
+            eq("C"), eq("30"), eq("301"), eq("3011"),
+            eq("C"), any(), eq("30"), any(), eq("301"), any(), eq("3011"), any(), any()
         );
         verify(jdbcTemplate, times(2)).update(
-            contains("SET remark = N'GB/T 4754-2017 工厂行业划分'"),
+            contains("SET remark = N'GB/T 4754-2017 行业分类'"),
             any(), any(), any(), any()
         );
         verify(jdbcTemplate).update(
@@ -229,6 +238,10 @@ class CeSchemaMigrationRunnerTest {
             eq("10102"), eq("2"), eq("101"), eq("10102"), any(), any(),
             eq("650000"), any(), eq("多晶硅生产"),
             eq("C"), any(), eq("39"), any(), eq("398"), any(), eq("3985"), any(), eq("source(A)")
+        );
+        verify(jdbcTemplate).update(
+            eq("DELETE FROM sys_menu WHERE menu_id = ? OR path = ? OR menu_name = N'107 行业代码表'"),
+            eq(900116L), eq("industry")
         );
     }
 }

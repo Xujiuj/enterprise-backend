@@ -42,7 +42,7 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         seedEmissionActivityTemplateIfMissing();
         addUniqueConstraintIfMissing("ce_template_field", "uk_ce_template_field_business_code", "sheet_id, business_field_code");
         backfillSourceARelationshipColumns();
-        insertIndustryMenuIfMissing();
+        removeIndustryMenuIfPresent();
     }
 
     private void seedEmissionActivityTemplateIfMissing() {
@@ -186,30 +186,17 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         };
     }
 
-    private void insertIndustryMenuIfMissing() {
+    private void removeIndustryMenuIfPresent() {
         try {
-            Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_menu WHERE menu_id = ? OR path = ?",
-                Integer.class, 900116L, "industry"
+            int deleted = jdbcTemplate.update(
+                "DELETE FROM sys_menu WHERE menu_id = ? OR path = ? OR menu_name = N'107 行业代码表'",
+                900116L, "industry"
             );
-            if (count != null && count > 0) {
-                log.debug("[SchemaMigration] industry menu exists, skipped");
-                return;
+            if (deleted > 0) {
+                log.info("[SchemaMigration] removed industry menu, deleted={}", deleted);
             }
-            jdbcTemplate.update("""
-                INSERT INTO sys_menu (
-                    menu_id, menu_name, parent_id, order_num, path, component, query_param,
-                    is_frame, is_cache, menu_type, visible, status, perms, icon, remark
-                ) VALUES (
-                    ?, N'107 行业代码表', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, N'行业代码表'
-                )
-                """,
-                900116L, 900110L, 6, "industry", "enterprise/dimension/index", "{\"code\":\"industry\"}",
-                1, 0, "C", "0", "0", "enterprise:dimension:list", "dict"
-            );
-            log.info("[SchemaMigration] inserted industry menu");
         } catch (Exception e) {
-            log.warn("[SchemaMigration] industry menu insert skipped: {}", e.getMessage());
+            log.warn("[SchemaMigration] industry menu removal skipped: {}", e.getMessage());
         }
     }
 
