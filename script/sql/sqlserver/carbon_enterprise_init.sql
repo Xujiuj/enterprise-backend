@@ -451,7 +451,7 @@ VALUES
     (900154, N'504 碳排放强度容忍率参数表', 900150, 4, N'intensity-tolerance', N'enterprise/dimension/index', N'{"code":"intensity-tolerance"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'chart', N'碳排放强度容忍率参数表'),
 
     (900160, N'报表管理', 0, 7, N'report-management', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'chart', N'报表管理目录'),
-    (900161, N'Content', 900160, 1, N'content', N'enterprise/reports/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'chart', N'Content'),
+    (900161, N'温室气体核算报表', 900160, 1, N'content', N'enterprise/reports/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'chart', N'Power BI 温室气体核算报表'),
     (900162, N'数据验证', 900160, 2, N'data-validation', N'enterprise/dataValidation/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:dataValidation:view', N'validCode', N'数据验证'),
     (900163, N'报表模板下载', 900160, 3, N'report-template-download', N'enterprise/reportTemplateFile/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reportTemplateFile:list', N'download', N'报表模板下载'),
 
