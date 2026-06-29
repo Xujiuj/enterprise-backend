@@ -9,6 +9,8 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.dromara.carbon.enterprise.sourcea.domain.CeSourceAImportResult;
+import org.dromara.carbon.enterprise.shared.config.CeGbIndustryClassification;
+import org.dromara.carbon.enterprise.shared.config.CeGbIndustryClassification.IndustryRecord;
 import org.dromara.carbon.enterprise.shared.service.ICeSourceAImportService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
@@ -378,11 +380,20 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
                 "factory_type", "industry_section_code", "industry_section_name", "industry_division_code", "industry_division_name",
                 "industry_group_code", "industry_group_name", "industry_class_code", "industry_class_name", "effective_date", "expiry_date",
                 "is_active", "remark"),
-            mapRows(data.companyRows, row -> values(row.get("SK_公司"), row.get("公司编号"), row.get("BK_工厂编号"), row.get("公司"),
-                row.get("工厂"), row.get("省份编码"), row.get("所在省份"), row.get("工厂类型"), row.get("行业门类代码"),
-                row.get("行业门类名称"), row.get("行业大类代码"), row.get("行业大类名称"), row.get("行业中类代码"), row.get("行业中类名称"),
-                row.get("行业小类代码"), row.get("行业小类名称"), sqlDate(row.get("生效日期")), sqlDate(row.get("失效日期")),
-                activeFlag(row.get("是否有效")), MARK)));
+            mapRows(data.companyRows, row -> {
+                IndustryRecord industry = CeGbIndustryClassification.byFactoryType(text(row.get("工厂类型")));
+                return values(row.get("SK_公司"), row.get("公司编号"), row.get("BK_工厂编号"), row.get("公司"),
+                    row.get("工厂"), row.get("省份编码"), row.get("所在省份"), row.get("工厂类型"),
+                    industryValue(industry, row, "sectionCode", "行业门类代码"),
+                    industryValue(industry, row, "sectionName", "行业门类名称"),
+                    industryValue(industry, row, "divisionCode", "行业大类代码"),
+                    industryValue(industry, row, "divisionName", "行业大类名称"),
+                    industryValue(industry, row, "groupCode", "行业中类代码"),
+                    industryValue(industry, row, "groupName", "行业中类名称"),
+                    industryValue(industry, row, "classCode", "行业小类代码"),
+                    industryValue(industry, row, "className", "行业小类名称"),
+                    sqlDate(row.get("生效日期")), sqlDate(row.get("失效日期")), activeFlag(row.get("是否有效")), MARK);
+            }));
 
         insertRows(result, "ce_emission_source_category", List.of(
                 "category_sk", "business_key", "ghg_scope", "ghg_scope_category_sort", "ghg_scope_category", "ghg_scope_en",
@@ -655,6 +666,23 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
 
     private List<Object> values(Object... values) {
         return new ArrayList<>(Arrays.asList(values));
+    }
+
+    private Object industryValue(IndustryRecord industry, Map<String, Object> row, String field, String fallbackColumn) {
+        if (industry == null) {
+            return row.get(fallbackColumn);
+        }
+        return switch (field) {
+            case "sectionCode" -> industry.sectionCode();
+            case "sectionName" -> industry.sectionName();
+            case "divisionCode" -> industry.divisionCode();
+            case "divisionName" -> industry.divisionName();
+            case "groupCode" -> industry.groupCode();
+            case "groupName" -> industry.groupName();
+            case "classCode" -> industry.classCode();
+            case "className" -> industry.className();
+            default -> row.get(fallbackColumn);
+        };
     }
 
     private Object first(Object first, Object second) {

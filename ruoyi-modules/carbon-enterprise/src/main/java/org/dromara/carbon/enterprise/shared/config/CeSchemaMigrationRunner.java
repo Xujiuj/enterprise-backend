@@ -3,6 +3,7 @@ package org.dromara.carbon.enterprise.shared.config;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityFieldDescriptor;
 import org.dromara.carbon.enterprise.activity.service.impl.CeEmissionActivityValidationServiceImpl;
+import org.dromara.carbon.enterprise.shared.config.CeGbIndustryClassification.IndustryRecord;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -251,23 +252,199 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
 
     private void seedIndustryClassificationRecords() {
         try {
-            int inserted = 0;
-            inserted += seedIndustryClassificationRecord(1, "S", "综合管理服务", "", "", "", "", "", "");
-            inserted += seedIndustryClassificationRecord(2, "C", "制造业", "26", "化学原料和化学制品制造业", "261", "基础化学原料制造", "2614", "有机化学原料制造");
-            inserted += seedIndustryClassificationRecord(3, "D", "电力、热力、燃气及水生产和供应业", "44", "电力、热力生产和供应业", "441", "电力生产", "4411", "火力发电");
-            inserted += seedIndustryClassificationRecord(4, "C", "制造业", "30", "非金属矿物制品业", "301", "水泥、石灰和石膏制造", "3011", "水泥制造");
-            log.info("[SchemaMigration] seeded ce_industry_classification reference records, inserted={}", inserted);
+            migrateLegacyIndustryClassificationRecord(
+                "S", "", "", "",
+                CeGbIndustryClassification.HEADQUARTERS
+            );
+            migrateLegacyIndustryClassificationRecord(
+                "C", "26", "261", "2614",
+                CeGbIndustryClassification.POLYSILICON
+            );
+            for (IndustryRecord record : CeGbIndustryClassification.records()) {
+                seedIndustryClassificationRecord(record);
+            }
+            markSeededIndustryClassificationRecord("D", "44", "441", "4411");
+            markSeededIndustryClassificationRecord("C", "30", "301", "3011");
+            migrateCompanyFactoryIndustryCodes();
+            seedCompanyFactoryReferenceRecords();
+            log.info("[SchemaMigration] processed ce_industry_classification GB/T 4754-2017 reference records");
         } catch (Exception e) {
             log.warn("[SchemaMigration] industry classification seed skipped: {}", e.getMessage());
         }
     }
 
-    private int seedIndustryClassificationRecord(int sortOrder,
-                                                 String sectionCode, String sectionName,
-                                                 String divisionCode, String divisionName,
-                                                 String groupCode, String groupName,
-                                                 String classCode, String className) {
-        return jdbcTemplate.update("""
+    private void migrateCompanyFactoryIndustryCodes() {
+        jdbcTemplate.update("""
+            UPDATE ce_company_factory
+               SET industry_section_code = ?,
+                   industry_section_name = ?,
+                   industry_division_code = ?,
+                   industry_division_name = ?,
+                   industry_group_code = ?,
+                   industry_group_name = ?,
+                   industry_class_code = ?,
+                   industry_class_name = ?,
+                   update_time = SYSDATETIME()
+             WHERE industry_section_code = ?
+               AND ISNULL(industry_division_code, '') = ?
+               AND ISNULL(industry_group_code, '') = ?
+               AND ISNULL(industry_class_code, '') = ?
+            """,
+            CeGbIndustryClassification.HEADQUARTERS.sectionCode(), CeGbIndustryClassification.HEADQUARTERS.sectionName(),
+            CeGbIndustryClassification.HEADQUARTERS.divisionCode(), CeGbIndustryClassification.HEADQUARTERS.divisionName(),
+            CeGbIndustryClassification.HEADQUARTERS.groupCode(), CeGbIndustryClassification.HEADQUARTERS.groupName(),
+            CeGbIndustryClassification.HEADQUARTERS.classCode(), CeGbIndustryClassification.HEADQUARTERS.className(),
+            "S", "", "", ""
+        );
+        jdbcTemplate.update("""
+            UPDATE ce_company_factory
+               SET industry_section_code = ?,
+                   industry_section_name = ?,
+                   industry_division_code = ?,
+                   industry_division_name = ?,
+                   industry_group_code = ?,
+                   industry_group_name = ?,
+                   industry_class_code = ?,
+                   industry_class_name = ?,
+                   update_time = SYSDATETIME()
+             WHERE industry_section_code = ?
+               AND ISNULL(industry_division_code, '') = ?
+               AND ISNULL(industry_group_code, '') = ?
+               AND ISNULL(industry_class_code, '') = ?
+            """,
+            CeGbIndustryClassification.POLYSILICON.sectionCode(), CeGbIndustryClassification.POLYSILICON.sectionName(),
+            CeGbIndustryClassification.POLYSILICON.divisionCode(), CeGbIndustryClassification.POLYSILICON.divisionName(),
+            CeGbIndustryClassification.POLYSILICON.groupCode(), CeGbIndustryClassification.POLYSILICON.groupName(),
+            CeGbIndustryClassification.POLYSILICON.classCode(), CeGbIndustryClassification.POLYSILICON.className(),
+            "C", "26", "261", "2614"
+        );
+    }
+
+    private void seedCompanyFactoryReferenceRecords() {
+        seedCompanyFactoryReferenceRecord(
+            "1", "101", "10101", "峰行智成集团", "集团总部", "650000", "新疆维吾尔自治区", "集团总部",
+            CeGbIndustryClassification.HEADQUARTERS
+        );
+        seedCompanyFactoryReferenceRecord(
+            "2", "101", "10102", "峰行智成集团", "峰行智成（新疆）硅基材料有限公司", "650000", "新疆维吾尔自治区", "多晶硅生产",
+            CeGbIndustryClassification.POLYSILICON
+        );
+        seedCompanyFactoryReferenceRecord(
+            "3", "101", "10103", "峰行智成集团", "峰行智成（山东）热电联产有限公司", "370000", "山东省", "电力生产",
+            CeGbIndustryClassification.THERMAL_POWER
+        );
+        seedCompanyFactoryReferenceRecord(
+            "4", "101", "10104", "峰行智成集团", "峰行智成（安徽）建材有限公司", "340000", "安徽省", "水泥生产",
+            CeGbIndustryClassification.CEMENT
+        );
+    }
+
+    private void seedCompanyFactoryReferenceRecord(String companySk,
+                                                   String companyCode,
+                                                   String factoryCode,
+                                                   String companyName,
+                                                   String factoryName,
+                                                   String provinceCode,
+                                                   String provinceName,
+                                                   String factoryType,
+                                                   IndustryRecord industry) {
+        jdbcTemplate.update("""
+            IF NOT EXISTS (
+                SELECT 1 FROM ce_company_factory WHERE factory_code = ?
+            )
+            INSERT INTO ce_company_factory (
+                company_sk, company_code, factory_code, company_name, factory_name,
+                province_code, province_name, factory_type,
+                industry_section_code, industry_section_name,
+                industry_division_code, industry_division_name,
+                industry_group_code, industry_group_name,
+                industry_class_code, industry_class_name,
+                effective_date, expiry_date, is_active, create_time, remark
+            )
+            VALUES (
+                ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?,
+                ?, ?,
+                ?, ?,
+                ?, ?,
+                '2024-01-01', '9999-12-31', N'Y', SYSDATETIME(), ?
+            )
+            """,
+            factoryCode,
+            companySk, companyCode, factoryCode, companyName, factoryName,
+            provinceCode, provinceName, factoryType,
+            industry.sectionCode(), industry.sectionName(),
+            industry.divisionCode(), industry.divisionName(),
+            industry.groupCode(), industry.groupName(),
+            industry.classCode(), industry.className(),
+            "source(A)"
+        );
+    }
+
+    private void migrateLegacyIndustryClassificationRecord(String oldSectionCode,
+                                                           String oldDivisionCode,
+                                                           String oldGroupCode,
+                                                           String oldClassCode,
+                                                           IndustryRecord record) {
+        jdbcTemplate.update("""
+            IF EXISTS (
+                SELECT 1
+                  FROM ce_industry_classification
+                 WHERE industry_section_code = ?
+                   AND ISNULL(industry_division_code, '') = ISNULL(?, '')
+                   AND ISNULL(industry_group_code, '') = ISNULL(?, '')
+                   AND ISNULL(industry_class_code, '') = ISNULL(?, '')
+                   AND remark = N'%s'
+            )
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1
+                      FROM ce_industry_classification
+                     WHERE industry_section_code = ?
+                       AND ISNULL(industry_division_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_group_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_class_code, '') = ISNULL(?, '')
+                )
+                    UPDATE ce_industry_classification
+                       SET industry_section_code = ?,
+                           industry_section_name = ?,
+                           industry_division_code = NULLIF(?, ''),
+                           industry_division_name = NULLIF(?, ''),
+                           industry_group_code = NULLIF(?, ''),
+                           industry_group_name = NULLIF(?, ''),
+                           industry_class_code = NULLIF(?, ''),
+                           industry_class_name = NULLIF(?, ''),
+                           sort_order = ?,
+                           status = N'active',
+                           update_time = SYSDATETIME(),
+                           remark = N'%s'
+                     WHERE industry_section_code = ?
+                       AND ISNULL(industry_division_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_group_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_class_code, '') = ISNULL(?, '')
+                       AND remark = N'%s'
+                ELSE
+                    DELETE FROM ce_industry_classification
+                     WHERE industry_section_code = ?
+                       AND ISNULL(industry_division_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_group_code, '') = ISNULL(?, '')
+                       AND ISNULL(industry_class_code, '') = ISNULL(?, '')
+                       AND remark = N'%s'
+            END
+            """.formatted(CeGbIndustryClassification.LEGACY_REMARK, CeGbIndustryClassification.REMARK,
+                CeGbIndustryClassification.LEGACY_REMARK, CeGbIndustryClassification.LEGACY_REMARK),
+            oldSectionCode, oldDivisionCode, oldGroupCode, oldClassCode,
+            record.sectionCode(), record.divisionCode(), record.groupCode(), record.classCode(),
+            record.sectionCode(), record.sectionName(), record.divisionCode(), record.divisionName(),
+            record.groupCode(), record.groupName(), record.classCode(), record.className(), record.sortOrder(),
+            oldSectionCode, oldDivisionCode, oldGroupCode, oldClassCode,
+            oldSectionCode, oldDivisionCode, oldGroupCode, oldClassCode
+        );
+    }
+
+    private void seedIndustryClassificationRecord(IndustryRecord record) {
+        jdbcTemplate.update("""
             IF NOT EXISTS (
                 SELECT 1
                   FROM ce_industry_classification
@@ -288,11 +465,28 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
                 NULLIF(?, ''), NULLIF(?, ''),
                 NULLIF(?, ''), NULLIF(?, ''),
                 NULLIF(?, ''), NULLIF(?, ''),
-                ?, N'active', SYSDATETIME(), N'Source(A) 102公司表参考数据'
+                ?, N'active', SYSDATETIME(), N'%s'
             )
-            """,
-            sectionCode, divisionCode, groupCode, classCode,
-            sectionCode, sectionName, divisionCode, divisionName, groupCode, groupName, classCode, className, sortOrder
+            """.formatted(CeGbIndustryClassification.REMARK),
+            record.sectionCode(), record.divisionCode(), record.groupCode(), record.classCode(),
+            record.sectionCode(), record.sectionName(), record.divisionCode(), record.divisionName(),
+            record.groupCode(), record.groupName(), record.classCode(), record.className(), record.sortOrder()
+        );
+    }
+
+    private void markSeededIndustryClassificationRecord(String sectionCode, String divisionCode,
+                                                        String groupCode, String classCode) {
+        jdbcTemplate.update("""
+            UPDATE ce_industry_classification
+               SET remark = N'%s',
+                   update_time = SYSDATETIME()
+             WHERE industry_section_code = ?
+               AND ISNULL(industry_division_code, '') = ISNULL(?, '')
+               AND ISNULL(industry_group_code, '') = ISNULL(?, '')
+               AND ISNULL(industry_class_code, '') = ISNULL(?, '')
+               AND remark = N'%s'
+            """.formatted(CeGbIndustryClassification.REMARK, CeGbIndustryClassification.LEGACY_REMARK),
+            sectionCode, divisionCode, groupCode, classCode
         );
     }
 
