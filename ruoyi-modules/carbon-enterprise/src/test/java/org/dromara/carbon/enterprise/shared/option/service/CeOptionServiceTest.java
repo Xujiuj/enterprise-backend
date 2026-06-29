@@ -522,7 +522,7 @@ class CeOptionServiceTest {
     }
 
     @Test
-    void companyIndustryOptionsFallBackToGbIndustryClassification() {
+    void companyIndustryOptionsDoNotFallBackToReferenceCatalog() {
         when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of());
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
@@ -530,26 +530,17 @@ class CeOptionServiceTest {
 
         var options = service.listOptions("dimension-field", query);
 
-        assertThat(options)
-            .extracting(option -> String.valueOf(option.getLabel()))
-            .contains("2614 / 有机化学原料制造", "3011 / 水泥制造", "4411 / 火力发电", "8052 / 足浴服务", "8053 / 养生保健服务");
-        assertThat(options)
-            .extracting(option -> String.valueOf(option.getValue()))
-            .hasSizeGreaterThan(1300)
-            .contains("2614", "3011", "4411", "8052", "8053");
-        assertThat(options)
-            .anySatisfy(option -> assertThat(option.getRecord())
-                .containsEntry("source", "gbt4754-2017")
-                .containsEntry("industryClassCode", "2614")
-                .containsEntry("industryGroupCode", "261")
-                .containsEntry("industryDivisionCode", "26")
-                .containsEntry("industrySectionCode", "C")
-                .containsEntry("industryClassName", "有机化学原料制造"));
+        assertThat(options).isEmpty();
     }
 
     @Test
     void companyIndustryDivisionOptionsCarryParentSectionCode() {
-        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of());
+        CeDimensionRecordVo chemical = new CeDimensionRecordVo();
+        chemical.setIndustrySectionCode("C");
+        chemical.setIndustrySectionName("制造业");
+        chemical.setIndustryDivisionCode("26");
+        chemical.setIndustryDivisionName("化学原料和化学制品制造业");
+        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of(chemical));
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
         query.setField("industryDivisionCode");
@@ -558,8 +549,7 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .hasSizeGreaterThanOrEqualTo(97)
-            .contains("26", "44");
+            .containsExactly("26");
         assertThat(options.stream()
             .filter(option -> "26".equals(String.valueOf(option.getValue())))
             .findFirst()
@@ -619,6 +609,18 @@ class CeOptionServiceTest {
         assertThat(options.stream().filter(option -> "北京市".equals(String.valueOf(option.getValue()))).findFirst().orElseThrow().getRecord())
             .containsEntry("provinceCode", "110000")
             .containsEntry("provinceName", "北京市");
+    }
+
+    @Test
+    void companyProvinceOptionsDoNotFallBackToReferenceRows() {
+        when(dimensionProjectionMapper.selectByDimensionCode("admin-division")).thenReturn(List.of());
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setField("provinceCode");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options).isEmpty();
     }
 
     @Test
