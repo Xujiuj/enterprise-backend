@@ -63,6 +63,51 @@ public class CeOptionServiceImpl implements ICeOptionService {
 
     private static final String DIMENSION_FIELD_OPTION = "dimension-field";
 
+    private static final List<Map<String, String>> SOURCE_A_COMPANY_REFERENCE_ROWS = List.of(
+        Map.of(
+            "provinceCode", "650000",
+            "provinceName", "新疆维吾尔自治区",
+            "industrySectionCode", "S",
+            "industrySectionName", "综合管理服务"
+        ),
+        Map.of(
+            "provinceCode", "650000",
+            "provinceName", "新疆维吾尔自治区",
+            "industrySectionCode", "C",
+            "industrySectionName", "制造业",
+            "industryDivisionCode", "26",
+            "industryDivisionName", "化学原料和化学制品制造业",
+            "industryGroupCode", "261",
+            "industryGroupName", "基础化学原料制造",
+            "industryClassCode", "2614",
+            "industryClassName", "有机化学原料制造"
+        ),
+        Map.of(
+            "provinceCode", "370000",
+            "provinceName", "山东省",
+            "industrySectionCode", "D",
+            "industrySectionName", "电力、热力、燃气及水生产和供应业",
+            "industryDivisionCode", "44",
+            "industryDivisionName", "电力、热力生产和供应业",
+            "industryGroupCode", "441",
+            "industryGroupName", "电力生产",
+            "industryClassCode", "4411",
+            "industryClassName", "火力发电"
+        ),
+        Map.of(
+            "provinceCode", "340000",
+            "provinceName", "安徽省",
+            "industrySectionCode", "C",
+            "industrySectionName", "制造业",
+            "industryDivisionCode", "30",
+            "industryDivisionName", "非金属矿物制品业",
+            "industryGroupCode", "301",
+            "industryGroupName", "水泥、石灰和石膏制造",
+            "industryClassCode", "3011",
+            "industryClassName", "水泥制造"
+        )
+    );
+
     private static final Set<String> ALLOWED_DIMENSION_CODES = Set.of(
         "admin-division",
         "company",
@@ -196,6 +241,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 collectDistinct(options, emissionSourceMapper, CeEmissionSource::getResponsibleDept, this::labelForRaw);
             }
             case "emission-source-code" -> collectEmissionSourceCodeOptions(options);
+            case "emission-source-name" -> collectEmissionSourceNameOptions(options, safeQuery);
             case "data-source" -> {
                 collectDistinct(options, activityDataMapper, CeActivityData::getDataSource, this::labelForRaw);
                 collectDistinct(options, emissionSourceMapper, CeEmissionSource::getDataSource, this::labelForRaw);
@@ -701,6 +747,13 @@ public class CeOptionServiceImpl implements ICeOptionService {
             String label = provinceOptionLabel(field, provinceCode, provinceName);
             addOption(target, label, value, provinceRecordMap(record, provinceCode, provinceName));
         }
+        for (Map<String, String> record : SOURCE_A_COMPANY_REFERENCE_ROWS) {
+            String provinceCode = record.get("provinceCode");
+            String provinceName = record.get("provinceName");
+            Object value = "provinceCode".equals(field) ? provinceCode : provinceName;
+            String label = provinceOptionLabel(field, provinceCode, provinceName);
+            addOption(target, label, value, sourceAReferenceRecordMap(record));
+        }
     }
 
     private void collectCompanyIndustryOptions(List<CeOptionVo> target, String field) {
@@ -717,6 +770,13 @@ public class CeOptionServiceImpl implements ICeOptionService {
             Object value = codeSelected ? code : name;
             String label = codeSelected ? labelWithName(code, name) : labelWithName(name, code);
             addOption(target, label, value, dimensionRecordMap(record));
+        }
+        for (Map<String, String> record : SOURCE_A_COMPANY_REFERENCE_ROWS) {
+            String code = normalizeValue(record.get(codeField));
+            String name = normalizeValue(record.get(nameField));
+            Object value = codeSelected ? code : name;
+            String label = codeSelected ? labelWithName(code, name) : labelWithName(name, code);
+            addOption(target, label, value, sourceAReferenceRecordMap(record));
         }
     }
 
@@ -750,6 +810,13 @@ public class CeOptionServiceImpl implements ICeOptionService {
         values.put("divisionName", provinceName);
         values.put("provinceCode", provinceCode);
         values.put("provinceName", provinceName);
+        return values;
+    }
+
+    private Map<String, Object> sourceAReferenceRecordMap(Map<String, String> record) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        record.forEach(values::put);
+        values.put("source", "source-a-company");
         return values;
     }
 

@@ -252,6 +252,26 @@ class CeOptionServiceTest {
     }
 
     @Test
+    void emissionSourceNameOptionsComeFromEmissionSourceRecordsForEfFactorAutofill() {
+        CeEmissionSource source = emissionSource("ES-001", "柴油燃烧", "A公司", "一厂", "cat-a");
+        source.setSourceUnit("t");
+        source.setFactorKey("EF-201-DIESEL");
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of(source));
+        when(factorCacheRecordMapper.selectList(any())).thenReturn(List.of());
+
+        var options = service.listOptions("emission-source-name", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("柴油燃烧");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("sourceIdentificationCode", "ES-001")
+            .containsEntry("emissionSourceName", "柴油燃烧")
+            .containsEntry("sourceUnit", "t")
+            .containsEntry("factorKey", "EF-201-DIESEL");
+    }
+
+    @Test
     void intensityRuleCodeOptionsComeFromEnterpriseBusinessTables() {
         when(intensityMetricMapper.selectObjs(any())).thenReturn(List.of("RULE-A", "RULE-B"));
         when(denominatorFactMapper.selectObjs(any())).thenReturn(List.of("RULE-B", "RULE-C"));
@@ -391,11 +411,11 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .containsExactly("C / 制造业");
+            .contains("C / 制造业");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .containsExactly("C");
-        assertThat(options.get(0).getRecord())
+            .contains("C");
+        assertThat(options.stream().filter(option -> "C".equals(String.valueOf(option.getValue()))).findFirst().orElseThrow().getRecord())
             .containsEntry("industrySectionCode", "C")
             .containsEntry("industrySectionName", "制造业");
     }
@@ -414,13 +434,39 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .containsExactly("化学原料和化学制品制造业 / 26");
+            .contains("化学原料和化学制品制造业 / 26");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .containsExactly("化学原料和化学制品制造业");
-        assertThat(options.get(0).getRecord())
+            .contains("化学原料和化学制品制造业");
+        assertThat(options.stream()
+            .filter(option -> "化学原料和化学制品制造业".equals(String.valueOf(option.getValue())))
+            .findFirst()
+            .orElseThrow()
+            .getRecord())
             .containsEntry("industryDivisionCode", "26")
             .containsEntry("industryDivisionName", "化学原料和化学制品制造业");
+    }
+
+    @Test
+    void companyIndustryOptionsFallBackToSourceACompanyReferenceRows() {
+        when(dimensionProjectionMapper.selectByDimensionCode("company")).thenReturn(List.of());
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setField("industryClassCode");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getLabel()))
+            .contains("2614 / 有机化学原料制造", "3011 / 水泥制造", "4411 / 火力发电");
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .contains("2614", "3011", "4411");
+        assertThat(options)
+            .anySatisfy(option -> assertThat(option.getRecord())
+                .containsEntry("source", "source-a-company")
+                .containsEntry("industryClassCode", "2614")
+                .containsEntry("industryClassName", "有机化学原料制造"));
     }
 
     @Test
@@ -441,11 +487,11 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .containsExactly("110000", "310000");
+            .contains("110000", "310000");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .containsExactly("110000 / 北京市", "310000 / 上海市");
-        assertThat(options.get(0).getRecord())
+            .contains("110000 / 北京市", "310000 / 上海市");
+        assertThat(options.stream().filter(option -> "110000".equals(String.valueOf(option.getValue()))).findFirst().orElseThrow().getRecord())
             .containsEntry("provinceCode", "110000")
             .containsEntry("provinceName", "北京市");
     }
@@ -464,11 +510,11 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .containsExactly("北京市");
+            .contains("北京市");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .containsExactly("北京市 / 110000");
-        assertThat(options.get(0).getRecord())
+            .contains("北京市 / 110000");
+        assertThat(options.stream().filter(option -> "北京市".equals(String.valueOf(option.getValue()))).findFirst().orElseThrow().getRecord())
             .containsEntry("provinceCode", "110000")
             .containsEntry("provinceName", "北京市");
     }
@@ -486,7 +532,7 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .containsExactly("C");
+            .contains("C");
     }
 
     @Test
