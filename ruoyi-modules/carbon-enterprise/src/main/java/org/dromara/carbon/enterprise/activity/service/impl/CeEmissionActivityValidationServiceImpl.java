@@ -36,25 +36,24 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ROOT);
     private static final DateTimeFormatter PERIOD_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM", Locale.ROOT);
     private static final List<FieldDescriptor> ALL_FIELDS = List.of(
-        new FieldDescriptor(1, "sourceIdentificationCode", "排放源识别编号", false, false, true),
-        new FieldDescriptor(2, "companyCode", "公司编号", false, false, true),
+        new FieldDescriptor(1, "sourceIdentificationCode", "PK_排放源识别编号", false, false, false),
+        new FieldDescriptor(2, "companyCode", "FK_公司编号", false, false, false),
         new FieldDescriptor(3, "companyName", "公司名称", false, true, false),
         new FieldDescriptor(4, "factoryName", "工厂", false, true, false),
-        new FieldDescriptor(5, "sourceCategoryKey", "排放源分类", false, false, true),
+        new FieldDescriptor(5, "sourceCategoryKey", "FK_排放源分类", false, false, false),
         new FieldDescriptor(6, "scopeName", "范围", false, true, false),
         new FieldDescriptor(7, "scopeSubcategory", "范围子类别", false, true, false),
         new FieldDescriptor(8, "sourceIdentificationName", "排放源识别", false, true, false),
-        new FieldDescriptor(9, "emissionSourceName", "排放源名称", false, true, false),
-        new FieldDescriptor(10, "activityUnit", "单位", false, false, true),
-        new FieldDescriptor(11, "activityPeriod", "活动期间", false, true, false),
-        new FieldDescriptor(12, "activityYear", "年度", false, false, true),
-        new FieldDescriptor(13, "activityMonth", "月份", false, false, true),
-        new FieldDescriptor(14, "activityDate", "日期", false, true, false),
-        new FieldDescriptor(15, "activityValue", "活动数据", false, true, false),
-        new FieldDescriptor(16, "responsibleDept", "负责部门", false, true, false),
-        new FieldDescriptor(17, "dataSource", "数据来源", false, true, false),
-        new FieldDescriptor(18, "sourceRemark", "备注", false, false, true),
-        new FieldDescriptor(19, "factorKey", "排放因子", false, false, true)
+        new FieldDescriptor(9, "emissionSourceName", "排放源", false, true, false),
+        new FieldDescriptor(10, "activityUnit", "单位", false, false, false),
+        new FieldDescriptor(11, "activityYear", "年度", false, true, false),
+        new FieldDescriptor(12, "activityMonth", "月份", false, true, false),
+        new FieldDescriptor(13, "activityDate", "日期", false, true, false),
+        new FieldDescriptor(14, "activityValue", "活动数据", false, true, false),
+        new FieldDescriptor(15, "responsibleDept", "负责部门", false, true, false),
+        new FieldDescriptor(16, "dataSource", "数据来源", false, true, false),
+        new FieldDescriptor(17, "sourceRemark", "备注", false, false, false),
+        new FieldDescriptor(18, "factorKey", "FK_排放因子", false, false, false)
     );
     private static final Map<String, FieldDescriptor> FIELD_BY_CODE = buildFieldIndex();
 
@@ -98,7 +97,6 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
             }
         }
 
-        normalizeActivityPeriod(clientValues, rowNumber, issues);
         validateYear(clientValues.get("activityYear"), rowNumber, issues);
         validateMonth(clientValues.get("activityMonth"), rowNumber, issues);
         validateDate(clientValues.get("activityDate"), rowNumber, issues);
@@ -208,22 +206,6 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
             && StringUtils.isNotBlank(clientValues.get("scopeSubcategory"))
             && StringUtils.isNotBlank(clientValues.get("sourceIdentificationName"))
             && StringUtils.isNotBlank(clientValues.get("emissionSourceName"));
-    }
-
-    private void normalizeActivityPeriod(Map<String, String> clientValues, Integer rowNumber,
-                                         List<CeEmissionActivityValidationIssue> issues) {
-        String period = clientValues.get("activityPeriod");
-        if (StringUtils.isBlank(period)) {
-            return;
-        }
-        try {
-            YearMonth yearMonth = YearMonth.parse(period, PERIOD_FORMATTER);
-            clientValues.put("activityYear", String.valueOf(yearMonth.getYear()));
-            clientValues.put("activityMonth", String.valueOf(yearMonth.getMonthValue()));
-        } catch (DateTimeParseException e) {
-            issues.add(issue(SEVERITY_ERROR, "INVALID_TYPE", rowNumber, descriptor("activityPeriod"),
-                "activity period must be yyyy-MM"));
-        }
     }
 
     private void validateYear(String value, Integer rowNumber, List<CeEmissionActivityValidationIssue> issues) {

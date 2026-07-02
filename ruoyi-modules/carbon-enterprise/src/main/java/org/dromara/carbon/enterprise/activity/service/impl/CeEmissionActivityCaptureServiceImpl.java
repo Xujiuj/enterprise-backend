@@ -209,10 +209,10 @@ public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivity
         for (int index = 0; index < rows.size(); index++) {
             rowValues.add(mergedValues(rows.get(index), rowResultAt(rowResults, index)));
         }
-        Map<String, Long> sourceIdsByCode = loadEmissionSourceIds(rowValues);
+        Map<String, CeEmissionSource> sourcesByCode = loadEmissionSources(rowValues);
         for (int index = 0; index < rows.size(); index++) {
             Map<String, String> valuesByCode = rowValues.get(index);
-            CeActivityData activityData = toActivityData(batchId, valuesByCode, sourceIdsByCode, now);
+            CeActivityData activityData = toActivityData(batchId, valuesByCode, sourcesByCode, now);
             if (activityData.getEmissionSourceId() == null) {
                 throw new ServiceException("enterprise-local emission_activity emission source is missing: "
                     + valuesByCode.get("sourceIdentificationCode"));
@@ -221,7 +221,7 @@ public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivity
         }
     }
 
-    private Map<String, Long> loadEmissionSourceIds(List<Map<String, String>> rowValues) {
+    private Map<String, CeEmissionSource> loadEmissionSources(List<Map<String, String>> rowValues) {
         List<String> sourceCodes = rowValues.stream()
             .map(values -> normalize(values.get("sourceIdentificationCode")))
             .filter(StringUtils::isNotBlank)
@@ -237,7 +237,8 @@ public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivity
         }
         List<CeEmissionSource> sources = emissionSourceMapper.selectList(
             new LambdaQueryWrapper<CeEmissionSource>()
-                .select(CeEmissionSource::getId, CeEmissionSource::getCompanyCode, CeEmissionSource::getSourceIdentificationCode)
+                .select(CeEmissionSource::getId, CeEmissionSource::getCompanyCode, CeEmissionSource::getFactoryCode,
+                    CeEmissionSource::getCompanyName, CeEmissionSource::getFactoryName, CeEmissionSource::getSourceIdentificationCode)
                 .in(CeEmissionSource::getCompanyCode, companyCodes)
                 .in(CeEmissionSource::getSourceIdentificationCode, sourceCodes)
         );
@@ -247,24 +248,24 @@ public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivity
                 && StringUtils.isNotBlank(source.getSourceIdentificationCode()))
             .collect(Collectors.toMap(
                 source -> sourceKey(source.getCompanyCode(), source.getSourceIdentificationCode()),
-                CeEmissionSource::getId,
+                Function.identity(),
                 (left, right) -> left,
                 LinkedHashMap::new
             ));
     }
 
     private CeActivityData toActivityData(Long batchId, Map<String, String> valuesByCode,
-                                          Map<String, Long> sourceIdsByCode, Date now) {
+                                          Map<String, CeEmissionSource> sourcesByCode, Date now) {
+        CeEmissionSource source = sourcesByCode.get(sourceKey(valuesByCode.get("companyCode"), valuesByCode.get("sourceIdentificationCode")));
         CeActivityData activityData = new CeActivityData();
         activityData.setBatchId(batchId);
-        activityData.setEmissionSourceId(sourceIdsByCode.get(sourceKey(valuesByCode.get("companyCode"), valuesByCode.get("sourceIdentificationCode"))));
-        activityData.setActivityPeriod(valuesByCode.get("activityPeriod"));
+        activityData.setEmissionSourceId(source == null ? null : source.getId());
         activityData.setSourceSheetCode(TARGET_TABLE_CODE);
         activityData.setSourceIdentificationCode(valuesByCode.get("sourceIdentificationCode"));
         activityData.setCompanyCode(valuesByCode.get("companyCode"));
-        activityData.setCompanyName(valuesByCode.get("companyName"));
-        activityData.setFactoryCode(valuesByCode.get("companyCode"));
-        activityData.setFactoryName(valuesByCode.get("factoryName"));
+        activityData.setCompanyName(firstNonBlank(valuesByCode.get("companyName"), source == null ? null : source.getCompanyName()));
+        activityData.setFactoryCode(source == null ? null : source.getFactoryCode());
+        activityData.setFactoryName(firstNonBlank(valuesByCode.get("factoryName"), source == null ? null : source.getFactoryName()));
         activityData.setSourceCategoryKey(valuesByCode.get("sourceCategoryKey"));
         activityData.setScopeName(valuesByCode.get("scopeName"));
         activityData.setScopeSubcategory(valuesByCode.get("scopeSubcategory"));
@@ -288,6 +289,10 @@ public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivity
 
     private String sourceKey(String companyCode, String sourceCode) {
         return normalize(companyCode) + "|" + normalize(sourceCode);
+    }
+
+    private String firstNonBlank(String preferred, String fallback) {
+        return StringUtils.isNotBlank(preferred) ? preferred : fallback;
     }
 
     private CeEmissionActivityValidationResult rowResultAt(List<CeEmissionActivityValidationResult> rowResults, int index) {

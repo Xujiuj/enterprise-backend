@@ -16,6 +16,8 @@ import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.emission.service.impl.CeEmissionSourceServiceImpl;
 import org.dromara.common.core.validate.AddGroup;
 import jakarta.validation.Validation;
+import org.dromara.system.domain.SysDept;
+import org.dromara.system.mapper.SysDeptMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -25,6 +27,7 @@ import org.mockito.ArgumentCaptor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,12 +37,14 @@ class CeEmissionSourceServiceTest {
     private CeEmissionSourceMapper emissionSourceMapper;
     private CeCompanyFactoryMapper companyFactoryMapper;
     private CeEmissionSourceCategoryMapper emissionSourceCategoryMapper;
+    private SysDeptMapper sysDeptMapper;
     private CeEmissionSourceServiceImpl service;
 
     @BeforeAll
     static void initializeLambdaCache() {
         initializeEntityLambdaCache(CeCompanyFactoryMapper.class, CeCompanyFactory.class);
         initializeEntityLambdaCache(CeEmissionSourceCategoryMapper.class, CeEmissionSourceCategory.class);
+        initializeEntityLambdaCache(SysDeptMapper.class, SysDept.class);
     }
 
     @BeforeEach
@@ -47,7 +52,9 @@ class CeEmissionSourceServiceTest {
         emissionSourceMapper = mock(CeEmissionSourceMapper.class);
         companyFactoryMapper = mock(CeCompanyFactoryMapper.class);
         emissionSourceCategoryMapper = mock(CeEmissionSourceCategoryMapper.class);
-        service = new CeEmissionSourceServiceImpl(emissionSourceMapper, companyFactoryMapper, emissionSourceCategoryMapper) {
+        sysDeptMapper = mock(SysDeptMapper.class);
+        when(sysDeptMapper.selectCount(any())).thenReturn(1L);
+        service = new CeEmissionSourceServiceImpl(emissionSourceMapper, companyFactoryMapper, emissionSourceCategoryMapper, sysDeptMapper) {
             @Override
             protected CeEmissionSource toEntity(CeEmissionSourceBo bo) {
                 CeEmissionSource source = new CeEmissionSource();
@@ -88,9 +95,9 @@ class CeEmissionSourceServiceTest {
         service.insertByBo(validBo());
 
         ArgumentCaptor<LambdaQueryWrapper<CeCompanyFactory>> wrapperCaptor = ArgumentCaptor.captor();
-        verify(companyFactoryMapper).selectList(wrapperCaptor.capture());
-        assertThat(wrapperCaptor.getValue().getSqlSegment()).contains("companyCode");
-        assertThat(wrapperCaptor.getValue().getSqlSegment()).doesNotContain("factoryCode");
+        verify(companyFactoryMapper, atLeastOnce()).selectList(wrapperCaptor.capture());
+        assertThat(wrapperCaptor.getAllValues().get(0).getSqlSegment()).contains("companyCode");
+        assertThat(wrapperCaptor.getAllValues().get(0).getSqlSegment()).doesNotContain("factoryCode");
         ArgumentCaptor<CeEmissionSource> sourceCaptor = ArgumentCaptor.forClass(CeEmissionSource.class);
         verify(emissionSourceMapper).insert(sourceCaptor.capture());
         assertThat(sourceCaptor.getValue().getCompanyName()).isEqualTo("Company A");

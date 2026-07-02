@@ -42,6 +42,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -66,6 +67,9 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     private static final String FIELD_DEPARTMENT = "responsibleDept";
     private static final String MODULE_ACTIVITY = "活动数据";
     private static final BigDecimal ONE_HUNDRED = BigDecimal.valueOf(100);
+    private static final String FREQUENCY_MONTHLY = "monthly";
+    private static final String FREQUENCY_DAILY = "daily";
+    private static final String FREQUENCY_QUARTERLY = "quarterly";
 
     private final CeActivityDataMapper activityDataMapper;
     private final CeEmissionSourceMapper emissionSourceMapper;
@@ -100,18 +104,22 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         ActivityPeriod period = resolvePeriod(bo);
         String dueDate = resolveDueDate(period);
         List<CeEmissionSource> sources = listEnabledEmissionSources();
-        List<CeActivityData> activities = listActivities(period);
+        Map<String, CeEmissionSource> sourceByCode = sources.stream()
+            .filter(source -> StringUtils.isNotBlank(source.getSourceIdentificationCode()))
+            .collect(Collectors.toMap(source -> source.getSourceIdentificationCode().trim(), Function.identity(), (left, right) -> left));
+        List<CeActivityData> activities = listActivities(period).stream()
+            .filter(activity -> isActivityExpectedInPeriod(activity, sourceByCode, period))
+            .toList();
         List<CeGreenPowerCertificate> greenCertificates = listGreenPowerCertificates(period);
         List<CeIntensityDenominatorFact> denominatorFacts = listDenominatorFacts(period);
         Map<String, List<CeActivityData>> activitiesBySourceCode = activities.stream()
             .filter(activity -> StringUtils.isNotBlank(activity.getSourceIdentificationCode()))
             .collect(Collectors.groupingBy(activity -> activity.getSourceIdentificationCode().trim()));
-        Map<String, CeEmissionSource> sourceByCode = sources.stream()
-            .filter(source -> StringUtils.isNotBlank(source.getSourceIdentificationCode()))
-            .collect(Collectors.toMap(source -> source.getSourceIdentificationCode().trim(), Function.identity(), (left, right) -> left));
         Map<String, CaptureSubmissionMeta> captureMetaBySourceCode = loadCaptureMetaBySourceCode(period.label());
 
-        List<CeEmissionSource> expectedSources = new ArrayList<>(sources);
+        List<CeEmissionSource> expectedSources = sources.stream()
+            .filter(source -> isSourceExpectedInPeriod(source, period))
+            .collect(Collectors.toCollection(ArrayList::new));
         for (CeActivityData activity : activities) {
             String sourceCode = activity.getSourceIdentificationCode();
             if (StringUtils.isNotBlank(sourceCode) && !sourceByCode.containsKey(sourceCode.trim())) {
@@ -293,6 +301,37 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
             .eq(CeEmissionSource::getEnabledFlag, true)
             .orderByAsc(CeEmissionSource::getSourceIdentificationCode)
             .orderByAsc(CeEmissionSource::getId));
+    }
+
+    private boolean isActivityExpectedInPeriod(CeActivityData activity, Map<String, CeEmissionSource> sourceByCode, ActivityPeriod period) {
+        if (activity == null || StringUtils.isBlank(activity.getSourceIdentificationCode())) {
+            return true;
+        }
+        CeEmissionSource source = sourceByCode.get(activity.getSourceIdentificationCode().trim());
+        return source == null || isSourceExpectedInPeriod(source, period);
+    }
+
+    private boolean isSourceExpectedInPeriod(CeEmissionSource source, ActivityPeriod period) {
+        String frequency = normalizedFrequency(source == null ? null : source.getDataFrequency());
+        if (FREQUENCY_QUARTERLY.equals(frequency)) {
+            return period.month() == null || isQuarterEndMonth(period.month());
+        }
+        return FREQUENCY_MONTHLY.equals(frequency) || FREQUENCY_DAILY.equals(frequency);
+    }
+
+    private boolean isQuarterEndMonth(Integer month) {
+        return month != null && month >= 1 && month <= 12 && month % 3 == 0;
+    }
+
+    private String normalizedFrequency(String frequency) {
+        if (StringUtils.isBlank(frequency)) {
+            return FREQUENCY_MONTHLY;
+        }
+        String normalized = frequency.trim().toLowerCase(Locale.ROOT);
+        if (FREQUENCY_DAILY.equals(normalized) || FREQUENCY_MONTHLY.equals(normalized) || FREQUENCY_QUARTERLY.equals(normalized)) {
+            return normalized;
+        }
+        return FREQUENCY_MONTHLY;
     }
 
     private List<CeActivityData> listActivities(ActivityPeriod period) {

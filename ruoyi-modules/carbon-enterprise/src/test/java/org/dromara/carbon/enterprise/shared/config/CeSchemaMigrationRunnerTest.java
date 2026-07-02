@@ -1,6 +1,7 @@
 package org.dromara.carbon.enterprise.shared.config;
 
 import org.dromara.carbon.enterprise.activity.service.impl.CeEmissionActivityValidationServiceImpl;
+import org.dromara.carbon.enterprise.shared.service.ICeCompanyFactoryDeptSyncService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -45,7 +46,7 @@ class CeSchemaMigrationRunnerTest {
             any(), any(), any(), any(), any(), any()
         )).thenReturn(20L);
 
-        new CeSchemaMigrationRunner(jdbcTemplate).run();
+        new CeSchemaMigrationRunner(jdbcTemplate, mock(ICeCompanyFactoryDeptSyncService.class)).run();
 
         verify(jdbcTemplate).queryForObject(
             eq("""
@@ -89,7 +90,7 @@ class CeSchemaMigrationRunnerTest {
             eq("emission_activity")
         )).thenReturn(20L);
 
-        new CeSchemaMigrationRunner(jdbcTemplate).run();
+        new CeSchemaMigrationRunner(jdbcTemplate, mock(ICeCompanyFactoryDeptSyncService.class)).run();
 
         verify(jdbcTemplate).update(
             eq("UPDATE ce_template_sheet SET field_count = ? WHERE id = ?"),

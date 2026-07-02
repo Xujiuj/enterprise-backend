@@ -11,13 +11,16 @@ import org.dromara.carbon.enterprise.vendor.domain.CeVendorDimensionRecord;
 import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.license.mapper.CeLicenseStateMapper;
+import org.dromara.carbon.enterprise.shared.service.ICeCompanyFactoryDeptSyncService;
 import org.dromara.carbon.enterprise.shared.service.ICeDimensionRecordService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -35,6 +38,7 @@ import java.util.stream.Stream;
 public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private static final String LICENSE_STATUS_VALID = "VALID";
+    private static final String COMPANY_DIMENSION_CODE = "company";
 
     private static final Set<String> ALLOWED_VENDOR_DIMENSION_CODES = Set.of(
         "admin-division",
@@ -79,6 +83,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     private final CeDimensionProjectionMapper dimensionProjectionMapper;
     private final CeLicenseStateMapper licenseStateMapper;
     private final CeVendorDimensionOpenClient vendorDimensionOpenClient;
+    private final ICeCompanyFactoryDeptSyncService companyFactoryDeptSyncService;
 
     @Override
     public TableDataInfo<CeDimensionRecordVo> queryPageList(CeDimensionRecordBo bo, PageQuery pageQuery) {
@@ -103,27 +108,65 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean insertByBo(CeDimensionRecordBo bo) {
         validateEditableDimensionCode(bo.getDimensionCode());
         normalizeEditableRecord(bo);
-        return dimensionProjectionMapper.insertByDimensionCode(bo) > 0;
-    }
-
-    @Override
-    public Boolean updateByBo(CeDimensionRecordBo bo) {
-        validateEditableDimensionCode(bo.getDimensionCode());
-        normalizeEditableRecord(bo);
-        return dimensionProjectionMapper.updateByDimensionCode(bo) > 0;
-    }
-
-    @Override
-    public Boolean deleteByIds(String dimensionCode, Collection<Long> ids) {
-        validateEditableDimensionCode(dimensionCode);
-        boolean changed = false;
-        for (Long id : ids) {
-            changed = dimensionProjectionMapper.deleteByDimensionCodeAndId(dimensionCode, id) > 0 || changed;
+        boolean changed = dimensionProjectionMapper.insertByDimensionCode(bo) > 0;
+        if (changed && isCompanyDimension(bo.getDimensionCode())) {
+            companyFactoryDeptSyncService.syncCompanyFactoriesToSysDept();
         }
         return changed;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean updateByBo(CeDimensionRecordBo bo) {
+        validateEditableDimensionCode(bo.getDimensionCode());
+        CeDimensionRecordVo previous = isCompanyDimension(bo.getDimensionCode())
+            ? dimensionProjectionMapper.selectByDimensionCodeAndId(bo.getDimensionCode(), bo.getId())
+            : null;
+        normalizeEditableRecord(bo);
+        boolean changed = dimensionProjectionMapper.updateByDimensionCode(bo) > 0;
+        if (changed && previous != null) {
+            companyFactoryDeptSyncService.syncCompanyFactoryChange(
+                previous.getRecordCode(),
+                previous.getFactoryName(),
+                bo.getRecordCode(),
+                bo.getFactoryName(),
+                bo.getActiveFlag()
+            );
+        }
+        return changed;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean deleteByIds(String dimensionCode, Collection<Long> ids) {
+        validateEditableDimensionCode(dimensionCode);
+        List<CeDimensionRecordVo> deletedCompanies = new ArrayList<>();
+        boolean changed = false;
+        for (Long id : ids) {
+            CeDimensionRecordVo previous = isCompanyDimension(dimensionCode)
+                ? dimensionProjectionMapper.selectByDimensionCodeAndId(dimensionCode, id)
+                : null;
+            boolean rowChanged = dimensionProjectionMapper.deleteByDimensionCodeAndId(dimensionCode, id) > 0;
+            if (rowChanged && previous != null) {
+                deletedCompanies.add(previous);
+            }
+            changed = rowChanged || changed;
+        }
+        for (CeDimensionRecordVo deletedCompany : deletedCompanies) {
+            companyFactoryDeptSyncService.disableCompanyFactoryDept(
+                deletedCompany.getRecordCode(),
+                deletedCompany.getFactoryName()
+            );
+        }
+        return changed;
+    }
+
+    private boolean isCompanyDimension(String dimensionCode) {
+        return COMPANY_DIMENSION_CODE.equals(dimensionCode);
     }
 
     private void validateDimensionCode(String dimensionCode) {
@@ -172,6 +215,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     private void normalizeEditableRecord(CeDimensionRecordBo bo) {
         normalizeCompanyRecord(bo);
         normalizeIndustryRecord(bo);
+        normalizeBaseYearRecord(bo);
         normalizeIntensityDenominatorRecord(bo);
         normalizeIntensityTargetRecord(bo);
         normalizeIntensityToleranceRecord(bo);
@@ -216,6 +260,19 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         }
         requireNotBlank(code, label + "代码不能为空");
         requireNotBlank(name, label + "名称不能为空");
+    }
+
+    private void normalizeBaseYearRecord(CeDimensionRecordBo bo) {
+        if (!"base-year".equals(bo.getDimensionCode())) {
+            return;
+        }
+        requireNotBlank(bo.getRecordCode(), "baseYearKey cannot be blank");
+        requireNotBlank(bo.getRecordName(), "baseYear cannot be blank");
+        bo.setBaseYearKey(bo.getRecordCode());
+        bo.setBaseYear(bo.getRecordName());
+        if (StringUtils.isBlank(bo.getCurrentBaseFlag())) {
+            bo.setCurrentBaseFlag("1".equals(bo.getIsCurrent()) ? "Y" : "N");
+        }
     }
 
     private void normalizeIntensityDenominatorRecord(CeDimensionRecordBo bo) {

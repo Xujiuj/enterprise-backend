@@ -30,7 +30,9 @@ import org.dromara.carbon.enterprise.license.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.report.mapper.CeReportTemplateFileMapper;
 import org.dromara.carbon.enterprise.shared.option.service.impl.CeOptionServiceImpl;
 import org.dromara.system.domain.SysDept;
+import org.dromara.system.domain.SysUser;
 import org.dromara.system.mapper.SysDeptMapper;
+import org.dromara.system.mapper.SysUserMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -56,6 +58,7 @@ class CeOptionServiceTest {
     private CeFactorCacheRecordMapper factorCacheRecordMapper;
     private CeFactorConfirmationMapper factorConfirmationMapper;
     private SysDeptMapper sysDeptMapper;
+    private SysUserMapper sysUserMapper;
     private CeOptionServiceImpl service;
 
     @BeforeAll
@@ -70,6 +73,7 @@ class CeOptionServiceTest {
         initializeEntityLambdaCache(CeFactorConfirmationMapper.class, CeFactorConfirmation.class);
         initializeEntityLambdaCache(CeGreenPowerCertificateMapper.class, CeGreenPowerCertificate.class);
         initializeEntityLambdaCache(SysDeptMapper.class, SysDept.class);
+        initializeEntityLambdaCache(SysUserMapper.class, SysUser.class);
     }
 
     @BeforeEach
@@ -84,6 +88,7 @@ class CeOptionServiceTest {
         factorCacheRecordMapper = mock(CeFactorCacheRecordMapper.class);
         factorConfirmationMapper = mock(CeFactorConfirmationMapper.class);
         sysDeptMapper = mock(SysDeptMapper.class);
+        sysUserMapper = mock(SysUserMapper.class);
         when(dimensionProjectionMapper.selectByDimensionCode(any())).thenReturn(List.of());
         service = new CeOptionServiceImpl(
             activityDataMapper,
@@ -99,7 +104,8 @@ class CeOptionServiceTest {
             mock(CeCaptureBatchMapper.class),
             mock(CeLicenseStateMapper.class),
             dimensionProjectionMapper,
-            sysDeptMapper
+            sysDeptMapper,
+            sysUserMapper
         );
     }
 
@@ -163,28 +169,60 @@ class CeOptionServiceTest {
     }
 
     @Test
-    void responsibleDeptOptionsComeFromSystemDeptAndHistoricalBusinessRows() {
+    void responsibleDeptOptionsComeFromSystemDeptOnly() {
         SysDept dept = new SysDept();
         dept.setDeptId(10L);
         dept.setParentId(1L);
         dept.setDeptName("Production");
         dept.setStatus("0");
-        CeActivityData activity = new CeActivityData();
-        activity.setResponsibleDept("EHS");
-        CeEmissionSource source = new CeEmissionSource();
-        source.setResponsibleDept("Production");
         when(sysDeptMapper.selectList(any())).thenReturn(List.of(dept));
-        when(activityDataMapper.selectObjs(any())).thenReturn(List.of(activity.getResponsibleDept()));
-        when(emissionSourceMapper.selectObjs(any())).thenReturn(List.of(source.getResponsibleDept()));
 
         var options = service.listOptions("responsible-dept", null);
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .containsExactly("EHS", "Production");
-        assertThat(options.get(1).getRecord())
+            .containsExactly("Production");
+        assertThat(options.get(0).getRecord())
             .containsEntry("deptId", 10L)
             .containsEntry("deptName", "Production");
+    }
+
+    @Test
+    void dataFrequencyOptionsExposeReportPeriods() {
+        var options = service.listOptions("data-frequency", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactlyInAnyOrder("monthly", "daily", "quarterly");
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getLabel()))
+            .containsExactlyInAnyOrder("\u6708\u62a5", "\u65e5\u62a5", "\u5b63\u62a5");
+    }
+
+    @Test
+    void responsibleUserOptionsComeFromActiveSystemUsers() {
+        SysUser user = new SysUser();
+        user.setUserId(100L);
+        user.setUserName("zhangsan");
+        user.setNickName("Zhang San");
+        user.setStatus("0");
+        user.setDeptId(10L);
+        when(sysUserMapper.selectList(any())).thenReturn(List.of(user));
+
+        var options = service.listOptions("responsible-user", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("100");
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getLabel()))
+            .containsExactly("Zhang San / zhangsan");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("userId", 100L)
+            .containsEntry("userName", "zhangsan")
+            .containsEntry("nickName", "Zhang San")
+            .containsEntry("deptId", 10L)
+            .containsEntry("status", "0");
     }
 
     @Test
@@ -204,7 +242,8 @@ class CeOptionServiceTest {
             mock(CeCaptureBatchMapper.class),
             mock(CeLicenseStateMapper.class),
             dimensionProjectionMapper,
-            sysDeptMapper
+            sysDeptMapper,
+            sysUserMapper
         );
         var category = new org.dromara.carbon.enterprise.emission.domain.CeEmissionSourceCategory();
         category.setCategorySk("CAT-1");

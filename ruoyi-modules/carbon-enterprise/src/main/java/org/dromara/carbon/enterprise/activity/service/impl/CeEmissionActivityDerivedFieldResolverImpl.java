@@ -77,6 +77,7 @@ public class CeEmissionActivityDerivedFieldResolverImpl implements ICeEmissionAc
         row.setEmissionSourceCode(source.getSourceIdentificationCode());
         row.setCompanyCode(source.getCompanyCode());
         row.setCompanyName(source.getCompanyName());
+        row.setFactoryCode(source.getFactoryCode());
         row.setFactoryName(source.getFactoryName());
         row.setEmissionSourceCategoryCode(source.getSourceCategoryKey());
         row.setScope(source.getScopeName());

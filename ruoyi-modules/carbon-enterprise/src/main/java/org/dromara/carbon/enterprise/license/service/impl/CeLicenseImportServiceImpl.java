@@ -14,6 +14,8 @@ import org.dromara.carbon.enterprise.license.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.shared.service.ICeDimensionSyncService;
 import org.dromara.carbon.enterprise.shared.service.ICeFactorSyncService;
 import org.dromara.carbon.enterprise.shared.service.ICeLicenseImportService;
+import org.dromara.carbon.enterprise.vendor.client.CeVendorLicenseOpenClient;
+import org.dromara.carbon.enterprise.vendor.domain.CeVendorLicenseCurrentResponse;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +52,7 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
     private final ObjectMapper objectMapper;
     private final ICeDimensionSyncService dimensionSyncService;
     private final ICeFactorSyncService factorSyncService;
+    private final CeVendorLicenseOpenClient vendorLicenseOpenClient;
 
     @Override
     public CeLicenseImportResult verifyLicense(String licenseContent, String publicKeyPem, String expectedInstallId,
@@ -103,7 +106,10 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
         CeLicenseImportResult result = verifyLicense(licenseContent, publicKeyPem, expectedInstallId,
             verificationTime, findMaxObservedTime());
         if (result.isValid()) {
-            licenseStateMapper.insert(result.getLicenseState());
+            result = confirmVendorBinding(result.getLicenseState());
+        }
+        if (result.isValid()) {
+            saveLicenseState(result.getLicenseState());
 
             String dimensionSyncMessage;
             try {
@@ -131,6 +137,40 @@ public class CeLicenseImportServiceImpl implements ICeLicenseImportService {
             result = result.withSyncMessage("授权已导入。厂商端同步结果：" + dimensionSyncMessage + "；" + factorSyncMessage + "。");
         }
         return result;
+    }
+
+    private CeLicenseImportResult confirmVendorBinding(CeLicenseState state) {
+        try {
+            CeVendorLicenseCurrentResponse response = vendorLicenseOpenClient.currentLicense(
+                state.getLicenseId(),
+                state.getInstallId(),
+                state.getKeyId(),
+                state.getCurrentSummary()
+            );
+            if (response == null || !"active".equalsIgnoreCase(response.getStatus())) {
+                return CeLicenseImportResult.invalid("VENDOR_LICENSE_NOT_ACTIVE", "厂商授权当前不可用");
+            }
+            if (!Objects.equals(state.getLicenseId(), response.getLicenseId())) {
+                return CeLicenseImportResult.invalid("LICENSE_BINDING_FAILED", "厂商授权编号与本地授权不一致");
+            }
+            return CeLicenseImportResult.valid(state);
+        } catch (Exception e) {
+            return CeLicenseImportResult.invalid("LICENSE_BINDING_FAILED",
+                StringUtils.blankToDefault(e.getMessage(), "厂商授权绑定确认失败"));
+        }
+    }
+
+    private synchronized void saveLicenseState(CeLicenseState state) {
+        CeLicenseState existing = licenseStateMapper.selectOne(new LambdaQueryWrapper<CeLicenseState>()
+            .eq(CeLicenseState::getLicenseId, state.getLicenseId())
+            .eq(CeLicenseState::getInstallId, state.getInstallId())
+            .eq(CeLicenseState::getPayloadDigest, state.getPayloadDigest()), false);
+        if (existing == null) {
+            licenseStateMapper.insert(state);
+            return;
+        }
+        state.setId(existing.getId());
+        licenseStateMapper.updateById(state);
     }
 
     private CeLicenseImportResult validateEnvelope(CeLicenseEnvelope envelope) {

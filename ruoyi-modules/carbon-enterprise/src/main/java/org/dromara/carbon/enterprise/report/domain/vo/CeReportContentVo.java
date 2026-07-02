@@ -28,8 +28,6 @@ public class CeReportContentVo implements Serializable {
 
     private String subdirectoryName;
 
-    private String chartNames;
-
     private Integer displayOrder;
 
     private Date createTime;

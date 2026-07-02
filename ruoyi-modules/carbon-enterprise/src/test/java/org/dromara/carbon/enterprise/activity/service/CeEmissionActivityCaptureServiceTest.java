@@ -132,7 +132,7 @@ class CeEmissionActivityCaptureServiceTest {
     @Test
     void manualSaveAndImportShareTheSameFieldValidation() {
         CeEmissionActivityValidationRequest invalidRow = row(values -> {
-            values.put("activityPeriod", "2026-13");
+            values.put("activityMonth", "13");
         });
 
         CeEmissionActivityCaptureResult manualResult = service.saveManual(invalidRow);
@@ -140,7 +140,7 @@ class CeEmissionActivityCaptureServiceTest {
 
         assertFalse(manualResult.isPersisted());
         assertFalse(importResult.isPersisted());
-        assertEquals(List.of("INVALID_TYPE"), rowIssueCodes(manualResult));
+        assertEquals(List.of("INVALID_VALUE_DOMAIN"), rowIssueCodes(manualResult));
         assertEquals(rowIssueCodes(manualResult), rowIssueCodes(importResult));
         verifyNoInteractions(templateSheetMapper, templateFieldMapper, captureBatchMapper, captureRowMapper,
             captureCellMapper, activityDataMapper);
@@ -164,7 +164,7 @@ class CeEmissionActivityCaptureServiceTest {
         ArgumentCaptor<CeActivityData> activityCaptor = ArgumentCaptor.forClass(CeActivityData.class);
         verify(captureBatchMapper).insert(batchCaptor.capture());
         verify(captureRowMapper).insert(rowCaptor.capture());
-        verify(captureCellMapper, org.mockito.Mockito.times(19)).insert(cellCaptor.capture());
+        verify(captureCellMapper, org.mockito.Mockito.times(18)).insert(cellCaptor.capture());
         verify(activityDataMapper).insert(activityCaptor.capture());
         verify(templateSheetMapper).selectList(any());
         verify(templateFieldMapper).selectList(any());
@@ -180,8 +180,8 @@ class CeEmissionActivityCaptureServiceTest {
         Map<Long, CeCaptureCell> cellsByFieldId = cellCaptor.getAllValues().stream()
             .collect(java.util.stream.Collectors.toMap(CeCaptureCell::getFieldId, cell -> cell));
         assertEquals("Company One", cellsByFieldId.get(1003L).getTextValue());
-        assertEquals("EF-2026-001", cellsByFieldId.get(1019L).getTextValue());
-        assertEquals(new BigDecimal("12.5"), cellsByFieldId.get(1015L).getDecimalValue());
+        assertEquals("EF-2026-001", cellsByFieldId.get(1018L).getTextValue());
+        assertEquals(new BigDecimal("12.5"), cellsByFieldId.get(1014L).getDecimalValue());
 
         CeActivityData activityData = activityCaptor.getValue();
         assertEquals(100L, activityData.getBatchId());
@@ -197,7 +197,7 @@ class CeEmissionActivityCaptureServiceTest {
         assertEquals("Natural Gas Boiler", activityData.getSourceIdentificationName());
         assertEquals("Natural Gas", activityData.getEmissionSourceName());
         assertEquals("Nm3", activityData.getActivityUnit());
-        assertEquals("2026-06", activityData.getActivityPeriod());
+        assertNull(activityData.getActivityPeriod());
         assertEquals(2026, activityData.getActivityYear());
         assertEquals(6, activityData.getActivityMonth());
         assertEquals(LocalDate.of(2026, 6, 5), activityData.getActivityDate()
@@ -213,24 +213,22 @@ class CeEmissionActivityCaptureServiceTest {
     }
 
     @Test
-    void legacyCustomerActivitySampleIsRejectedBeforeImportBecauseSemanticHeadersAreMissing() throws IOException {
+    void sourceAActivitySampleHeadersParseBeforeImport() throws IOException {
         Path sample = findWorkspaceFile("source（A）/活动数据表/3 排放活动数据表10101.xlsx");
         ICeEmissionActivityImportValidationService parser = new CeEmissionActivityImportValidationServiceImpl(
             new CeEmissionActivityValidationServiceImpl(fakeResolver())
         );
 
-        org.dromara.common.core.exception.ServiceException exception = assertThrows(
-            org.dromara.common.core.exception.ServiceException.class,
-            () -> parser.parseImportFile(new MockMultipartFile(
+        CeEmissionActivityImportValidationRequest request = parser.parseImportFile(new MockMultipartFile(
             "file",
             sample.getFileName().toString(),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             Files.readAllBytes(sample)
-        )));
+        ));
 
-        assertTrue(exception.getMessage().contains("缺少必要表头"));
-        assertTrue(exception.getMessage().contains("排放源名称"));
-        assertTrue(exception.getMessage().contains("活动期间"));
+        assertEquals(18, request.getHeaderFields().size());
+        assertFalse(request.getRows().isEmpty());
+        assertEquals("PK_排放源识别编号", request.getHeaderFields().get(0).getFieldName());
     }
 
     @Test
@@ -243,12 +241,12 @@ class CeEmissionActivityCaptureServiceTest {
         })));
 
         ArgumentCaptor<CeCaptureCell> cellCaptor = ArgumentCaptor.forClass(CeCaptureCell.class);
-        verify(captureCellMapper, org.mockito.Mockito.times(19)).insert(cellCaptor.capture());
+        verify(captureCellMapper, org.mockito.Mockito.times(18)).insert(cellCaptor.capture());
 
         Map<Long, CeCaptureCell> cellsByFieldId = cellCaptor.getAllValues().stream()
             .collect(java.util.stream.Collectors.toMap(CeCaptureCell::getFieldId, cell -> cell));
-        assertEquals("2026-06", cellsByFieldId.get(1014L).getTextValue());
-        assertEquals(LocalDate.of(2026, 6, 1), cellsByFieldId.get(1014L).getDateValue()
+        assertEquals("2026-06", cellsByFieldId.get(1013L).getTextValue());
+        assertEquals(LocalDate.of(2026, 6, 1), cellsByFieldId.get(1013L).getDateValue()
             .toInstant()
             .atZone(ZoneId.systemDefault())
             .toLocalDate());
@@ -456,7 +454,8 @@ class CeEmissionActivityCaptureServiceTest {
         values.put("sourceIdentificationName", "Natural Gas Boiler");
         values.put("emissionSourceName", "Natural Gas");
         values.put("activityUnit", "Nm3");
-        values.put("activityPeriod", "2026-06");
+        values.put("activityYear", "2026");
+        values.put("activityMonth", "6");
         values.put("activityDate", "2026-06-05");
         values.put("activityValue", "12.5");
         values.put("responsibleDept", "Production");

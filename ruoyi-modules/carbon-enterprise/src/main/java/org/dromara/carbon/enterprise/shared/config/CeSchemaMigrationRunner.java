@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.carbon.enterprise.activity.domain.CeEmissionActivityFieldDescriptor;
 import org.dromara.carbon.enterprise.activity.service.impl.CeEmissionActivityValidationServiceImpl;
 import org.dromara.carbon.enterprise.shared.config.CeGbIndustryClassification.IndustryRecord;
+import org.dromara.carbon.enterprise.shared.service.ICeCompanyFactoryDeptSyncService;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,9 +24,12 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
     private static final String EMISSION_ACTIVITY_MODULE_CODE = "activity-data";
 
     private final JdbcTemplate jdbcTemplate;
+    private final ICeCompanyFactoryDeptSyncService companyFactoryDeptSyncService;
 
-    public CeSchemaMigrationRunner(JdbcTemplate jdbcTemplate) {
+    public CeSchemaMigrationRunner(JdbcTemplate jdbcTemplate,
+                                   ICeCompanyFactoryDeptSyncService companyFactoryDeptSyncService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.companyFactoryDeptSyncService = companyFactoryDeptSyncService;
     }
 
     @Override
@@ -34,15 +38,224 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         seedIndustryClassificationRecords();
         addColumnIfMissing("ce_emission_source", "source_unit", "NVARCHAR(64) NULL");
         addColumnIfMissing("ce_emission_source", "factory_code", "NVARCHAR(64) NULL");
+        addColumnIfMissing("ce_emission_source", "data_frequency", "NVARCHAR(16) NULL");
+        addColumnIfMissing("ce_emission_source", "responsible_user_id", "BIGINT NULL");
+        addColumnIfMissing("ce_emission_source", "responsible_user_name", "NVARCHAR(100) NULL");
         addColumnIfMissing("ce_activity_data", "emission_source_id", "BIGINT NULL");
         addColumnIfMissing("ce_activity_data", "activity_period", "NVARCHAR(32) NULL");
         addColumnIfMissing("ce_activity_data", "factory_code", "NVARCHAR(64) NULL");
+        addColumnIfMissing("ce_factor_cache_record", "custom_fields", "NVARCHAR(MAX) NULL");
+        addColumnIfMissing("ce_factor_cache_record", "remark", "NVARCHAR(500) NULL");
         addColumnIfMissing("ce_template_field", "business_field_code", "NVARCHAR(64) NULL");
+        alterColumnIfExists("ce_base_year", "factory_code", "NVARCHAR(64) NULL");
+        alterColumnIfExists("ce_base_year", "factory_name", "NVARCHAR(255) NULL");
+        clearEnterpriseReportContentCharts();
         backfillTemplateFieldBusinessCode();
         seedEmissionActivityTemplateIfMissing();
         addUniqueConstraintIfMissing("ce_template_field", "uk_ce_template_field_business_code", "sheet_id, business_field_code");
         backfillSourceARelationshipColumns();
         removeIndustryMenuIfPresent();
+        seedEnterpriseDeptMenuIfMissing();
+        syncCompanyFactoriesToSysDept();
+        syncEmissionSourceDepartmentsToSysDept();
+        updateEnterpriseMenuIcons();
+    }
+
+    private void syncCompanyFactoriesToSysDept() {
+        try {
+            companyFactoryDeptSyncService.syncCompanyFactoriesToSysDept();
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] company factory department sync skipped: {}", e.getMessage());
+        }
+    }
+
+    private void syncEmissionSourceDepartmentsToSysDept() {
+        try {
+            jdbcTemplate.update("""
+                IF OBJECT_ID(N'dbo.sys_dept', N'U') IS NOT NULL
+                   AND OBJECT_ID(N'dbo.ce_emission_source', N'U') IS NOT NULL
+                BEGIN
+                    ;WITH parent_dept AS (
+                        SELECT
+                            CASE WHEN EXISTS (SELECT 1 FROM dbo.sys_dept WHERE dept_id = 100) THEN 100 ELSE 0 END AS parent_id,
+                            CASE WHEN EXISTS (SELECT 1 FROM dbo.sys_dept WHERE dept_id = 100) THEN N'0,100' ELSE N'0' END AS ancestors
+                    ),
+                    resolved_source AS (
+                        SELECT DISTINCT
+                            LTRIM(RTRIM(es.responsible_dept)) AS dept_name,
+                            COALESCE(
+                                NULLIF(LTRIM(RTRIM(cf_by_factory.company_code)), N''),
+                                NULLIF(LTRIM(RTRIM(cf_by_company.company_code)), N''),
+                                NULLIF(LTRIM(RTRIM(es.company_code)), N''),
+                                N''
+                            ) AS dept_category,
+                            COALESCE(
+                                NULLIF(LTRIM(RTRIM(cf_by_factory.factory_name)), N''),
+                                NULLIF(LTRIM(RTRIM(cf_by_company.factory_name)), N''),
+                                NULLIF(LTRIM(RTRIM(es.factory_name)), N'')
+                            ) AS factory_dept_name
+                        FROM dbo.ce_emission_source es
+                        LEFT JOIN dbo.ce_company_factory cf_by_factory
+                            ON cf_by_factory.factory_code = es.factory_code
+                        LEFT JOIN dbo.ce_company_factory cf_by_company
+                            ON cf_by_company.company_code = es.company_code
+                        WHERE es.responsible_dept IS NOT NULL
+                          AND LTRIM(RTRIM(es.responsible_dept)) <> N''
+                    ),
+                    source_depts AS (
+                        SELECT DISTINCT
+                            resolved_source.dept_name,
+                            resolved_source.dept_category,
+                            COALESCE(factory_dept.dept_id, parent_dept.parent_id) AS parent_id,
+                            COALESCE(CONCAT(factory_dept.ancestors, N',', factory_dept.dept_id), parent_dept.ancestors) AS ancestors
+                        FROM resolved_source
+                        CROSS JOIN parent_dept
+                        LEFT JOIN dbo.sys_dept factory_dept
+                            ON factory_dept.del_flag = N'0'
+                           AND factory_dept.dept_name = resolved_source.factory_dept_name
+                           AND ISNULL(factory_dept.dept_category, N'') = resolved_source.dept_category
+                           AND factory_dept.parent_id = parent_dept.parent_id
+                        WHERE resolved_source.factory_dept_name IS NULL
+                           OR resolved_source.dept_name <> resolved_source.factory_dept_name
+                    ),
+                    candidates AS (
+                        SELECT source_depts.dept_name, source_depts.dept_category, source_depts.parent_id, source_depts.ancestors
+                        FROM source_depts
+                        WHERE NOT EXISTS (
+                            SELECT 1
+                            FROM dbo.sys_dept d
+                            WHERE d.del_flag = N'0'
+                              AND d.dept_name = source_depts.dept_name
+                              AND ISNULL(d.dept_category, N'') = source_depts.dept_category
+                              AND d.parent_id = source_depts.parent_id
+                        )
+                    ),
+                    numbered AS (
+                        SELECT
+                            candidates.dept_name,
+                            candidates.dept_category,
+                            candidates.parent_id,
+                            candidates.ancestors,
+                            ROW_NUMBER() OVER (ORDER BY candidates.dept_category, candidates.parent_id, candidates.dept_name) AS rn
+                        FROM candidates
+                    ),
+                    id_base AS (
+                        SELECT CASE WHEN ISNULL(MAX(dept_id), 0) < 100000 THEN 100000 ELSE MAX(dept_id) END AS max_dept_id
+                        FROM dbo.sys_dept
+                    ),
+                    tenant_value AS (
+                        SELECT COALESCE((SELECT TOP 1 tenant_id FROM dbo.sys_dept WHERE tenant_id IS NOT NULL ORDER BY dept_id), N'000000') AS tenant_id
+                    )
+                    INSERT INTO dbo.sys_dept (
+                        dept_id, tenant_id, parent_id, ancestors, dept_name, dept_category,
+                        order_num, status, del_flag, create_dept, create_by, create_time
+                    )
+                    SELECT
+                        id_base.max_dept_id + numbered.rn,
+                        tenant_value.tenant_id,
+                        numbered.parent_id,
+                        numbered.ancestors,
+                        numbered.dept_name,
+                        numbered.dept_category,
+                        100 + numbered.rn,
+                        N'0',
+                        N'0',
+                        numbered.parent_id,
+                        1,
+                        SYSDATETIME()
+                    FROM numbered
+                    CROSS JOIN id_base
+                    CROSS JOIN tenant_value;
+                END
+                """);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] emission source department sync skipped: {}", e.getMessage());
+        }
+    }
+
+    private void seedEnterpriseDeptMenuIfMissing() {
+        try {
+            seedMenu(103L, "部门管理", 1L, 4, "dept", "system/dept/index", "C", "system:dept:list", "form", "部门管理");
+            seedMenu(1051L, "部门查询", 103L, 1, "#", "", "F", "system:dept:query", "#", "部门查询权限");
+            seedMenu(1052L, "部门新增", 103L, 2, "#", "", "F", "system:dept:add", "#", "部门新增权限");
+            seedMenu(1053L, "部门修改", 103L, 3, "#", "", "F", "system:dept:edit", "#", "部门修改权限");
+            seedMenu(1054L, "部门删除", 103L, 4, "#", "", "F", "system:dept:remove", "#", "部门删除权限");
+            updateMenuIcon("dept", "form");
+            grantMenuToRole(900001L, 103L, 1051L, 1052L, 1053L, 1054L);
+            grantMenuToRole(900002L, 103L, 1051L, 1052L, 1053L, 1054L);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] enterprise dept menu seed skipped: {}", e.getMessage());
+        }
+    }
+
+    private void seedMenu(Long menuId, String menuName, Long parentId, int orderNum, String path, String component,
+                          String menuType, String perms, String icon, String remark) {
+        jdbcTemplate.update("""
+            IF NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = ?)
+            INSERT INTO sys_menu (
+                menu_id, menu_name, parent_id, order_num, path, component, query_param,
+                is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark
+            )
+            VALUES (?, ?, ?, ?, ?, ?, N'', 1, 0, ?, N'0', N'0', ?, ?, 103, 1, SYSDATETIME(), ?)
+            """,
+            menuId, menuId, menuName, parentId, orderNum, path, component, menuType, perms, icon, remark);
+    }
+
+    private void grantMenuToRole(Long roleId, Long... menuIds) {
+        for (Long menuId : menuIds) {
+            jdbcTemplate.update("""
+                IF EXISTS (SELECT 1 FROM sys_role WHERE role_id = ?)
+                   AND EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = ?)
+                   AND NOT EXISTS (SELECT 1 FROM sys_role_menu WHERE role_id = ? AND menu_id = ?)
+                INSERT INTO sys_role_menu (role_id, menu_id) VALUES (?, ?)
+                """, roleId, menuId, roleId, menuId, roleId, menuId);
+        }
+    }
+
+    private void updateEnterpriseMenuIcons() {
+        updateMenuIcon("system-auth", "link");
+        updateMenuIcon("license-import", "link");
+        updateMenuIcon("emission-source-config", "list");
+        updateMenuIcon("factor-confirm", "list");
+        updateMenuIcon("activity-data", "list");
+        updateMenuIcon("green-electricity", "list");
+        updateMenuIcon("intensity", "list");
+        updateMenuIcon("admin-division", "link");
+        updateMenuIcon("company", "form");
+        updateMenuIcon("emission-source-category", "link");
+        updateMenuIcon("base-year", "link");
+        updateMenuIcon("ef-factor", "form");
+        updateMenuIcon("ef-electricity-factor", "link");
+        updateMenuIcon("ef-electricity-version", "link");
+        updateMenuIcon("ef-electricity-scope", "link");
+        updateMenuIcon("greenhouse-gas", "link");
+        updateMenuIcon("intensity-target", "form");
+        updateMenuIcon("intensity-tolerance", "form");
+        updateMenuIcon("content", "link");
+        updateMenuIcon("report-template-download", "link");
+    }
+
+    private void updateMenuIcon(String path, String icon) {
+        try {
+            jdbcTemplate.update("UPDATE sys_menu SET icon = ? WHERE path = ?", icon, path);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] menu icon update skipped for path {}: {}", path, e.getMessage());
+        }
+    }
+
+    private void clearEnterpriseReportContentCharts() {
+        try {
+            jdbcTemplate.update("""
+                IF OBJECT_ID(N'dbo.ce_report_content', N'U') IS NOT NULL
+                   AND COL_LENGTH(N'dbo.ce_report_content', N'chart_names') IS NOT NULL
+                UPDATE dbo.ce_report_content
+                   SET chart_names = NULL,
+                       update_time = SYSDATETIME()
+                 WHERE chart_names IS NOT NULL
+                """);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] enterprise report content chart cleanup skipped: {}", e.getMessage());
+        }
     }
 
     private void seedEmissionActivityTemplateIfMissing() {
@@ -499,6 +712,18 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         return count != null && count > 0;
     }
 
+    private void alterColumnIfExists(String tableName, String columnName, String columnDef) {
+        try {
+            if (!columnExists(tableName, columnName)) {
+                return;
+            }
+            jdbcTemplate.execute("ALTER TABLE " + tableName + " ALTER COLUMN " + columnName + " " + columnDef);
+            log.info("[SchemaMigration] altered {}.{} ({})", tableName, columnName, columnDef);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] failed to alter {}.{}: {}", tableName, columnName, e.getMessage());
+        }
+    }
+
     private void addUniqueConstraintIfMissing(String tableName, String constraintName, String columns) {
         try {
             Integer count = jdbcTemplate.queryForObject(
@@ -519,21 +744,68 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
     private void backfillSourceARelationshipColumns() {
         try {
             jdbcTemplate.update("""
-                UPDATE ce_emission_source
-                   SET factory_code = company_code
-                 WHERE (factory_code IS NULL OR factory_code = '')
-                   AND company_code IS NOT NULL
-                   AND company_code <> ''
+                UPDATE es
+                   SET es.factory_code = cf.factory_code,
+                       es.company_code = cf.company_code,
+                       es.company_name = COALESCE(NULLIF(es.company_name, ''), cf.company_name),
+                       es.factory_name = COALESCE(NULLIF(es.factory_name, ''), cf.factory_name)
+                  FROM ce_emission_source es
+                  JOIN ce_company_factory cf
+                    ON cf.factory_code = es.company_code
+                 WHERE (es.factory_code IS NULL OR es.factory_code = '')
+                   AND es.company_code IS NOT NULL
+                   AND es.company_code <> ''
+                """);
+            jdbcTemplate.update("""
+                UPDATE es
+                   SET es.company_code = cf.company_code,
+                       es.company_name = COALESCE(NULLIF(es.company_name, ''), cf.company_name),
+                       es.factory_name = COALESCE(NULLIF(es.factory_name, ''), cf.factory_name)
+                  FROM ce_emission_source es
+                  JOIN ce_company_factory cf
+                    ON cf.factory_code = es.factory_code
+                 WHERE es.factory_code IS NOT NULL
+                   AND es.factory_code <> ''
+                   AND (es.company_code IS NULL OR es.company_code = '' OR es.company_code <> cf.company_code)
+                """);
+            jdbcTemplate.update("""
+                UPDATE ad
+                   SET ad.factory_code = cf.factory_code,
+                       ad.company_code = cf.company_code,
+                       ad.company_name = COALESCE(NULLIF(ad.company_name, ''), cf.company_name),
+                       ad.factory_name = COALESCE(NULLIF(ad.factory_name, ''), cf.factory_name)
+                  FROM ce_activity_data ad
+                  JOIN ce_company_factory cf
+                    ON cf.factory_code = ad.company_code
+                 WHERE (ad.factory_code IS NULL OR ad.factory_code = '')
+                   AND ad.company_code IS NOT NULL
+                   AND ad.company_code <> ''
+                """);
+            jdbcTemplate.update("""
+                UPDATE ad
+                   SET ad.company_code = cf.company_code,
+                       ad.company_name = COALESCE(NULLIF(ad.company_name, ''), cf.company_name),
+                       ad.factory_name = COALESCE(NULLIF(ad.factory_name, ''), cf.factory_name)
+                  FROM ce_activity_data ad
+                  JOIN ce_company_factory cf
+                    ON cf.factory_code = ad.factory_code
+                 WHERE ad.factory_code IS NOT NULL
+                   AND ad.factory_code <> ''
+                   AND (ad.company_code IS NULL OR ad.company_code = '' OR ad.company_code <> cf.company_code)
                 """);
             jdbcTemplate.update("""
                 UPDATE ad
                    SET ad.emission_source_id = es.id,
                        ad.activity_period = COALESCE(NULLIF(ad.activity_period, ''), CONCAT(ad.activity_year, '-', RIGHT('0' + CAST(ad.activity_month AS VARCHAR(2)), 2))),
-                       ad.factory_code = COALESCE(NULLIF(ad.factory_code, ''), NULLIF(ad.company_code, ''), es.factory_code)
+                       ad.factory_code = COALESCE(NULLIF(ad.factory_code, ''), es.factory_code),
+                       ad.company_code = COALESCE(NULLIF(ad.company_code, ''), es.company_code)
                   FROM ce_activity_data ad
                   JOIN ce_emission_source es
                     ON es.source_identification_code = ad.source_identification_code
-                   AND (es.company_code = ad.company_code OR ad.company_code IS NULL OR ad.company_code = '')
+                   AND (
+                        es.factory_code = ad.factory_code
+                        OR (ad.factory_code IS NULL OR ad.factory_code = '')
+                   )
                  WHERE (ad.emission_source_id IS NULL OR ad.emission_source_id = 0 OR ad.activity_period IS NULL OR ad.activity_period = '' OR ad.factory_code IS NULL OR ad.factory_code = '')
              """);
         } catch (Exception e) {

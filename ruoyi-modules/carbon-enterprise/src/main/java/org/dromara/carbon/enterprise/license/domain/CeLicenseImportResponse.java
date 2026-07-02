@@ -41,6 +41,8 @@ public class CeLicenseImportResponse {
             case "EXPIRED" -> "授权已过期";
             case "INSTALL_ID_MISMATCH" -> "授权文件的部署指纹与本机不匹配";
             case "CLOCK_ROLLBACK" -> "系统时间早于最近授权校验时间";
+            case "LICENSE_BINDING_FAILED" -> "厂商授权绑定确认失败";
+            case "VENDOR_LICENSE_NOT_ACTIVE" -> "厂商授权当前不可用";
             case "PUBLIC_KEY_UNAVAILABLE" -> "企业端授权公钥不可用";
             default -> "授权导入失败";
         };

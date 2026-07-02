@@ -44,22 +44,22 @@ import static org.mockito.Mockito.when;
 class CeEmissionActivityImportValidationServiceTest {
 
     @Test
-    void rejectsLegacyCustomerActivitySampleWhenRequiredSemanticHeadersAreMissing() throws IOException {
+    void parsesSourceAActivitySampleHeaders() throws IOException {
         CeEmissionActivityImportValidationServiceImpl service = new CeEmissionActivityImportValidationServiceImpl(
             new CeEmissionActivityValidationServiceImpl(fakeResolver())
         );
         Path sample = findWorkspaceFile("source（A）/活动数据表/3 排放活动数据表10101.xlsx");
 
-        ServiceException exception = assertThrows(ServiceException.class, () -> service.parseImportFile(new MockMultipartFile(
+        CeEmissionActivityImportValidationRequest request = service.parseImportFile(new MockMultipartFile(
             "file",
             sample.getFileName().toString(),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             Files.readAllBytes(sample)
-        )));
+        ));
 
-        assertTrue(exception.getMessage().contains("缺少必要表头"));
-        assertTrue(exception.getMessage().contains("排放源名称"));
-        assertTrue(exception.getMessage().contains("活动期间"));
+        assertEquals(18, request.getHeaderFields().size());
+        assertFalse(request.getRows().isEmpty());
+        assertEquals("PK_排放源识别编号", request.getHeaderFields().get(0).getFieldName());
     }
 
     @Test
@@ -79,17 +79,17 @@ class CeEmissionActivityImportValidationServiceTest {
             )
         ));
 
-        assertEquals(11, request.getHeaderFields().size());
-        assertEquals("公司名称", request.getHeaderFields().get(0).getFieldName());
+        assertEquals(18, request.getHeaderFields().size());
+        assertEquals("PK_排放源识别编号", request.getHeaderFields().get(0).getFieldName());
         assertEquals(2, request.getRows().size());
         assertEquals(2, request.getRows().get(0).getRowNumber());
         assertEquals(3, request.getRows().get(1).getRowNumber());
         assertEquals("12.5", fieldValue(request.getRows().get(0), "activityValue"));
-        assertEquals("", fieldValue(request.getRows().get(1), "sourceRemark"));
+        assertEquals(null, fieldValue(request.getRows().get(1), "sourceRemark"));
     }
 
     @Test
-    void parsesCompactEntryTemplateAndLeavesDerivedFieldsForResolver() {
+    void parsesSourceAEntryTemplateAndLeavesOptionalCodesForResolver() {
         CeEmissionActivityImportValidationServiceImpl service = new CeEmissionActivityImportValidationServiceImpl(
             new CeEmissionActivityValidationServiceImpl(fakeResolver())
         );
@@ -111,15 +111,16 @@ class CeEmissionActivityImportValidationServiceTest {
             ))
         ));
 
-        assertEquals(11, request.getHeaderFields().size());
-        assertEquals(19, request.getRows().get(0).getFieldValues().size());
-        assertEquals("", fieldValue(request.getRows().get(0), "sourceIdentificationCode"));
+        assertEquals(18, request.getHeaderFields().size());
+        assertEquals(18, request.getRows().get(0).getFieldValues().size());
+        assertEquals(null, fieldValue(request.getRows().get(0), "sourceIdentificationCode"));
         assertEquals("Company One", fieldValue(request.getRows().get(0), "companyName"));
         assertEquals("Natural Gas Boiler", fieldValue(request.getRows().get(0), "sourceIdentificationName"));
-        assertEquals("2026-06", fieldValue(request.getRows().get(0), "activityPeriod"));
+        assertEquals("2026", fieldValue(request.getRows().get(0), "activityYear"));
+        assertEquals("6", fieldValue(request.getRows().get(0), "activityMonth"));
         assertEquals("12.5", fieldValue(request.getRows().get(0), "activityValue"));
-        assertEquals("", fieldValue(request.getRows().get(0), "companyCode"));
-        assertEquals("", fieldValue(request.getRows().get(0), "factorKey"));
+        assertEquals(null, fieldValue(request.getRows().get(0), "companyCode"));
+        assertEquals(null, fieldValue(request.getRows().get(0), "factorKey"));
 
         CeEmissionActivityImportValidationResult result = service.validateImport(request);
 
@@ -396,7 +397,8 @@ class CeEmissionActivityImportValidationServiceTest {
         values.put("sourceIdentificationName", "Natural Gas Boiler");
         values.put("emissionSourceName", "Natural Gas");
         values.put("activityUnit", "Nm3");
-        values.put("activityPeriod", "2026-06");
+        values.put("activityYear", "2026");
+        values.put("activityMonth", "6");
         values.put("activityDate", "2026-06-05");
         values.put("activityValue", "12.5");
         values.put("responsibleDept", "Production");
@@ -444,11 +446,34 @@ class CeEmissionActivityImportValidationServiceTest {
     }
 
     private List<String> rowValues(String... values) {
+        if (values.length == 11) {
+            String[] expanded = new String[18];
+            expanded[0] = "";
+            expanded[1] = "";
+            expanded[2] = values[0];
+            expanded[3] = values[1];
+            expanded[4] = "";
+            expanded[5] = values[2];
+            expanded[6] = values[3];
+            expanded[7] = values[4];
+            expanded[8] = values[5];
+            expanded[9] = "";
+            String[] period = values[6].split("-", 2);
+            expanded[10] = period.length > 0 ? period[0] : "";
+            expanded[11] = period.length > 1 ? String.valueOf(Integer.parseInt(period[1])) : "";
+            expanded[12] = values[7];
+            expanded[13] = values[8];
+            expanded[14] = values[9];
+            expanded[15] = values[10];
+            expanded[16] = "";
+            expanded[17] = "";
+            return List.of(expanded);
+        }
         return List.of(values);
     }
 
     private List<String> blankRowValues() {
-        return new ArrayList<>(Collections.nCopies(11, ""));
+        return new ArrayList<>(Collections.nCopies(18, ""));
     }
 
     private ICeEmissionActivityDerivedFieldResolver fakeResolver() {

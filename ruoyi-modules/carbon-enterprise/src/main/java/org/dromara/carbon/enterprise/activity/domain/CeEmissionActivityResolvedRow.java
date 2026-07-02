@@ -14,6 +14,8 @@ public class CeEmissionActivityResolvedRow {
 
     private String companyName;
 
+    private String factoryCode;
+
     private String factoryName;
 
     private String emissionSourceCategoryCode;

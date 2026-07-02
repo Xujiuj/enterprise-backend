@@ -1,6 +1,5 @@
 package org.dromara.carbon.enterprise.emission.domain;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -27,7 +26,6 @@ public class CeEmissionSource implements Serializable {
 
     private String companyName;
 
-    @TableField(exist = false)
     private String factoryCode;
 
     private String factoryName;
@@ -45,6 +43,12 @@ public class CeEmissionSource implements Serializable {
     private String emissionSourceName;
 
     private String responsibleDept;
+
+    private String dataFrequency;
+
+    private Long responsibleUserId;
+
+    private String responsibleUserName;
 
     private String dataSource;
 

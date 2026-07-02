@@ -6,6 +6,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.dromara.carbon.enterprise.sourcea.domain.CeSourceAImportResult;
 import org.dromara.carbon.enterprise.sourcea.service.impl.CeSourceAImportServiceImpl;
+import org.dromara.carbon.enterprise.shared.service.ICeCompanyFactoryDeptSyncService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @Tag("dev")
@@ -50,6 +52,7 @@ class CeSourceAImportServiceTest {
         writeMinimalSourceAWorkbooks(sourceDir);
 
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        ICeCompanyFactoryDeptSyncService companyFactoryDeptSyncService = mock(ICeCompanyFactoryDeptSyncService.class);
         List<BatchInsert> batches = new ArrayList<>();
         when(jdbcTemplate.update(anyString(), any(Object[].class))).thenReturn(0);
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), any())).thenReturn(0);
@@ -63,21 +66,37 @@ class CeSourceAImportServiceTest {
             return new int[rows.size()];
         });
 
-        CeSourceAImportResult result = new CeSourceAImportServiceImpl(jdbcTemplate).importDirectory(sourceDir.toString());
+        CeSourceAImportResult result = new CeSourceAImportServiceImpl(jdbcTemplate, companyFactoryDeptSyncService).importDirectory(sourceDir.toString());
 
         assertTrue(result.isImported(), () -> "errors=" + result.getErrors() + ", warnings=" + result.getWarnings());
+        verify(companyFactoryDeptSyncService).syncCompanyFactoriesToSysDept();
         assertTrue(result.getWarnings().stream().anyMatch(warning -> warning.contains("de-duplicated")));
+        assertFalse(result.getTableRows().getOrDefault("ce_company_factory", 0) == 0);
         assertFalse(result.getTableRows().getOrDefault("ce_emission_source", 0) == 0);
+        BatchInsert companyFactoryBatch = batches.stream()
+            .filter(batch -> batch.sql().contains("INSERT INTO ce_company_factory "))
+            .findFirst()
+            .orElseThrow();
+        Object[] firstCompanyFactory = companyFactoryBatch.rows().get(0);
+        assertEquals("1", firstCompanyFactory[0]);
+        assertEquals("101", firstCompanyFactory[1]);
+        assertEquals("10101", firstCompanyFactory[2]);
+        assertEquals("峰行智成集团", firstCompanyFactory[3]);
+        assertEquals("集团总部", firstCompanyFactory[4]);
+        assertEquals("650000", firstCompanyFactory[5]);
+        assertEquals("新疆维吾尔自治区", firstCompanyFactory[6]);
+
         BatchInsert emissionSourceBatch = batches.stream()
             .filter(batch -> batch.sql().contains("INSERT INTO ce_emission_source "))
             .findFirst()
             .orElseThrow();
         Object[] firstEmissionSource = emissionSourceBatch.rows().get(0);
-        assertEquals("10101", firstEmissionSource[0]);
+        assertEquals("101", firstEmissionSource[0]);
         assertEquals("10101", firstEmissionSource[2]);
         assertEquals("ES-001", firstEmissionSource[7]);
-        assertEquals("EF-001", firstEmissionSource[12]);
-        assertEquals("t", firstEmissionSource[13]);
+        assertEquals("monthly", firstEmissionSource[11]);
+        assertEquals("EF-001", firstEmissionSource[15]);
+        assertEquals("t", firstEmissionSource[16]);
     }
 
     private record BatchInsert(String sql, List<Object[]> rows) {

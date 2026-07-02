@@ -37,7 +37,9 @@ import org.dromara.carbon.enterprise.shared.service.ICeOptionService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.system.domain.SysDept;
+import org.dromara.system.domain.SysUser;
 import org.dromara.system.mapper.SysDeptMapper;
+import org.dromara.system.mapper.SysUserMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -135,6 +137,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
     private final CeLicenseStateMapper licenseStateMapper;
     private final CeDimensionProjectionMapper dimensionProjectionMapper;
     private final SysDeptMapper sysDeptMapper;
+    private final SysUserMapper sysUserMapper;
 
     @Override
     public List<CeOptionVo> listOptions(String optionCode, CeOptionQueryBo query) {
@@ -193,9 +196,9 @@ public class CeOptionServiceImpl implements ICeOptionService {
             }
             case "responsible-dept" -> {
                 collectSystemDeptOptions(options);
-                collectDistinct(options, activityDataMapper, CeActivityData::getResponsibleDept, this::labelForRaw);
-                collectDistinct(options, emissionSourceMapper, CeEmissionSource::getResponsibleDept, this::labelForRaw);
             }
+            case "data-frequency" -> collectDataFrequencyOptions(options);
+            case "responsible-user" -> collectSystemUserOptions(options);
             case "emission-source-code" -> collectEmissionSourceCodeOptions(options);
             case "emission-source-name" -> collectEmissionSourceNameOptions(options, safeQuery);
             case "data-source" -> {
@@ -433,6 +436,22 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
+    private void collectDataFrequencyOptions(List<CeOptionVo> target) {
+        addOption(target, "月报", "monthly");
+        addOption(target, "日报", "daily");
+        addOption(target, "季报", "quarterly");
+    }
+
+    private void collectSystemUserOptions(List<CeOptionVo> target) {
+        for (SysUser user : sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+            .select(SysUser::getUserId, SysUser::getUserName, SysUser::getNickName, SysUser::getStatus, SysUser::getDeptId)
+            .eq(SysUser::getStatus, "0")
+            .isNotNull(SysUser::getUserId)
+            .orderByAsc(SysUser::getUserName))) {
+            addOption(target, systemUserLabel(user), user.getUserId(), systemUserRecord(user));
+        }
+    }
+
     private String labelWithName(Object value, Object name) {
         String rawValue = normalizeValue(value);
         String rawName = normalizeValue(name);
@@ -533,6 +552,25 @@ public class CeOptionServiceImpl implements ICeOptionService {
         return record;
     }
 
+    private String systemUserLabel(SysUser user) {
+        String userName = normalizeValue(user.getUserName());
+        String nickName = normalizeValue(user.getNickName());
+        if (StringUtils.isBlank(nickName) || nickName.equals(userName)) {
+            return userName;
+        }
+        return nickName + " / " + userName;
+    }
+
+    private Map<String, Object> systemUserRecord(SysUser user) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("userId", user.getUserId());
+        record.put("userName", normalizeValue(user.getUserName()));
+        record.put("nickName", normalizeValue(user.getNickName()));
+        record.put("deptId", user.getDeptId());
+        record.put("status", normalizeValue(user.getStatus()));
+        return record;
+    }
+
     private String factorOptionLabel(Object value, Object primaryName, Object fallbackName, Object unit) {
         String rawValue = normalizeValue(value);
         String name = Stream.of(primaryName, fallbackName)
@@ -628,6 +666,9 @@ public class CeOptionServiceImpl implements ICeOptionService {
         record.put("sourceIdentificationName", source.getSourceIdentificationName());
         record.put("emissionSourceName", source.getEmissionSourceName());
         record.put("responsibleDept", source.getResponsibleDept());
+        record.put("dataFrequency", source.getDataFrequency());
+        record.put("responsibleUserId", source.getResponsibleUserId());
+        record.put("responsibleUserName", source.getResponsibleUserName());
         record.put("dataSource", source.getDataSource());
         record.put("factorKey", source.getFactorKey());
         record.put("factorDisplayName", factorNameCache.getOrDefault(normalizeValue(source.getFactorKey()), source.getFactorKey()));

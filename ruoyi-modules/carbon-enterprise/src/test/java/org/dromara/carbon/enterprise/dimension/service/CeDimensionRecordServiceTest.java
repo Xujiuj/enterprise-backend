@@ -7,6 +7,7 @@ import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMappe
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionSqlProvider;
 import org.dromara.carbon.enterprise.dimension.service.impl.CeDimensionRecordServiceImpl;
 import org.dromara.carbon.enterprise.license.mapper.CeLicenseStateMapper;
+import org.dromara.carbon.enterprise.shared.service.ICeCompanyFactoryDeptSyncService;
 import org.dromara.carbon.enterprise.vendor.client.CeVendorDimensionOpenClient;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -30,6 +32,7 @@ class CeDimensionRecordServiceTest {
 
     private CeDimensionProjectionMapper dimensionProjectionMapper;
     private CeVendorDimensionOpenClient vendorDimensionOpenClient;
+    private ICeCompanyFactoryDeptSyncService companyFactoryDeptSyncService;
     private CeDimensionRecordServiceImpl service;
 
     @BeforeEach
@@ -37,10 +40,12 @@ class CeDimensionRecordServiceTest {
         dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
         CeLicenseStateMapper licenseStateMapper = mock(CeLicenseStateMapper.class);
         vendorDimensionOpenClient = mock(CeVendorDimensionOpenClient.class);
+        companyFactoryDeptSyncService = mock(ICeCompanyFactoryDeptSyncService.class);
         service = new CeDimensionRecordServiceImpl(
             dimensionProjectionMapper,
             licenseStateMapper,
-            vendorDimensionOpenClient
+            vendorDimensionOpenClient,
+            companyFactoryDeptSyncService
         );
     }
 
@@ -99,6 +104,7 @@ class CeDimensionRecordServiceTest {
         verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record ->
             "SK_COMP-001_FAC-001".equals(record.getCompanySk()) && "Y".equals(record.getActiveFlag())
         ));
+        verify(companyFactoryDeptSyncService).syncCompanyFactoriesToSysDept();
     }
 
     @Test
@@ -161,6 +167,19 @@ class CeDimensionRecordServiceTest {
         service.insertByBo(bo);
 
         verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record -> "0".equals(record.getEnabledText())));
+    }
+
+    @Test
+    void companyDeleteDisablesSyncedFactoryDepartment() {
+        CeDimensionRecordVo previous = localCompany();
+        previous.setFactoryName("Demo Factory");
+        when(dimensionProjectionMapper.selectByDimensionCodeAndId("company", 1L)).thenReturn(previous);
+        when(dimensionProjectionMapper.deleteByDimensionCodeAndId("company", 1L)).thenReturn(1);
+
+        boolean changed = service.deleteByIds("company", java.util.List.of(1L));
+
+        assertTrue(changed);
+        verify(companyFactoryDeptSyncService).disableCompanyFactoryDept(eq("COMP-001"), eq("Demo Factory"));
     }
 
     @Test

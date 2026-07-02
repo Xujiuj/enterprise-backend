@@ -37,6 +37,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -50,6 +51,9 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
 
     private static final String LICENSE_VALID = "VALID";
     private static final String UNIT_TCO2E = "tCO2e";
+    private static final String FREQUENCY_MONTHLY = "monthly";
+    private static final String FREQUENCY_DAILY = "daily";
+    private static final String FREQUENCY_QUARTERLY = "quarterly";
     private static final int ANNOUNCEMENT_LIMIT = 5;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -70,8 +74,8 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
         CeActivityDataValidationDashboardVo dashboard = activityDataService.queryValidationDashboard(new CeActivityDataBo());
         String period = periodLabel(dashboard);
         CeLicenseStateVo licenseState = licenseStateService.queryCurrent();
-        List<CeActivityData> activities = listActivities(dashboard);
         List<CeEmissionSource> sources = emissionSourceMapper.selectList(Wrappers.<CeEmissionSource>lambdaQuery());
+        List<CeActivityData> activities = listActivities(dashboard, sources);
         List<CeFactorConfirmation> factors = listLatestFactors();
         CeFactorCacheVersion latestSyncedFactor = latestSyncedFactor();
         String latestSyncedFactorVersion = latestSyncedFactor == null ? null : latestSyncedFactor.getVersionCode();
@@ -89,13 +93,55 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
         return overview;
     }
 
-    private List<CeActivityData> listActivities(CeActivityDataValidationDashboardVo dashboard) {
+    private List<CeActivityData> listActivities(CeActivityDataValidationDashboardVo dashboard, List<CeEmissionSource> sources) {
+        Map<String, CeEmissionSource> sourceByCode = new LinkedHashMap<>();
+        for (CeEmissionSource source : sources) {
+            if (source != null && StringUtils.isNotBlank(source.getSourceIdentificationCode())) {
+                sourceByCode.putIfAbsent(source.getSourceIdentificationCode().trim(), source);
+            }
+        }
         return activityDataMapper.selectList(Wrappers.<CeActivityData>lambdaQuery()
             .eq(dashboard.getActivityYear() != null, CeActivityData::getActivityYear, dashboard.getActivityYear())
             .eq(dashboard.getActivityMonth() != null, CeActivityData::getActivityMonth, dashboard.getActivityMonth())
             .orderByDesc(CeActivityData::getUpdateTime)
             .orderByDesc(CeActivityData::getCreateTime)
-            .orderByDesc(CeActivityData::getId));
+            .orderByDesc(CeActivityData::getId))
+            .stream()
+            .filter(activity -> isActivityExpectedInPeriod(activity, sourceByCode, dashboard))
+            .toList();
+    }
+
+    private boolean isActivityExpectedInPeriod(CeActivityData activity, Map<String, CeEmissionSource> sourceByCode,
+                                               CeActivityDataValidationDashboardVo dashboard) {
+        if (activity == null || StringUtils.isBlank(activity.getSourceIdentificationCode())) {
+            return true;
+        }
+        CeEmissionSource source = sourceByCode.get(activity.getSourceIdentificationCode().trim());
+        return source == null || isSourceExpectedInPeriod(source, dashboard);
+    }
+
+    private boolean isSourceExpectedInPeriod(CeEmissionSource source, CeActivityDataValidationDashboardVo dashboard) {
+        String frequency = normalizedFrequency(source == null ? null : source.getDataFrequency());
+        if (FREQUENCY_QUARTERLY.equals(frequency)) {
+            Integer month = dashboard == null ? null : dashboard.getActivityMonth();
+            return month == null || isQuarterEndMonth(month);
+        }
+        return FREQUENCY_MONTHLY.equals(frequency) || FREQUENCY_DAILY.equals(frequency);
+    }
+
+    private boolean isQuarterEndMonth(Integer month) {
+        return month != null && month >= 1 && month <= 12 && month % 3 == 0;
+    }
+
+    private String normalizedFrequency(String frequency) {
+        if (StringUtils.isBlank(frequency)) {
+            return FREQUENCY_MONTHLY;
+        }
+        String normalized = frequency.trim().toLowerCase(Locale.ROOT);
+        if (FREQUENCY_DAILY.equals(normalized) || FREQUENCY_MONTHLY.equals(normalized) || FREQUENCY_QUARTERLY.equals(normalized)) {
+            return normalized;
+        }
+        return FREQUENCY_MONTHLY;
     }
 
     private List<CeFactorConfirmation> listLatestFactors() {
@@ -198,8 +244,8 @@ public class CeWorkbenchServiceImpl implements ICeWorkbenchService {
             todoItem("数据录入", defaultInt(dashboard.getMissingItems()) > 0 ? dashboard.getMissingItems() + " 项未填报" : "本期暂无缺失项",
                 defaultInt(dashboard.getMissingItems()) > 0 ? "未完成" : "正常", defaultInt(dashboard.getMissingItems()) > 0 ? "warn" : "ok",
                 "/activity-data/emission-activity-data", "去录入"),
-            todoItem("因子库", StringUtils.isBlank(latestFactorVersion) ? "暂无因子同步记录" : latestFactorVersion + " 已同步",
-                StringUtils.isBlank(latestFactorVersion) ? "待同步" : "已同步", StringUtils.isBlank(latestFactorVersion) ? "warn" : "info",
+            todoItem("因子库", StringUtils.isBlank(latestFactorVersion) ? "暂无因子库匹配记录" : latestFactorVersion + " 已匹配",
+                StringUtils.isBlank(latestFactorVersion) ? "待匹配" : "已匹配", StringUtils.isBlank(latestFactorVersion) ? "warn" : "info",
                 "/factor-confirm/ef-factor", "查看")
         );
     }

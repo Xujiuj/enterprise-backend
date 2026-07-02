@@ -136,6 +136,46 @@ class CeActivityDataValidationDashboardServiceTest {
     }
 
     @Test
+    void appliesEmissionSourceFrequencyToCurrentPeriodAccounting() {
+        when(emissionSourceMapper.selectList(any())).thenReturn(List.of(
+            emissionSource(1L, "ES-MONTHLY", "Monthly source", "monthly"),
+            emissionSource(2L, "ES-DAILY", "Daily source", "daily"),
+            emissionSource(3L, "ES-QUARTERLY", "Quarterly source", "quarterly")
+        ));
+        when(activityDataMapper.selectList(any())).thenReturn(List.of(
+            activity("ES-MONTHLY", "submitted", BigDecimal.TEN, "kWh", "EF-001"),
+            activity("ES-DAILY", "submitted", BigDecimal.ONE, "kWh", "EF-002"),
+            activity("ES-QUARTERLY", "submitted", BigDecimal.ONE, "kWh", "EF-003")
+        ));
+        when(greenPowerCertificateMapper.selectList(any())).thenReturn(List.of());
+        when(denominatorFactMapper.selectList(any())).thenReturn(List.of());
+        when(templateSheetMapper.selectList(any())).thenReturn(List.of());
+        when(templateFieldMapper.selectList(any())).thenReturn(List.of());
+
+        CeActivityDataBo query = new CeActivityDataBo();
+        query.setActivityYear(2026);
+        query.setActivityMonth(4);
+
+        CeActivityDataValidationDashboardVo dashboard = service.queryValidationDashboard(query);
+
+        assertEquals(2, dashboard.getExpectedItems());
+        assertEquals(2, dashboard.getValidatedRecordCount());
+        assertEquals(2, dashboard.getSubmittedItems());
+        assertEquals(0, dashboard.getMissingItems());
+        assertEquals(0, dashboard.getIssues().size());
+
+        query.setActivityMonth(6);
+
+        CeActivityDataValidationDashboardVo quarterEndDashboard = service.queryValidationDashboard(query);
+
+        assertEquals(3, quarterEndDashboard.getExpectedItems());
+        assertEquals(3, quarterEndDashboard.getValidatedRecordCount());
+        assertEquals(3, quarterEndDashboard.getSubmittedItems());
+        assertEquals(0, quarterEndDashboard.getMissingItems());
+        assertEquals(0, quarterEndDashboard.getIssues().size());
+    }
+
+    @Test
     void listsNewestActivityDataFirstWhenNoExplicitSortFieldExists() {
         when(activityDataMapper.selectVoPage(any(), any())).thenReturn(new Page<CeActivityDataVo>(1, 10));
 
@@ -149,12 +189,17 @@ class CeActivityDataValidationDashboardServiceTest {
     }
 
     private CeEmissionSource emissionSource(Long id, String code, String name) {
+        return emissionSource(id, code, name, "monthly");
+    }
+
+    private CeEmissionSource emissionSource(Long id, String code, String name, String dataFrequency) {
         CeEmissionSource source = new CeEmissionSource();
         source.setId(id);
         source.setSourceIdentificationCode(code);
         source.setSourceIdentificationName(name);
         source.setEmissionSourceName(name);
         source.setFactoryName("Factory A");
+        source.setDataFrequency(dataFrequency);
         source.setEnabledFlag(true);
         return source;
     }

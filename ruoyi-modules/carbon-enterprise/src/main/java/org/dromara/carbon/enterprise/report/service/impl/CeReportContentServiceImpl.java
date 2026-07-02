@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseState;
 import org.dromara.carbon.enterprise.report.domain.CeReportContent;
 import org.dromara.carbon.enterprise.report.domain.CeReportContentSyncResponse;
+import org.dromara.carbon.enterprise.report.domain.bo.CeReportContentBo;
 import org.dromara.carbon.enterprise.report.domain.vo.CeReportContentVo;
 import org.dromara.carbon.enterprise.license.mapper.CeLicenseStateMapper;
 import org.dromara.carbon.enterprise.report.mapper.CeReportContentMapper;
@@ -18,8 +19,11 @@ import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Enterprise local report content catalog service implementation.
@@ -36,12 +40,37 @@ public class CeReportContentServiceImpl implements ICeReportContentService {
 
     @Override
     public List<CeReportContentVo> listContent() {
-        if (reportContentMapper.selectCount(Wrappers.lambdaQuery(CeReportContent.class)) == 0) {
-            syncContent();
-        }
         return reportContentMapper.selectVoList(new LambdaQueryWrapper<CeReportContent>()
             .orderByAsc(CeReportContent::getDisplayOrder)
             .orderByAsc(CeReportContent::getId));
+    }
+
+    @Override
+    public CeReportContentVo getContent(Long id) {
+        return reportContentMapper.selectVoById(id);
+    }
+
+    @Override
+    public Boolean insertContent(CeReportContentBo bo) {
+        CeReportContent entity = toEntity(bo);
+        Date now = new Date();
+        entity.setCreateTime(now);
+        entity.setUpdateTime(now);
+        entity.setChartNames(null);
+        return reportContentMapper.insert(entity) > 0;
+    }
+
+    @Override
+    public Boolean updateContent(CeReportContentBo bo) {
+        CeReportContent entity = toEntity(bo);
+        entity.setUpdateTime(new Date());
+        entity.setChartNames(null);
+        return reportContentMapper.updateById(entity) > 0;
+    }
+
+    @Override
+    public Boolean deleteContent(Long[] ids) {
+        return reportContentMapper.deleteBatchIds(Arrays.asList(ids)) > 0;
     }
 
     @Override
@@ -53,26 +82,49 @@ public class CeReportContentServiceImpl implements ICeReportContentService {
         validateVendorResponse(license, vendorResponse);
 
         Date syncedTime = new Date();
-        reportContentMapper.delete(Wrappers.lambdaQuery(CeReportContent.class));
+        Set<String> existingKeys = new HashSet<>();
+        reportContentMapper.selectList(Wrappers.lambdaQuery(CeReportContent.class))
+            .forEach(content -> existingKeys.add(contentKey(content.getDirectoryNo(), content.getSubdirectoryNo())));
+        int inserted = 0;
         for (CeVendorReportContentRecord record : vendorResponse.getContents()) {
+            if (!existingKeys.add(contentKey(record.getDirectoryNo(), record.getSubdirectoryNo()))) {
+                continue;
+            }
             CeReportContent entity = new CeReportContent();
             entity.setDirectoryNo(record.getDirectoryNo());
             entity.setDirectoryName(record.getDirectoryName());
             entity.setSubdirectoryNo(record.getSubdirectoryNo());
             entity.setSubdirectoryName(record.getSubdirectoryName());
-            entity.setChartNames(record.getChartNames());
+            entity.setChartNames(null);
             entity.setDisplayOrder(record.getDisplayOrder());
             entity.setCreateTime(syncedTime);
             entity.setUpdateTime(syncedTime);
             entity.setRemark(record.getRemark());
             reportContentMapper.insert(entity);
+            inserted++;
         }
 
         CeReportContentSyncResponse response = new CeReportContentSyncResponse();
         response.setLicenseId(license.getLicenseId());
-        response.setContentCount(vendorResponse.getContents().size());
+        response.setContentCount(inserted);
         response.setSyncedTime(syncedTime);
         return response;
+    }
+
+    private CeReportContent toEntity(CeReportContentBo bo) {
+        CeReportContent entity = new CeReportContent();
+        entity.setId(bo.getId());
+        entity.setDirectoryNo(bo.getDirectoryNo());
+        entity.setDirectoryName(bo.getDirectoryName());
+        entity.setSubdirectoryNo(bo.getSubdirectoryNo());
+        entity.setSubdirectoryName(bo.getSubdirectoryName());
+        entity.setDisplayOrder(bo.getDisplayOrder() == null ? 0 : bo.getDisplayOrder());
+        entity.setRemark(bo.getRemark());
+        return entity;
+    }
+
+    private String contentKey(Integer directoryNo, Integer subdirectoryNo) {
+        return String.valueOf(directoryNo) + "|" + String.valueOf(subdirectoryNo);
     }
 
     private CeLicenseState requireCurrentLicense() {

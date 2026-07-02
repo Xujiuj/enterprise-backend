@@ -39,22 +39,12 @@ class CeEmissionActivityValidationTest {
         List<CeEmissionActivityFieldDescriptor> fields = service.listEntryFields();
 
         assertEquals(List.of(
-            "companyName:公司名称:false:true:false",
-            "factoryName:工厂:false:true:false",
-            "scopeName:范围:false:true:false",
-            "scopeSubcategory:范围子类别:false:true:false",
-            "sourceIdentificationName:排放源识别:false:true:false",
-            "emissionSourceName:排放源名称:false:true:false",
-            "activityPeriod:活动期间:false:true:false",
-            "activityDate:日期:false:true:false",
-            "activityValue:活动数据:false:true:false",
-            "responsibleDept:负责部门:false:true:false",
-            "dataSource:数据来源:false:true:false"
-        ), fields.stream()
-            .map(field -> field.getFieldCode() + ":" + field.getFieldName() + ":"
-                + field.isSourceRequired() + ":" + field.isRowValueRequired() + ":" + field.isDerivedField())
-            .toList());
-        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+            "sourceIdentificationCode", "companyCode", "companyName", "factoryName", "sourceCategoryKey",
+            "scopeName", "scopeSubcategory", "sourceIdentificationName", "emissionSourceName", "activityUnit",
+            "activityYear", "activityMonth", "activityDate", "activityValue", "responsibleDept", "dataSource",
+            "sourceRemark", "factorKey"
+        ), fields.stream().map(CeEmissionActivityFieldDescriptor::getFieldCode).toList());
+        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18),
             fields.stream().map(CeEmissionActivityFieldDescriptor::getFieldOrder).toList());
     }
 
@@ -112,7 +102,8 @@ class CeEmissionActivityValidationTest {
 
         CeEmissionActivityValidationResult result = service.validate(request(values -> {
             values.put("sourceIdentificationCode", "");
-            values.put("activityPeriod", "2026-13");
+            values.put("activityYear", "bad-year");
+            values.put("activityMonth", "13");
             values.put("activityDate", "bad-date");
             values.put("activityValue", "0");
             values.put("responsibleDept", "");
@@ -123,10 +114,10 @@ class CeEmissionActivityValidationTest {
         assertFalse(result.isDraftSavable());
         assertEquals(List.of(
             "REQUIRED_FIELD_MISSING:responsibleDept:负责部门",
-            "INVALID_TYPE:activityPeriod:活动期间",
+            "INVALID_TYPE:activityYear:年度",
+            "INVALID_VALUE_DOMAIN:activityMonth:月份",
             "INVALID_TYPE:activityDate:日期",
-            "INVALID_VALUE_DOMAIN:activityValue:活动数据",
-            "DERIVED_FIELD_SERVER_FILLED:sourceIdentificationCode:排放源识别编号"
+            "INVALID_VALUE_DOMAIN:activityValue:活动数据"
         ), issueSummaries(result));
     }
 
@@ -154,7 +145,7 @@ class CeEmissionActivityValidationTest {
     }
 
     @Test
-    void weakWarningsDoNotBlockDraftSaveAndIdentifyServerFilledDerivedColumns() {
+    void blankOptionalSourceCodesDoNotProduceWarnings() {
         CeEmissionActivityValidationServiceImpl service = new CeEmissionActivityValidationServiceImpl(fakeResolver());
 
         CeEmissionActivityValidationResult result = service.validate(request(values -> {
@@ -164,9 +155,9 @@ class CeEmissionActivityValidationTest {
         assertTrue(result.isValid());
         assertFalse(result.isBlocking());
         assertTrue(result.isDraftSavable());
-        assertEquals(DERIVED_CODES, issueColumns(result, "DERIVED_FIELD_SERVER_FILLED"));
+        assertTrue(issueColumns(result, "DERIVED_FIELD_SERVER_FILLED").isEmpty());
         assertEquals(expectedDerivedValues(), resolvedValueMap(result));
-        assertTrue(result.getIssues().stream().allMatch(issue -> "WARNING".equals(issue.getSeverity())));
+        assertTrue(result.getIssues().isEmpty());
     }
 
     @Test
@@ -195,7 +186,7 @@ class CeEmissionActivityValidationTest {
 
         assertFalse(result.isValid());
         assertTrue(result.isBlocking());
-        assertEquals(List.of("MASTER_DATA_NOT_FOUND:sourceIdentificationCode:排放源识别编号"), issueSummaries(result));
+        assertEquals(List.of("MASTER_DATA_NOT_FOUND:sourceIdentificationCode:PK_排放源识别编号"), issueSummaries(result));
         assertFalse(resolvedValueMap(result).containsKey("companyCode"));
         assertEquals("2026", resolvedValueMap(result).get("activityYear"));
     }
@@ -259,7 +250,6 @@ class CeEmissionActivityValidationTest {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("sourceIdentificationCode", "SRC-001");
         values.putAll(expectedDerivedValues());
-        values.put("activityPeriod", "2026-06");
         values.put("activityDate", "2026-06-05");
         values.put("activityValue", "12.5");
         values.put("responsibleDept", "生产部");

@@ -112,7 +112,7 @@ public class CeDimensionProjectionSqlProvider {
             case "emission-source-category" -> """
                 select id,
                        'emission-source-category' as dimension_code,
-                       business_key as record_code,
+                       category_sk as record_code,
                        coalesce(unified_standard_category, ghg_scope_category, iso_category, gb_scope_category, business_key) as record_name,
                        parent_code as parent_code,
                        category_sk as category_sk,
@@ -146,8 +146,8 @@ public class CeDimensionProjectionSqlProvider {
             case "base-year" -> """
                 select id,
                        'base-year' as dimension_code,
-                       factory_code as record_code,
-                       coalesce(factory_name, factory_code) as record_name,
+                       base_year_key as record_code,
+                       cast(base_year as char) as record_name,
                        null as parent_code,
                        base_year_key as base_year_key,
                        description as description,
@@ -160,7 +160,7 @@ public class CeDimensionProjectionSqlProvider {
                        update_time,
                        remark
                   from ce_base_year
-                 order by coalesce(sort_order, id), factory_code, base_year
+                 order by coalesce(sort_order, id), base_year_key, base_year
                 """;
             case "ef-factor" -> """
                 select id,
@@ -413,10 +413,14 @@ public class CeDimensionProjectionSqlProvider {
               </when>
               <when test="record.dimensionCode == 'base-year'">
                 insert into ce_base_year (
-                  factory_code, factory_name, base_year, enabled_flag, remark
+                  base_year_key, base_year, description, is_current, enabled_flag, status, sort_order, remark
                 ) values (
-                  #{record.recordCode}, #{record.recordName}, #{record.baseYear},
+                  #{record.recordCode}, try_convert(int, nullif(#{record.recordName,jdbcType=VARCHAR}, '')),
+                  #{record.description},
+                  case when #{record.currentBaseFlag} = 'Y' or #{record.isCurrent} = '1' then 1 else 0 end,
                   case when #{record.status} = '1' or #{record.currentBaseFlag} = 'N' then 0 else 1 end,
+                  coalesce(#{record.status}, '0'),
+                  try_convert(int, nullif(#{record.sortOrder,jdbcType=VARCHAR}, '')),
                   #{record.remark}
                 )
               </when>
@@ -535,10 +539,13 @@ public class CeDimensionProjectionSqlProvider {
               </when>
               <when test="record.dimensionCode == 'base-year'">
                 update ce_base_year
-                   set factory_code = #{record.recordCode},
-                       factory_name = #{record.recordName},
-                       base_year = #{record.baseYear},
+                   set base_year_key = #{record.recordCode},
+                       base_year = try_convert(int, nullif(#{record.recordName,jdbcType=VARCHAR}, '')),
+                       description = #{record.description},
+                       is_current = case when #{record.currentBaseFlag} = 'Y' or #{record.isCurrent} = '1' then 1 else 0 end,
                        enabled_flag = case when #{record.status} = '1' or #{record.currentBaseFlag} = 'N' then 0 else 1 end,
+                       status = coalesce(#{record.status}, '0'),
+                       sort_order = try_convert(int, nullif(#{record.sortOrder,jdbcType=VARCHAR}, '')),
                        update_time = SYSDATETIME(),
                        remark = #{record.remark}
                  where id = #{record.id}

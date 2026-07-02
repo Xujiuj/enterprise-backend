@@ -36,7 +36,7 @@ public class HttpCeVendorFactorOpenClient implements CeVendorFactorOpenClient {
             CeVendorOpenApiRequestSupport.bearerEntity(licenseId),
             new ParameterizedTypeReference<R<CeVendorFactorSyncResponse>>() {
             },
-            "厂商因子同步"
+            "匹配因子库"
         );
     }
 }

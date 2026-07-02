@@ -11,6 +11,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.dromara.carbon.enterprise.sourcea.domain.CeSourceAImportResult;
 import org.dromara.carbon.enterprise.shared.config.CeGbIndustryClassification;
 import org.dromara.carbon.enterprise.shared.config.CeGbIndustryClassification.IndustryRecord;
+import org.dromara.carbon.enterprise.shared.service.ICeCompanyFactoryDeptSyncService;
 import org.dromara.carbon.enterprise.shared.service.ICeSourceAImportService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
@@ -77,6 +78,7 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
     };
 
     private final JdbcTemplate jdbcTemplate;
+    private final ICeCompanyFactoryDeptSyncService companyFactoryDeptSyncService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -162,9 +164,18 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
 
         clearSourceAData(data);
         writeAll(data, result);
+        syncCompanyFactoriesToSysDept(result);
         validateDatabaseRelationships(result);
         result.setImported(result.getErrors().isEmpty());
         return result;
+    }
+
+    private void syncCompanyFactoriesToSysDept(CeSourceAImportResult result) {
+        try {
+            companyFactoryDeptSyncService.syncCompanyFactoriesToSysDept();
+        } catch (Exception e) {
+            result.issue("warning", "dept.factory-sync", "Factory department sync skipped", 1);
+        }
     }
 
     private void readWorkbook(String fileName, InputStream inputStream, SourceAData data) {
@@ -321,10 +332,10 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
             row -> text(row.get("工厂编号")) + "|" + text(row.get("年份")) + "|" + text(row.get("月份")) + "|" + text(row.get("分母度量名称")));
 
         countOrphans(result, "company.province", data.companyRows, row -> text(row.get("省份编码")), adminCodes);
-        countOrphans(result, "emission-source.company", data.emissionRows, this::companyCode, factoryCodes);
+        countOrphans(result, "emission-source.company", data.emissionRows, this::factoryCode, factoryCodes);
         countOrphans(result, "emission-source.category", data.emissionRows, this::sourceCategoryKey, categoryKeys);
         countOrphans(result, "activity.source", data.activityRows, this::sourceCode, sourceCodes);
-        countOrphans(result, "activity.company", data.activityRows, row -> text(value(row, "公司编号", "FK_公司编号", "工厂编号", "FK_工厂编号")), factoryCodes);
+        countOrphans(result, "activity.company", data.activityRows, this::factoryCode, factoryCodes);
         countOrphans(result, "activity.category", data.activityRows, this::sourceCategoryKey, categoryKeys);
         countOrphans(result, "green-power.factory", data.greenPowerRows, row -> text(row.get("FK_工厂编号")), factoryCodes);
         countOrphans(result, "green-power.category", data.greenPowerRows, row -> text(row.get("排放源分类")), categoryKeys);
@@ -486,14 +497,17 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
 
     private void insertEmissionRows(SourceAData data, CeSourceAImportResult result) {
         Map<String, String> factorUnits = factorUnits(data);
+        Map<String, Map<String, Object>> factoryByCode = factoryByCode(data);
         insertRows(result, "ce_emission_source", List.of("company_code", "company_name", "factory_code", "factory_name", "source_category_key",
                 "scope_name", "scope_subcategory", "source_identification_code", "source_identification_name", "emission_source_name",
-                "responsible_dept", "data_source", "factor_key", "source_unit", "enabled_flag", "remark"),
+                "responsible_dept", "data_frequency", "responsible_user_id", "responsible_user_name", "data_source", "factor_key", "source_unit", "enabled_flag", "remark"),
             mapRows(data.emissionRows, row -> {
                 String factorKey = factorKey(row);
-                return values(companyCode(row), value(row, "公司名称", "公司"), companyCode(row), row.get("工厂"), sourceCategoryKey(row),
+                String factoryCode = factoryCode(row);
+                Map<String, Object> factory = factoryByCode.getOrDefault(factoryCode, Map.of());
+                return values(companyCode(row, factory), first(value(row, "公司名称", "公司"), factory.get("公司")), factoryCode, first(row.get("工厂"), factory.get("工厂")), sourceCategoryKey(row),
                     row.get("范围"), row.get("范围子类别"), sourceCode(row), row.get("排放源识别"), row.get("排放源"),
-                    row.get("负责部门"), row.get("数据来源"), factorKey, factorUnits.get(factorKey), 1, MARK);
+                    row.get("负责部门"), "monthly", null, null, row.get("数据来源"), factorKey, factorUnits.get(factorKey), 1, MARK);
             }));
     }
 
@@ -501,6 +515,7 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         Map<String, Map<String, Object>> sourceByCode = sourceByCode(data);
         Map<String, Long> sourceIdsByCode = currentEmissionSourceIds();
         Map<String, String> factorUnits = factorUnits(data);
+        Map<String, Map<String, Object>> factoryByCode = factoryByCode(data);
         insertRows(result, "ce_activity_data", List.of("emission_source_id", "activity_period", "source_sheet_code", "source_identification_code", "company_code", "company_name",
                 "factory_code", "factory_name", "source_category_key", "scope_name", "scope_subcategory", "source_identification_name", "emission_source_name",
                 "activity_unit", "activity_year", "activity_month", "activity_date", "activity_value", "responsible_dept", "data_source",
@@ -510,10 +525,12 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
                 Map<String, Object> source = sourceByCode.getOrDefault(sourceCode, Map.of());
                 Integer year = integer(row.get("年度"));
                 Integer month = integer(row.get("月份"));
-                String companyCode = text(first(value(row, "公司编号", "FK_公司编号", "工厂编号", "FK_工厂编号"), companyCode(source)));
+                String factoryCode = text(first(factoryCode(row), factoryCode(source)));
+                Map<String, Object> factory = factoryByCode.getOrDefault(factoryCode, Map.of());
+                String companyCode = companyCode(row, factory);
                 String rowFactorKey = activityFactorKey(row, sourceByCode, keySet(data.efFactorRows, factor -> text(factor.get("SK_排放因子"))));
-                return values(sourceIdsByCode.get(sourceKey(companyCode, sourceCode)), activityPeriod(year, month), "source-a-activity", sourceCode, companyCode,
-                    first(value(row, "公司名称", "公司"), value(source, "公司名称", "公司")), companyCode, first(row.get("工厂"), source.get("工厂")),
+                return values(sourceIdsByCode.get(sourceKey(factoryCode, sourceCode)), activityPeriod(year, month), "source-a-activity", sourceCode, companyCode,
+                    first(value(row, "公司名称", "公司"), first(value(source, "公司名称", "公司"), factory.get("公司"))), factoryCode, first(row.get("工厂"), first(source.get("工厂"), factory.get("工厂"))),
                     first(sourceCategoryKey(row), sourceCategoryKey(source)), first(row.get("范围"), source.get("范围")),
                     first(row.get("范围子类别"), source.get("范围子类别")), first(row.get("排放源识别"), source.get("排放源识别")),
                     first(row.get("排放源"), source.get("排放源")), first(row.get("单位"), factorUnits.get(rowFactorKey)), year, month, sqlDate(first(row.get("日期"), firstDay(year, month))),
@@ -524,13 +541,13 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
 
     private Map<String, Long> currentEmissionSourceIds() {
         return jdbcTemplate.query(
-            "SELECT company_code, source_identification_code, id FROM ce_emission_source WHERE company_code IS NOT NULL AND source_identification_code IS NOT NULL",
-            (rs, rowNum) -> Map.entry(sourceKey(rs.getString("company_code"), rs.getString("source_identification_code")), rs.getLong("id"))
+            "SELECT factory_code, source_identification_code, id FROM ce_emission_source WHERE factory_code IS NOT NULL AND source_identification_code IS NOT NULL",
+            (rs, rowNum) -> Map.entry(sourceKey(rs.getString("factory_code"), rs.getString("source_identification_code")), rs.getLong("id"))
         ).stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (left, right) -> left, LinkedHashMap::new));
     }
 
-    private String sourceKey(String companyCode, String sourceCode) {
-        return text(companyCode) + "|" + text(sourceCode);
+    private String sourceKey(String factoryCode, String sourceCode) {
+        return text(factoryCode) + "|" + text(sourceCode);
     }
 
     private String activityPeriod(Integer year, Integer month) {
@@ -585,13 +602,13 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         checkSqlCount(result, "db.company.province",
             "SELECT COUNT(*) FROM ce_company_factory cf LEFT JOIN ce_admin_division ad ON ad.division_code = cf.province_code WHERE cf.remark = ? AND cf.province_code IS NOT NULL AND ad.id IS NULL");
         checkSqlCount(result, "db.emission-source.company",
-            "SELECT COUNT(*) FROM ce_emission_source es LEFT JOIN ce_company_factory cf ON cf.factory_code = es.company_code WHERE es.remark = ? AND cf.id IS NULL");
+            "SELECT COUNT(*) FROM ce_emission_source es LEFT JOIN ce_company_factory cf ON cf.factory_code = es.factory_code AND cf.company_code = es.company_code WHERE es.remark = ? AND cf.id IS NULL");
         checkSqlCount(result, "db.emission-source.category",
             "SELECT COUNT(*) FROM ce_emission_source es LEFT JOIN ce_emission_source_category cat ON cat.category_sk = es.source_category_key WHERE es.remark = ? AND cat.id IS NULL");
         checkSqlCount(result, "db.activity.source",
-            "SELECT COUNT(*) FROM ce_activity_data ad LEFT JOIN ce_emission_source es ON es.source_identification_code = ad.source_identification_code WHERE ad.remark = ? AND es.id IS NULL");
+            "SELECT COUNT(*) FROM ce_activity_data ad LEFT JOIN ce_emission_source es ON es.source_identification_code = ad.source_identification_code AND es.factory_code = ad.factory_code WHERE ad.remark = ? AND es.id IS NULL");
         checkSqlCount(result, "db.activity.company",
-            "SELECT COUNT(*) FROM ce_activity_data ad LEFT JOIN ce_company_factory cf ON cf.factory_code = ad.company_code WHERE ad.remark = ? AND cf.id IS NULL");
+            "SELECT COUNT(*) FROM ce_activity_data ad LEFT JOIN ce_company_factory cf ON cf.factory_code = ad.factory_code AND cf.company_code = ad.company_code WHERE ad.remark = ? AND cf.id IS NULL");
         checkSqlCount(result, "db.green-power.factory",
             "SELECT COUNT(*) FROM ce_green_power_certificate gp LEFT JOIN ce_company_factory cf ON cf.factory_code = gp.factory_code WHERE gp.remark = ? AND cf.id IS NULL");
         checkSqlCount(result, "db.denominator-fact.factory",
@@ -687,6 +704,12 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
             .collect(Collectors.toMap(this::sourceCode, Function.identity(), (left, right) -> left, LinkedHashMap::new));
     }
 
+    private Map<String, Map<String, Object>> factoryByCode(SourceAData data) {
+        return data.companyRows.stream()
+            .filter(row -> StringUtils.isNotBlank(text(row.get("BK_工厂编号"))))
+            .collect(Collectors.toMap(row -> text(row.get("BK_工厂编号")), Function.identity(), (left, right) -> left, LinkedHashMap::new));
+    }
+
     private String activityFactorKey(Map<String, Object> row, Map<String, Map<String, Object>> sourceByCode, Set<String> factorKeys) {
         String activityFactor = factorKey(row);
         if (isKnownFactorKey(activityFactor, factorKeys)) {
@@ -726,8 +749,12 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         return null;
     }
 
-    private String companyCode(Map<String, Object> row) {
-        return text(value(row, "公司编号", "FK_公司编号", "工厂编号", "FK_工厂编号"));
+    private String companyCode(Map<String, Object> row, Map<String, Object> factory) {
+        return text(first(factory.get("公司编号"), value(row, "公司编号")));
+    }
+
+    private String factoryCode(Map<String, Object> row) {
+        return text(value(row, "FK_公司编号", "工厂编号", "FK_工厂编号", "公司编号"));
     }
 
     private String sourceCategoryKey(Map<String, Object> row) {

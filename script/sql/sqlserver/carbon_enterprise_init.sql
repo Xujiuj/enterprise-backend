@@ -415,46 +415,46 @@ VALUES
     (100, N'用户管理', 1, 1, N'user', N'system/user/index', N'', 1, 0, N'C', N'0', N'0', N'system:user:list', N'user', N'用户管理'),
     (101, N'角色管理', 1, 2, N'role', N'system/role/index', N'', 1, 0, N'C', N'0', N'0', N'system:role:list', N'peoples', N'角色管理'),
     (102, N'菜单管理', 1, 3, N'menu', N'system/menu/index', N'', 1, 0, N'C', N'0', N'0', N'system:menu:list', N'tree-table', N'菜单管理'),
-    (900107, N'扩展字段配置', 1, 4, N'extension-field', N'enterprise/extensionField/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:extensionField:list', N'form', N'扩展字段配置'),
+    (900107, N'扩展字段配置', 1, 5, N'extension-field', N'enterprise/extensionField/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:extensionField:list', N'form', N'扩展字段配置'),
 
-    (900100, N'系统授权', 0, 1, N'system-auth', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'lock', N'系统授权目录'),
-    (900102, N'授权管理', 900100, 1, N'license-import', N'enterprise/licenseImport/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:licenseImport:import', N'lock', N'授权管理'),
+    (900100, N'系统授权', 0, 1, N'system-auth', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'link', N'系统授权目录'),
+    (900102, N'授权管理', 900100, 1, N'license-import', N'enterprise/licenseImport/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:licenseImport:import', N'link', N'授权管理'),
     (900103, N'授权导入接口', 900100, 2, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:licenseImport:import', N'#', N'授权导入接口权限'),
     (900104, N'授权状态查询', 900100, 3, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:licenseState:query', N'#', N'授权状态查询权限'),
     (900105, N'授权状态列表', 900100, 4, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:licenseState:list', N'#', N'授权状态列表权限'),
     (900106, N'工作台总览', 900100, 5, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:workbench:overview', N'#', N'工作台总览接口权限'),
 
-    (900110, N'1 配置排放源', 0, 2, N'emission-source-config', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'tree', N'配置排放源目录'),
-    (900111, N'101 行政区划', 900110, 1, N'admin-division', N'enterprise/dimension/index', N'{"code":"admin-division"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'tree', N'行政区划'),
-    (900112, N'102 公司表', 900110, 2, N'company', N'enterprise/dimension/index', N'{"code":"company"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'company', N'公司表'),
-    (900113, N'103 排放源分类', 900110, 3, N'emission-source-category', N'enterprise/dimension/index', N'{"code":"emission-source-category"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'tree', N'排放源分类'),
+    (900110, N'1 配置排放源', 0, 2, N'emission-source-config', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'list', N'配置排放源目录'),
+    (900111, N'101 行政区划', 900110, 1, N'admin-division', N'enterprise/dimension/index', N'{"code":"admin-division"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'link', N'行政区划'),
+    (900112, N'102 公司表', 900110, 2, N'company', N'enterprise/dimension/index', N'{"code":"company"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'form', N'公司表'),
+    (900113, N'103 排放源分类', 900110, 3, N'emission-source-category', N'enterprise/dimension/index', N'{"code":"emission-source-category"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'link', N'排放源分类'),
     (900114, N'104 排放源识别', 900110, 4, N'emission-source', N'enterprise/emissionSource/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:emissionSource:list', N'form', N'排放源识别'),
-    (900115, N'106 基准年维度表', 900110, 5, N'base-year', N'enterprise/dimension/index', N'{"code":"base-year"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'date-range', N'基准年维度表'),
+    (900115, N'106 基准年维度表', 900110, 5, N'base-year', N'enterprise/dimension/index', N'{"code":"base-year"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'link', N'基准年维度表'),
 
-    (900120, N'2 确认排放因子', 0, 3, N'factor-confirm', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'validCode', N'确认排放因子目录'),
-    (900121, N'201 EF排放因子维度表', 900120, 1, N'ef-factor', N'enterprise/dimension/index', N'{"code":"ef-factor"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'search', N'EF排放因子维度表'),
-    (900122, N'202 EF电力因子维度表', 900120, 2, N'ef-electricity-factor', N'enterprise/dimension/index', N'{"code":"ef-electricity-factor"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'search', N'EF电力因子维度表'),
-    (900123, N'203 EF电力因子版本对应', 900120, 3, N'ef-electricity-version', N'enterprise/dimension/index', N'{"code":"ef-electricity-version"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'validCode', N'EF电力因子版本对应'),
-    (900124, N'205 EF电力因子口径维度', 900120, 4, N'ef-electricity-scope', N'enterprise/dimension/index', N'{"code":"ef-electricity-scope"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'validCode', N'EF电力因子口径维度'),
-    (900125, N'206 温室气体维度', 900120, 5, N'greenhouse-gas', N'enterprise/dimension/index', N'{"code":"greenhouse-gas"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'search', N'温室气体维度'),
+    (900120, N'2 确认排放因子', 0, 3, N'factor-confirm', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'list', N'确认排放因子目录'),
+    (900121, N'201 EF排放因子维度表', 900120, 1, N'ef-factor', N'enterprise/dimension/index', N'{"code":"ef-factor"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'form', N'EF排放因子维度表'),
+    (900122, N'202 EF电力因子维度表', 900120, 2, N'ef-electricity-factor', N'enterprise/dimension/index', N'{"code":"ef-electricity-factor"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'link', N'EF电力因子维度表'),
+    (900123, N'203 EF电力因子版本对应', 900120, 3, N'ef-electricity-version', N'enterprise/dimension/index', N'{"code":"ef-electricity-version"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'link', N'EF电力因子版本对应'),
+    (900124, N'205 EF电力因子口径维度', 900120, 4, N'ef-electricity-scope', N'enterprise/dimension/index', N'{"code":"ef-electricity-scope"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'link', N'EF电力因子口径维度'),
+    (900125, N'206 温室气体维度', 900120, 5, N'greenhouse-gas', N'enterprise/dimension/index', N'{"code":"greenhouse-gas"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'link', N'温室气体维度'),
 
-    (900130, N'3 活动数据', 0, 4, N'activity-data', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'form', N'活动数据目录'),
+    (900130, N'3 活动数据', 0, 4, N'activity-data', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'list', N'活动数据目录'),
     (900131, N'排放活动数据', 900130, 1, N'emission-activity-data', N'enterprise/activityData/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:activityData:list', N'form', N'排放活动数据'),
 
-    (900140, N'4 绿电绿证', 0, 5, N'green-electricity', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'international', N'绿电绿证目录'),
+    (900140, N'4 绿电绿证', 0, 5, N'green-electricity', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'list', N'绿电绿证目录'),
     (900141, N'401 绿电绿证数据', 900140, 1, N'green-electricity-data', N'enterprise/greenPowerCertificate/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:greenPowerCertificate:list', N'international', N'绿电绿证数据'),
 
-    (900150, N'5 强度管理', 0, 6, N'intensity', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'chart', N'强度管理目录'),
+    (900150, N'5 强度管理', 0, 6, N'intensity', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'list', N'强度管理目录'),
     (900151, N'501 碳排放强度分母维度表', 900150, 1, N'intensity-denominator', N'enterprise/dimension/index', N'{"code":"intensity-denominator"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'form', N'碳排放强度分母维度表'),
-    (900152, N'502 强度目标表', 900150, 2, N'intensity-target', N'enterprise/dimension/index', N'{"code":"intensity-target"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'chart', N'强度目标表'),
+    (900152, N'502 强度目标表', 900150, 2, N'intensity-target', N'enterprise/dimension/index', N'{"code":"intensity-target"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'form', N'强度目标表'),
     (900153, N'503 分母事实表', 900150, 3, N'denominator-fact', N'enterprise/dimension/index', N'{"code":"denominator-fact"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'form', N'分母事实表'),
-    (900154, N'504 碳排放强度容忍率参数表', 900150, 4, N'intensity-tolerance', N'enterprise/dimension/index', N'{"code":"intensity-tolerance"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'chart', N'碳排放强度容忍率参数表'),
+    (900154, N'504 碳排放强度容忍率参数表', 900150, 4, N'intensity-tolerance', N'enterprise/dimension/index', N'{"code":"intensity-tolerance"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'form', N'碳排放强度容忍率参数表'),
 
     (900160, N'报表管理', 0, 7, N'report-management', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'chart', N'报表管理目录'),
-    (900161, N'Content', 900160, 1, N'content', N'enterprise/reports/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'chart', N'Content'),
+    (900161, N'Content', 900160, 1, N'content', N'enterprise/reports/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'link', N'Content'),
     (900164, N'温室气体核算报表', 900160, 2, N'powerbi-report', N'enterprise/reports/powerbi', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'chart', N'Power BI温室气体核算报表'),
     (900162, N'数据验证', 900160, 3, N'data-validation', N'enterprise/dataValidation/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:dataValidation:view', N'validCode', N'数据验证'),
-    (900163, N'报表模板下载', 900160, 4, N'report-template-download', N'enterprise/reportTemplateFile/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reportTemplateFile:list', N'download', N'报表模板下载'),
+    (900163, N'报表模板下载', 900160, 4, N'report-template-download', N'enterprise/reportTemplateFile/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reportTemplateFile:list', N'link', N'报表模板下载'),
 
     (900230, N'日志', 0, 9, N'log', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'log', N'日志目录'),
     (900231, N'操作日志', 900230, 1, N'operlog', N'monitor/operlog/index', N'', 1, 0, N'C', N'0', N'0', N'monitor:operlog:list', N'form', N'操作日志'),
@@ -509,7 +509,7 @@ VALUES
     (900202, N'因子确认新增', 900120, 8, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:factorConfirmation:add', N'#', N'因子确认新增权限'),
     (900203, N'因子确认修改', 900120, 9, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:factorConfirmation:edit', N'#', N'因子确认修改权限'),
     (900204, N'因子确认删除', 900120, 10, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:factorConfirmation:remove', N'#', N'因子确认删除权限'),
-    (900205, N'厂商因子同步', 900120, 11, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:factorSync:run', N'#', N'厂商因子同步权限'),
+    (900205, N'匹配因子库', 900120, 11, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:factorSync:run', N'#', N'匹配因子库权限'),
     (900206, N'因子缓存列表查询', 900120, 12, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:factorCacheRecord:list', N'#', N'因子缓存列表查询权限'),
     (900207, N'因子缓存详情查询', 900120, 13, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:factorCacheRecord:query', N'#', N'因子缓存详情查询权限'),
     (900208, N'因子缓存版本查询', 900120, 14, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:factorCacheVersion:list', N'#', N'因子缓存版本查询权限'),
@@ -681,6 +681,11 @@ SELECT 900002, menu_id
     900268, 900269, 900270, 900271,
     900230, 900231, 900232
  );
+
+INSERT INTO @roleMenu (role_id, menu_id)
+VALUES
+    (900001, 103), (900001, 1051), (900001, 1052), (900001, 1053), (900001, 1054),
+    (900002, 103), (900002, 1051), (900002, 1052), (900002, 1053), (900002, 1054);
 
 INSERT INTO @roleMenu (role_id, menu_id)
 SELECT 900003, menu_id

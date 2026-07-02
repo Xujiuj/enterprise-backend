@@ -96,7 +96,7 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
         lqw.eq(ObjectUtil.isNotNull(bo.getDeptId()), SysDept::getDeptId, bo.getDeptId());
         lqw.eq(ObjectUtil.isNotNull(bo.getParentId()), SysDept::getParentId, bo.getParentId());
         lqw.like(StringUtils.isNotBlank(bo.getDeptName()), SysDept::getDeptName, bo.getDeptName());
-        lqw.like(StringUtils.isNotBlank(bo.getDeptCategory()), SysDept::getDeptCategory, bo.getDeptCategory());
+        lqw.eq(StringUtils.isNotBlank(bo.getDeptCategory()), SysDept::getDeptCategory, bo.getDeptCategory());
         lqw.eq(StringUtils.isNotBlank(bo.getStatus()), SysDept::getStatus, bo.getStatus());
         lqw.between(params.get("beginTime") != null && params.get("endTime") != null,
             SysDept::getCreateTime, params.get("beginTime"), params.get("endTime"));
@@ -268,6 +268,7 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
         boolean exist = baseMapper.exists(new LambdaQueryWrapper<SysDept>()
             .eq(SysDept::getDeptName, dept.getDeptName())
             .eq(SysDept::getParentId, dept.getParentId())
+            .eq(StringUtils.isNotBlank(dept.getDeptCategory()), SysDept::getDeptCategory, dept.getDeptCategory())
             .ne(ObjectUtil.isNotNull(dept.getDeptId()), SysDept::getDeptId, dept.getDeptId()));
         return !exist;
     }
@@ -305,6 +306,7 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
             throw new ServiceException("部门停用，不允许新增");
         }
         SysDept dept = MapstructUtils.convert(bo, SysDept.class);
+        validateSameCompanyParent(dept, info);
         dept.setAncestors(info.getAncestors() + StringUtils.SEPARATOR + dept.getParentId());
         return baseMapper.insert(dept);
     }
@@ -327,10 +329,12 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
         if (ObjectUtil.isNull(oldDept)) {
             throw new ServiceException("部门不存在，无法修改");
         }
+        SysDept parentDept = baseMapper.selectById(dept.getParentId());
+        validateSameCompanyParent(dept, parentDept);
         if (!oldDept.getParentId().equals(dept.getParentId())) {
             // 如果是新父部门 则校验是否具有新父部门权限 避免越权
             this.checkDeptDataScope(dept.getParentId());
-            SysDept newParentDept = baseMapper.selectById(dept.getParentId());
+            SysDept newParentDept = parentDept;
             if (ObjectUtil.isNotNull(newParentDept)) {
                 String newAncestors = newParentDept.getAncestors() + StringUtils.SEPARATOR + newParentDept.getDeptId();
                 String oldAncestors = oldDept.getAncestors();
@@ -349,6 +353,17 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
             updateParentDeptStatusNormal(dept);
         }
         return result;
+    }
+
+    private void validateSameCompanyParent(SysDept dept, SysDept parentDept) {
+        if (ObjectUtil.isNull(parentDept)) {
+            return;
+        }
+        if (StringUtils.isNotBlank(parentDept.getDeptCategory())
+            && StringUtils.isNotBlank(dept.getDeptCategory())
+            && !StringUtils.equals(parentDept.getDeptCategory(), dept.getDeptCategory())) {
+            throw new ServiceException("上级部门必须属于同一部门类别");
+        }
     }
 
     /**

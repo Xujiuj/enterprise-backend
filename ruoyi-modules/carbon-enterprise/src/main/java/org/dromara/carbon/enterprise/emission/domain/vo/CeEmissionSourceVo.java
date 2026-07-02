@@ -40,6 +40,12 @@ public class CeEmissionSourceVo implements Serializable {
 
     private String responsibleDept;
 
+    private String dataFrequency;
+
+    private Long responsibleUserId;
+
+    private String responsibleUserName;
+
     private String dataSource;
 
     private String factorKey;

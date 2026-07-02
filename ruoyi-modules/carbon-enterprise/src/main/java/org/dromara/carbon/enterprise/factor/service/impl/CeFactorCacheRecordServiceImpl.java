@@ -84,8 +84,12 @@ public class CeFactorCacheRecordServiceImpl implements ICeFactorCacheRecordServi
             .eq(bo.getCacheVersionId() != null, CeFactorCacheRecord::getCacheVersionId, bo.getCacheVersionId())
             .eq(StringUtils.isNotBlank(bo.getFactorTableCode()), CeFactorCacheRecord::getFactorTableCode, bo.getFactorTableCode())
             .eq(StringUtils.isNotBlank(bo.getFactorCode()), CeFactorCacheRecord::getFactorCode, bo.getFactorCode())
+            .eq(StringUtils.isNotBlank(bo.getFactorKey()), CeFactorCacheRecord::getFactorKey, bo.getFactorKey())
             .like(StringUtils.isNotBlank(bo.getFactorName()), CeFactorCacheRecord::getFactorName, bo.getFactorName())
+            .like(StringUtils.isNotBlank(bo.getEmissionSourceName()), CeFactorCacheRecord::getEmissionSourceName, bo.getEmissionSourceName())
             .eq(StringUtils.isNotBlank(bo.getFactorCategory()), CeFactorCacheRecord::getFactorCategory, bo.getFactorCategory())
+            .eq(StringUtils.isNotBlank(bo.getFactorVersion()), CeFactorCacheRecord::getFactorVersion, bo.getFactorVersion())
+            .like(StringUtils.isNotBlank(bo.getDivisionName()), CeFactorCacheRecord::getDivisionName, bo.getDivisionName())
             .eq(bo.getEnabledFlag() != null, CeFactorCacheRecord::getEnabledFlag, bo.getEnabledFlag());
     }
 

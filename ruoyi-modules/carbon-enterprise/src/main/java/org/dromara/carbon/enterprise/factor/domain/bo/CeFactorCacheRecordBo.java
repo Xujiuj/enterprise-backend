@@ -132,7 +132,11 @@ public class CeFactorCacheRecordBo implements Serializable {
 
     private String sourceRef;
 
+    private String customFields;
+
     private Boolean enabledFlag;
 
     private Date syncedTime;
+
+    private String remark;
 }

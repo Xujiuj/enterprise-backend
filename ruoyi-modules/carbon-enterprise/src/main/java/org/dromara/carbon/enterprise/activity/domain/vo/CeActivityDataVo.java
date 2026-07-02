@@ -31,6 +31,8 @@ public class CeActivityDataVo implements Serializable {
 
     private String companyName;
 
+    private String factoryCode;
+
     private String factoryName;
 
     private String sourceCategoryKey;

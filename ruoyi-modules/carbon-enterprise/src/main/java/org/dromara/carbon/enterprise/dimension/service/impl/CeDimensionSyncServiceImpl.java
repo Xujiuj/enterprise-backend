@@ -36,6 +36,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 企业端维度同步服务实现.
@@ -204,16 +205,17 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
     }
 
     private void upsertEmissionSourceCategory(CeVendorDimensionRecord record) {
-        String businessKey = record.getRecordCode();
-        if (StringUtils.isBlank(businessKey)) {
+        String categorySk = StringUtils.isNotBlank(record.getCategorySk()) ? record.getCategorySk() : record.getRecordCode();
+        if (StringUtils.isBlank(categorySk)) {
             return;
         }
+        String businessKey = StringUtils.isNotBlank(record.getBusinessKey()) ? record.getBusinessKey() : categorySk;
         CeEmissionSourceCategory existing = emissionSourceCategoryMapper.selectOne(
             Wrappers.<CeEmissionSourceCategory>lambdaQuery()
-                .eq(CeEmissionSourceCategory::getBusinessKey, businessKey), false);
+                .eq(CeEmissionSourceCategory::getCategorySk, categorySk), false);
         if (existing == null) {
             CeEmissionSourceCategory entity = new CeEmissionSourceCategory();
-            entity.setCategorySk(record.getCategorySk());
+            entity.setCategorySk(categorySk);
             entity.setBusinessKey(businessKey);
             entity.setParentCode(record.getParentCode());
             entity.setCategoryNameEn(record.getCategoryNameEn());
@@ -239,7 +241,8 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             entity.setRemark(record.getRemark());
             emissionSourceCategoryMapper.insert(entity);
         } else {
-            existing.setCategorySk(record.getCategorySk());
+            existing.setCategorySk(categorySk);
+            existing.setBusinessKey(businessKey);
             existing.setParentCode(record.getParentCode());
             existing.setCategoryNameEn(record.getCategoryNameEn());
             existing.setGhgScope(record.getGhgScope());
@@ -267,18 +270,16 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
     }
 
     private void upsertBaseYear(CeVendorDimensionRecord record) {
-        String factoryCode = record.getRecordCode();
-        if (StringUtils.isBlank(factoryCode)) {
+        String baseYearKey = StringUtils.isNotBlank(record.getBaseYearKey()) ? record.getBaseYearKey() : record.getRecordCode();
+        if (StringUtils.isBlank(baseYearKey)) {
             return;
         }
         CeBaseYear existing = baseYearMapper.selectOne(
             Wrappers.<CeBaseYear>lambdaQuery()
-                .eq(CeBaseYear::getFactoryCode, factoryCode), false);
+                .eq(CeBaseYear::getBaseYearKey, baseYearKey), false);
         if (existing == null) {
             CeBaseYear entity = new CeBaseYear();
-            entity.setFactoryCode(factoryCode);
-            entity.setFactoryName(record.getRecordName());
-            entity.setBaseYearKey(record.getBaseYearKey());
+            entity.setBaseYearKey(baseYearKey);
             entity.setDescription(record.getDescription());
             entity.setBaseYear(record.getBaseYear());
             entity.setIsCurrent(record.getIsCurrent());
@@ -288,8 +289,7 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             entity.setRemark(record.getRemark());
             baseYearMapper.insert(entity);
         } else {
-            existing.setFactoryName(record.getRecordName());
-            existing.setBaseYearKey(record.getBaseYearKey());
+            existing.setBaseYearKey(baseYearKey);
             existing.setDescription(record.getDescription());
             existing.setBaseYear(record.getBaseYear());
             existing.setIsCurrent(record.getIsCurrent());
@@ -303,7 +303,9 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
     }
 
     private void upsertElectricityFactor(CeVendorDimensionRecord record) {
-        String versionProvinceCode = record.getRecordCode();
+        String versionProvinceCode = StringUtils.isNotBlank(record.getVersionProvinceCode())
+            ? record.getVersionProvinceCode()
+            : record.getRecordCode();
         if (StringUtils.isBlank(versionProvinceCode)) {
             return;
         }
@@ -349,9 +351,14 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
         if (StringUtils.isBlank(factorVersion)) {
             return;
         }
-        CeElectricityFactorVersionMap existing = electricityFactorVersionMapMapper.selectOne(
+        List<CeElectricityFactorVersionMap> existingRecords = electricityFactorVersionMapMapper.selectList(
             Wrappers.<CeElectricityFactorVersionMap>lambdaQuery()
-                .eq(CeElectricityFactorVersionMap::getFactorVersion, factorVersion), false);
+                .eq(CeElectricityFactorVersionMap::getFactorVersion, factorVersion)
+                .orderByAsc(CeElectricityFactorVersionMap::getId));
+        CeElectricityFactorVersionMap existing = existingRecords.stream()
+            .filter(item -> Objects.equals(item.getEffectiveYear(), record.getEffectiveYear()))
+            .findFirst()
+            .orElse(existingRecords.isEmpty() ? null : existingRecords.get(0));
         if (existing == null) {
             CeElectricityFactorVersionMap entity = new CeElectricityFactorVersionMap();
             entity.setFactorVersion(factorVersion);
@@ -361,6 +368,11 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             entity.setRemark(record.getRemark());
             electricityFactorVersionMapMapper.insert(entity);
         } else {
+            for (CeElectricityFactorVersionMap duplicate : existingRecords) {
+                if (!Objects.equals(duplicate.getId(), existing.getId())) {
+                    electricityFactorVersionMapMapper.deleteById(duplicate.getId());
+                }
+            }
             existing.setEffectiveYear(record.getEffectiveYear());
             existing.setSortOrder(record.getSortOrder());
             existing.setStatus(record.getStatus());
