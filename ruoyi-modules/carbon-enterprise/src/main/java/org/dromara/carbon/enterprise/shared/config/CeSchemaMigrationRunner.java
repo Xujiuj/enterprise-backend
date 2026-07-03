@@ -88,7 +88,7 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
                                 NULLIF(LTRIM(RTRIM(cf_by_company.company_code)), N''),
                                 NULLIF(LTRIM(RTRIM(es.company_code)), N''),
                                 N''
-                            ) AS dept_category,
+                            ) AS company_code,
                             COALESCE(
                                 NULLIF(LTRIM(RTRIM(cf_by_factory.factory_name)), N''),
                                 NULLIF(LTRIM(RTRIM(cf_by_company.factory_name)), N''),
@@ -105,16 +105,24 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
                     source_depts AS (
                         SELECT DISTINCT
                             resolved_source.dept_name,
-                            resolved_source.dept_category,
-                            COALESCE(factory_dept.dept_id, parent_dept.parent_id) AS parent_id,
-                            COALESCE(CONCAT(factory_dept.ancestors, N',', factory_dept.dept_id), parent_dept.ancestors) AS ancestors
+                            resolved_source.company_code AS dept_category,
+                            COALESCE(factory_dept.dept_id, company_dept.dept_id, parent_dept.parent_id) AS parent_id,
+                            COALESCE(
+                                CONCAT(factory_dept.ancestors, N',', factory_dept.dept_id),
+                                CONCAT(company_dept.ancestors, N',', company_dept.dept_id),
+                                parent_dept.ancestors
+                            ) AS ancestors
                         FROM resolved_source
                         CROSS JOIN parent_dept
+                        LEFT JOIN dbo.sys_dept company_dept
+                            ON company_dept.del_flag = N'0'
+                           AND company_dept.parent_id = parent_dept.parent_id
+                           AND ISNULL(company_dept.dept_category, N'') = resolved_source.company_code
                         LEFT JOIN dbo.sys_dept factory_dept
                             ON factory_dept.del_flag = N'0'
                            AND factory_dept.dept_name = resolved_source.factory_dept_name
-                           AND ISNULL(factory_dept.dept_category, N'') = resolved_source.dept_category
-                           AND factory_dept.parent_id = parent_dept.parent_id
+                           AND ISNULL(factory_dept.dept_category, N'') = resolved_source.company_code
+                           AND factory_dept.parent_id = company_dept.dept_id
                         WHERE resolved_source.factory_dept_name IS NULL
                            OR resolved_source.dept_name <> resolved_source.factory_dept_name
                     ),
