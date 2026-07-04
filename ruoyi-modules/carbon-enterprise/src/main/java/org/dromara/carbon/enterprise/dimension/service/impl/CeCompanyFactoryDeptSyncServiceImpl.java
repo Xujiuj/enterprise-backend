@@ -248,6 +248,109 @@ public class CeCompanyFactoryDeptSyncServiceImpl implements ICeCompanyFactoryDep
                 FROM numbered
                 CROSS JOIN id_base
                 CROSS JOIN tenant_value;
+
+                DECLARE @moved_direct_depts TABLE (
+                    dept_id BIGINT PRIMARY KEY,
+                    old_ancestors NVARCHAR(500),
+                    new_ancestors NVARCHAR(500)
+                );
+
+                ;WITH parent_dept AS (
+                    SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.sys_dept WHERE dept_id = 100) THEN 100 ELSE 0 END AS parent_id
+                ),
+                factory_rows AS (
+                    SELECT
+                        NULLIF(LTRIM(RTRIM(company_code)), N'') AS company_code,
+                        COALESCE(
+                            MAX(NULLIF(LTRIM(RTRIM(company_name)), N'')),
+                            NULLIF(LTRIM(RTRIM(company_code)), N'')
+                        ) AS company_dept_name,
+                        COALESCE(NULLIF(LTRIM(RTRIM(factory_name)), N''), NULLIF(LTRIM(RTRIM(factory_code)), N'')) AS dept_name
+                    FROM dbo.ce_company_factory
+                    WHERE NULLIF(LTRIM(RTRIM(company_code)), N'') IS NOT NULL
+                      AND ISNULL(is_active, N'Y') = N'Y'
+                      AND (
+                          NULLIF(LTRIM(RTRIM(factory_name)), N'') IS NOT NULL
+                          OR NULLIF(LTRIM(RTRIM(factory_code)), N'') IS NOT NULL
+                      )
+                    GROUP BY
+                        NULLIF(LTRIM(RTRIM(company_code)), N''),
+                        COALESCE(NULLIF(LTRIM(RTRIM(factory_name)), N''), NULLIF(LTRIM(RTRIM(factory_code)), N''))
+                ),
+                ranked_factories AS (
+                    SELECT
+                        factory_rows.company_code,
+                        factory_rows.company_dept_name,
+                        factory_rows.dept_name,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY factory_rows.company_code
+                            ORDER BY
+                                CASE
+                                    WHEN factory_rows.dept_name = N'集团总部' THEN 0
+                                    WHEN factory_rows.dept_name LIKE N'%总部%' THEN 1
+                                    ELSE 2
+                                END,
+                                factory_rows.dept_name
+                        ) AS rn
+                    FROM factory_rows
+                ),
+                target_factories AS (
+                    SELECT
+                        company_dept.dept_id AS company_dept_id,
+                        factory_dept.dept_id AS target_dept_id,
+                        factory_dept.ancestors AS target_ancestors,
+                        ranked_factories.company_code
+                    FROM ranked_factories
+                    CROSS JOIN parent_dept
+                    JOIN dbo.sys_dept company_dept
+                      ON company_dept.del_flag = N'0'
+                     AND company_dept.parent_id = parent_dept.parent_id
+                     AND company_dept.dept_name = ranked_factories.company_dept_name
+                     AND ISNULL(company_dept.dept_category, N'') = ranked_factories.company_code
+                    JOIN dbo.sys_dept factory_dept
+                      ON factory_dept.del_flag = N'0'
+                     AND factory_dept.parent_id = company_dept.dept_id
+                     AND factory_dept.dept_name = ranked_factories.dept_name
+                     AND ISNULL(factory_dept.dept_category, N'') = ranked_factories.company_code
+                    WHERE ranked_factories.rn = 1
+                )
+                UPDATE d
+                   SET d.parent_id = target_factories.target_dept_id,
+                       d.ancestors = CONCAT(target_factories.target_ancestors, N',', target_factories.target_dept_id),
+                       d.create_dept = target_factories.target_dept_id,
+                       d.update_time = SYSDATETIME()
+                OUTPUT inserted.dept_id, deleted.ancestors, inserted.ancestors
+                  INTO @moved_direct_depts (dept_id, old_ancestors, new_ancestors)
+                  FROM dbo.sys_dept d
+                  JOIN target_factories
+                    ON target_factories.company_dept_id = d.parent_id
+                   AND target_factories.company_code = ISNULL(d.dept_category, N'')
+                 WHERE d.del_flag = N'0'
+                   AND NOT EXISTS (
+                       SELECT 1
+                         FROM factory_rows
+                        WHERE factory_rows.company_code = ISNULL(d.dept_category, N'')
+                          AND factory_rows.dept_name = d.dept_name
+                   );
+
+                UPDATE child
+                   SET child.ancestors = CONCAT(
+                           CONCAT(moved.new_ancestors, N',', moved.dept_id),
+                           SUBSTRING(
+                               child.ancestors,
+                               LEN(CONCAT(moved.old_ancestors, N',', moved.dept_id)) + 1,
+                               LEN(child.ancestors)
+                           )
+                       ),
+                       child.update_time = SYSDATETIME()
+                  FROM dbo.sys_dept child
+                  JOIN @moved_direct_depts moved
+                    ON child.dept_id <> moved.dept_id
+                   AND (
+                       child.ancestors = CONCAT(moved.old_ancestors, N',', moved.dept_id)
+                       OR child.ancestors LIKE CONCAT(moved.old_ancestors, N',', moved.dept_id, N',%')
+                   )
+                 WHERE child.del_flag = N'0';
             END
             """);
     }

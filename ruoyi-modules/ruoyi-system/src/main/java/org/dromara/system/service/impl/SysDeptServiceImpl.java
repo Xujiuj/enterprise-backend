@@ -307,6 +307,7 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
         }
         SysDept dept = MapstructUtils.convert(bo, SysDept.class);
         validateSameCompanyParent(dept, info);
+        validateNotCompanyDirectParent(info);
         dept.setAncestors(info.getAncestors() + StringUtils.SEPARATOR + dept.getParentId());
         return baseMapper.insert(dept);
     }
@@ -332,6 +333,7 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
         SysDept parentDept = baseMapper.selectById(dept.getParentId());
         validateSameCompanyParent(dept, parentDept);
         if (!oldDept.getParentId().equals(dept.getParentId())) {
+            validateNotCompanyDirectParent(parentDept);
             // 如果是新父部门 则校验是否具有新父部门权限 避免越权
             this.checkDeptDataScope(dept.getParentId());
             SysDept newParentDept = parentDept;
@@ -363,6 +365,16 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
             && StringUtils.isNotBlank(dept.getDeptCategory())
             && !StringUtils.equals(parentDept.getDeptCategory(), dept.getDeptCategory())) {
             throw new ServiceException("上级部门必须属于同一部门类别");
+        }
+    }
+
+    private void validateNotCompanyDirectParent(SysDept parentDept) {
+        if (ObjectUtil.isNull(parentDept) || StringUtils.isBlank(parentDept.getDeptCategory())) {
+            return;
+        }
+        SysDept grandParentDept = baseMapper.selectById(parentDept.getParentId());
+        if (ObjectUtil.isNull(grandParentDept) || StringUtils.isBlank(grandParentDept.getDeptCategory())) {
+            throw new ServiceException("部门必须归属于工厂，不能直接挂在公司下");
         }
     }
 
