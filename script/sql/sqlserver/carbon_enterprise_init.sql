@@ -79,7 +79,7 @@ GO
 
 DECLARE @now DATETIME2 = SYSDATETIME();
 DECLARE @tenantId NVARCHAR(20) = N'000000';
-DECLARE @createDept BIGINT = 103;
+DECLARE @createDept BIGINT = 100;
 DECLARE @createBy BIGINT = 1;
 DECLARE @adminPassword NVARCHAR(100) = N'$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2';
 
@@ -123,8 +123,7 @@ IF OBJECT_ID(N'dbo.sys_dept', N'U') IS NOT NULL
 BEGIN
     MERGE dbo.sys_dept AS target
     USING (VALUES
-        (100, @tenantId, 0, N'0', N'企业总部', 0, N'0', N'0', 100),
-        (103, @tenantId, 100, N'0,100', N'碳管理部', 1, N'0', N'0', 100)
+        (100, @tenantId, 0, N'0', N'企业总部', 0, N'0', N'0', 100)
     ) AS source(dept_id, tenant_id, parent_id, ancestors, dept_name, order_num, status, del_flag, create_dept)
     ON target.dept_id = source.dept_id
     WHEN MATCHED THEN

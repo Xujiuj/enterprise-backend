@@ -89,6 +89,15 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
         return buildDeptTreeSelect(depts);
     }
 
+    @Override
+    public List<Tree<Long>> selectEnterpriseDeptTreeList(SysDeptBo bo) {
+        LambdaQueryWrapper<SysDept> lqw = buildQueryWrapper(bo);
+        lqw.isNotNull(SysDept::getDeptCategory);
+        lqw.ne(SysDept::getDeptCategory, StringUtils.EMPTY);
+        List<SysDeptVo> depts = baseMapper.selectDeptList(lqw);
+        return buildDeptTreeSelect(depts);
+    }
+
     private LambdaQueryWrapper<SysDept> buildQueryWrapper(SysDeptBo bo) {
         Map<String, Object> params = bo.getParams();
         LambdaQueryWrapper<SysDept> lqw = Wrappers.lambdaQuery();

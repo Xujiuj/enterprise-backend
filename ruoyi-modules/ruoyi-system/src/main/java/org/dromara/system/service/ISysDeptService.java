@@ -41,6 +41,14 @@ public interface ISysDeptService {
     List<Tree<Long>> selectDeptTreeList(SysDeptBo dept);
 
     /**
+     * 查询企业组织部门树，只包含企业维度同步出的公司、工厂、部门节点。
+     *
+     * @param dept 部门信息
+     * @return 企业组织部门树
+     */
+    List<Tree<Long>> selectEnterpriseDeptTreeList(SysDeptBo dept);
+
+    /**
      * 构建前端所需要下拉树结构
      *
      * @param depts 部门列表
