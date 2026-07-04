@@ -252,7 +252,8 @@ public class CeCompanyFactoryDeptSyncServiceImpl implements ICeCompanyFactoryDep
                 DECLARE @moved_direct_depts TABLE (
                     dept_id BIGINT PRIMARY KEY,
                     old_ancestors NVARCHAR(500),
-                    new_ancestors NVARCHAR(500)
+                    new_ancestors NVARCHAR(500),
+                    source_level NVARCHAR(20)
                 );
 
                 ;WITH parent_dept AS (
@@ -296,6 +297,7 @@ public class CeCompanyFactoryDeptSyncServiceImpl implements ICeCompanyFactoryDep
                 ),
                 target_factories AS (
                     SELECT
+                        parent_dept.parent_id AS root_parent_id,
                         company_dept.dept_id AS company_dept_id,
                         factory_dept.dept_id AS target_dept_id,
                         factory_dept.ancestors AS target_ancestors,
@@ -313,25 +315,52 @@ public class CeCompanyFactoryDeptSyncServiceImpl implements ICeCompanyFactoryDep
                      AND factory_dept.dept_name = ranked_factories.dept_name
                      AND ISNULL(factory_dept.dept_category, N'') = ranked_factories.company_code
                     WHERE ranked_factories.rn = 1
+                ),
+                movable_depts AS (
+                    SELECT
+                        d.dept_id,
+                        target_factories.target_dept_id,
+                        target_factories.target_ancestors,
+                        N'company' AS source_level
+                    FROM dbo.sys_dept d
+                    JOIN target_factories
+                      ON target_factories.company_dept_id = d.parent_id
+                     AND target_factories.company_code = ISNULL(d.dept_category, N'')
+                   WHERE d.del_flag = N'0'
+                     AND NOT EXISTS (
+                         SELECT 1
+                           FROM factory_rows
+                          WHERE factory_rows.company_code = ISNULL(d.dept_category, N'')
+                            AND factory_rows.dept_name = d.dept_name
+                     )
+                    UNION ALL
+                    SELECT
+                        d.dept_id,
+                        target_factories.target_dept_id,
+                        target_factories.target_ancestors,
+                        N'root' AS source_level
+                    FROM dbo.sys_dept d
+                    JOIN target_factories
+                      ON target_factories.root_parent_id = d.parent_id
+                     AND target_factories.company_code = ISNULL(d.dept_category, N'')
+                   WHERE d.del_flag = N'0'
+                     AND d.dept_id <> target_factories.company_dept_id
+                     AND NOT EXISTS (
+                         SELECT 1
+                           FROM factory_rows
+                          WHERE factory_rows.company_code = ISNULL(d.dept_category, N'')
+                            AND factory_rows.dept_name = d.dept_name
+                     )
                 )
                 UPDATE d
-                   SET d.parent_id = target_factories.target_dept_id,
-                       d.ancestors = CONCAT(target_factories.target_ancestors, N',', target_factories.target_dept_id),
-                       d.create_dept = target_factories.target_dept_id,
+                   SET d.parent_id = movable_depts.target_dept_id,
+                       d.ancestors = CONCAT(movable_depts.target_ancestors, N',', movable_depts.target_dept_id),
+                       d.create_dept = movable_depts.target_dept_id,
                        d.update_time = SYSDATETIME()
-                OUTPUT inserted.dept_id, deleted.ancestors, inserted.ancestors
-                  INTO @moved_direct_depts (dept_id, old_ancestors, new_ancestors)
+                OUTPUT inserted.dept_id, deleted.ancestors, inserted.ancestors, movable_depts.source_level
+                  INTO @moved_direct_depts (dept_id, old_ancestors, new_ancestors, source_level)
                   FROM dbo.sys_dept d
-                  JOIN target_factories
-                    ON target_factories.company_dept_id = d.parent_id
-                   AND target_factories.company_code = ISNULL(d.dept_category, N'')
-                 WHERE d.del_flag = N'0'
-                   AND NOT EXISTS (
-                       SELECT 1
-                         FROM factory_rows
-                        WHERE factory_rows.company_code = ISNULL(d.dept_category, N'')
-                          AND factory_rows.dept_name = d.dept_name
-                   );
+                  JOIN movable_depts ON movable_depts.dept_id = d.dept_id;
 
                 UPDATE child
                    SET child.ancestors = CONCAT(
@@ -351,6 +380,32 @@ public class CeCompanyFactoryDeptSyncServiceImpl implements ICeCompanyFactoryDep
                        OR child.ancestors LIKE CONCAT(moved.old_ancestors, N',', moved.dept_id, N',%')
                    )
                  WHERE child.del_flag = N'0';
+
+                ;WITH duplicate_roots AS (
+                    SELECT child.dept_id
+                      FROM dbo.sys_dept child
+                      JOIN @moved_direct_depts moved
+                        ON moved.source_level = N'root'
+                       AND child.parent_id = moved.dept_id
+                     WHERE child.del_flag = N'0'
+                       AND NOT EXISTS (SELECT 1 FROM dbo.sys_user u WHERE u.dept_id = child.dept_id)
+                ),
+                duplicate_tree AS (
+                    SELECT dept_id FROM duplicate_roots
+                    UNION ALL
+                    SELECT child.dept_id
+                      FROM dbo.sys_dept child
+                      JOIN duplicate_tree parent_tree ON parent_tree.dept_id = child.parent_id
+                     WHERE child.del_flag = N'0'
+                       AND NOT EXISTS (SELECT 1 FROM dbo.sys_user u WHERE u.dept_id = child.dept_id)
+                )
+                UPDATE d
+                   SET d.del_flag = N'1',
+                       d.status = N'1',
+                       d.update_time = SYSDATETIME()
+                  FROM dbo.sys_dept d
+                  JOIN duplicate_tree ON duplicate_tree.dept_id = d.dept_id
+                OPTION (MAXRECURSION 32767);
             END
             """);
     }
