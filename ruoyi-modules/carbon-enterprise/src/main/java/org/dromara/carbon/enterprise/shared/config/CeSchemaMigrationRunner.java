@@ -83,22 +83,22 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
                     resolved_source AS (
                         SELECT DISTINCT
                             LTRIM(RTRIM(es.responsible_dept)) AS dept_name,
+                            NULLIF(LTRIM(RTRIM(cf.company_code)), N'') AS company_code,
                             COALESCE(
-                                NULLIF(LTRIM(RTRIM(cf_by_factory.company_code)), N''),
-                                NULLIF(LTRIM(RTRIM(cf_by_company.company_code)), N''),
-                                NULLIF(LTRIM(RTRIM(es.company_code)), N''),
-                                N''
-                            ) AS company_code,
-                            COALESCE(
-                                NULLIF(LTRIM(RTRIM(cf_by_factory.factory_name)), N''),
-                                NULLIF(LTRIM(RTRIM(cf_by_company.factory_name)), N''),
-                                NULLIF(LTRIM(RTRIM(es.factory_name)), N'')
+                                NULLIF(LTRIM(RTRIM(cf.factory_name)), N''),
+                                NULLIF(LTRIM(RTRIM(cf.factory_code)), N'')
                             ) AS factory_dept_name
                         FROM dbo.ce_emission_source es
-                        LEFT JOIN dbo.ce_company_factory cf_by_factory
-                            ON cf_by_factory.factory_code = es.factory_code
-                        LEFT JOIN dbo.ce_company_factory cf_by_company
-                            ON cf_by_company.company_code = es.company_code
+                        JOIN dbo.ce_company_factory cf
+                          ON (
+                              NULLIF(LTRIM(RTRIM(es.factory_code)), N'') IS NOT NULL
+                              AND cf.factory_code = NULLIF(LTRIM(RTRIM(es.factory_code)), N'')
+                          )
+                          OR (
+                              NULLIF(LTRIM(RTRIM(es.factory_code)), N'') IS NULL
+                              AND NULLIF(LTRIM(RTRIM(es.factory_name)), N'') IS NOT NULL
+                              AND cf.factory_name = NULLIF(LTRIM(RTRIM(es.factory_name)), N'')
+                          )
                         WHERE es.responsible_dept IS NOT NULL
                           AND LTRIM(RTRIM(es.responsible_dept)) <> N''
                     ),
@@ -106,25 +106,20 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
                         SELECT DISTINCT
                             resolved_source.dept_name,
                             resolved_source.company_code AS dept_category,
-                            COALESCE(factory_dept.dept_id, company_dept.dept_id, parent_dept.parent_id) AS parent_id,
-                            COALESCE(
-                                CONCAT(factory_dept.ancestors, N',', factory_dept.dept_id),
-                                CONCAT(company_dept.ancestors, N',', company_dept.dept_id),
-                                parent_dept.ancestors
-                            ) AS ancestors
+                            factory_dept.dept_id AS parent_id,
+                            CONCAT(factory_dept.ancestors, N',', factory_dept.dept_id) AS ancestors
                         FROM resolved_source
                         CROSS JOIN parent_dept
-                        LEFT JOIN dbo.sys_dept company_dept
+                        JOIN dbo.sys_dept company_dept
                             ON company_dept.del_flag = N'0'
                            AND company_dept.parent_id = parent_dept.parent_id
                            AND ISNULL(company_dept.dept_category, N'') = resolved_source.company_code
-                        LEFT JOIN dbo.sys_dept factory_dept
+                        JOIN dbo.sys_dept factory_dept
                             ON factory_dept.del_flag = N'0'
                            AND factory_dept.dept_name = resolved_source.factory_dept_name
                            AND ISNULL(factory_dept.dept_category, N'') = resolved_source.company_code
                            AND factory_dept.parent_id = company_dept.dept_id
-                        WHERE resolved_source.factory_dept_name IS NULL
-                           OR resolved_source.dept_name <> resolved_source.factory_dept_name
+                        WHERE resolved_source.dept_name <> resolved_source.factory_dept_name
                     ),
                     candidates AS (
                         SELECT source_depts.dept_name, source_depts.dept_category, source_depts.parent_id, source_depts.ancestors

@@ -249,6 +249,92 @@ public class CeCompanyFactoryDeptSyncServiceImpl implements ICeCompanyFactoryDep
                 CROSS JOIN id_base
                 CROSS JOIN tenant_value;
 
+                IF OBJECT_ID(N'dbo.ce_emission_source', N'U') IS NOT NULL
+                BEGIN
+                    ;WITH parent_dept AS (
+                        SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.sys_dept WHERE dept_id = 100) THEN 100 ELSE 0 END AS parent_id
+                    ),
+                    source_depts AS (
+                        SELECT DISTINCT
+                            LTRIM(RTRIM(es.responsible_dept)) AS dept_name,
+                            cf.company_code AS dept_category,
+                            factory_dept.dept_id AS parent_id,
+                            CONCAT(factory_dept.ancestors, N',', factory_dept.dept_id) AS ancestors
+                        FROM dbo.ce_emission_source es
+                        JOIN dbo.ce_company_factory cf
+                          ON (
+                              NULLIF(LTRIM(RTRIM(es.factory_code)), N'') IS NOT NULL
+                              AND cf.factory_code = NULLIF(LTRIM(RTRIM(es.factory_code)), N'')
+                          )
+                          OR (
+                              NULLIF(LTRIM(RTRIM(es.factory_code)), N'') IS NULL
+                              AND NULLIF(LTRIM(RTRIM(es.factory_name)), N'') IS NOT NULL
+                              AND cf.factory_name = NULLIF(LTRIM(RTRIM(es.factory_name)), N'')
+                          )
+                        CROSS JOIN parent_dept
+                        JOIN dbo.sys_dept company_dept
+                          ON company_dept.del_flag = N'0'
+                         AND company_dept.parent_id = parent_dept.parent_id
+                         AND ISNULL(company_dept.dept_category, N'') = cf.company_code
+                        JOIN dbo.sys_dept factory_dept
+                          ON factory_dept.del_flag = N'0'
+                         AND factory_dept.parent_id = company_dept.dept_id
+                         AND ISNULL(factory_dept.dept_category, N'') = cf.company_code
+                         AND factory_dept.dept_name = COALESCE(NULLIF(LTRIM(RTRIM(cf.factory_name)), N''), NULLIF(LTRIM(RTRIM(cf.factory_code)), N''))
+                        WHERE es.responsible_dept IS NOT NULL
+                          AND LTRIM(RTRIM(es.responsible_dept)) <> N''
+                          AND LTRIM(RTRIM(es.responsible_dept)) <> factory_dept.dept_name
+                    ),
+                    candidates AS (
+                        SELECT source_depts.dept_name, source_depts.dept_category, source_depts.parent_id, source_depts.ancestors
+                        FROM source_depts
+                        WHERE NOT EXISTS (
+                            SELECT 1
+                              FROM dbo.sys_dept d
+                             WHERE d.del_flag = N'0'
+                               AND d.parent_id = source_depts.parent_id
+                               AND d.dept_name = source_depts.dept_name
+                               AND ISNULL(d.dept_category, N'') = source_depts.dept_category
+                        )
+                    ),
+                    numbered AS (
+                        SELECT
+                            candidates.dept_name,
+                            candidates.dept_category,
+                            candidates.parent_id,
+                            candidates.ancestors,
+                            ROW_NUMBER() OVER (ORDER BY candidates.dept_category, candidates.parent_id, candidates.dept_name) AS rn
+                        FROM candidates
+                    ),
+                    id_base AS (
+                        SELECT CASE WHEN ISNULL(MAX(dept_id), 0) < 100000 THEN 100000 ELSE MAX(dept_id) END AS max_dept_id
+                        FROM dbo.sys_dept
+                    ),
+                    tenant_value AS (
+                        SELECT COALESCE((SELECT TOP 1 tenant_id FROM dbo.sys_dept WHERE tenant_id IS NOT NULL ORDER BY dept_id), N'000000') AS tenant_id
+                    )
+                    INSERT INTO dbo.sys_dept (
+                        dept_id, tenant_id, parent_id, ancestors, dept_name, dept_category,
+                        order_num, status, del_flag, create_dept, create_by, create_time
+                    )
+                    SELECT
+                        id_base.max_dept_id + numbered.rn,
+                        tenant_value.tenant_id,
+                        numbered.parent_id,
+                        numbered.ancestors,
+                        numbered.dept_name,
+                        numbered.dept_category,
+                        100 + numbered.rn,
+                        N'0',
+                        N'0',
+                        numbered.parent_id,
+                        1,
+                        SYSDATETIME()
+                    FROM numbered
+                    CROSS JOIN id_base
+                    CROSS JOIN tenant_value;
+                END
+
                 DECLARE @moved_direct_depts TABLE (
                     dept_id BIGINT PRIMARY KEY,
                     old_ancestors NVARCHAR(500),
@@ -326,7 +412,8 @@ public class CeCompanyFactoryDeptSyncServiceImpl implements ICeCompanyFactoryDep
                     JOIN target_factories
                       ON target_factories.company_dept_id = d.parent_id
                      AND target_factories.company_code = ISNULL(d.dept_category, N'')
-                   WHERE d.del_flag = N'0'
+                   WHERE 1 = 0
+                     AND d.del_flag = N'0'
                      AND NOT EXISTS (
                          SELECT 1
                            FROM factory_rows
@@ -343,7 +430,8 @@ public class CeCompanyFactoryDeptSyncServiceImpl implements ICeCompanyFactoryDep
                     JOIN target_factories
                       ON target_factories.root_parent_id = d.parent_id
                      AND target_factories.company_code = ISNULL(d.dept_category, N'')
-                   WHERE d.del_flag = N'0'
+                   WHERE 1 = 0
+                     AND d.del_flag = N'0'
                      AND d.dept_id <> target_factories.company_dept_id
                      AND NOT EXISTS (
                          SELECT 1
