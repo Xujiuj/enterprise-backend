@@ -25,7 +25,13 @@ import org.dromara.system.service.ISysOssService;
 import org.dromara.system.service.ISysUserService;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Arrays;
@@ -41,6 +47,7 @@ import java.util.Arrays;
 @RequestMapping("/system/user/profile")
 public class SysProfileController extends BaseController {
 
+
     private final ISysUserService userService;
     private final ISysOssService ossService;
 
@@ -52,7 +59,6 @@ public class SysProfileController extends BaseController {
         SysUserVo user = userService.selectUserById(LoginHelper.getUserId());
         String roleGroup = userService.selectUserRoleGroup(user.getUserId());
         String postGroup = userService.selectUserPostGroup(user.getUserId());
-        // 单独做一个vo专门给个人中心用 避免数据被脱敏
         ProfileUserVo profileUser = BeanUtil.toBean(user, ProfileUserVo.class);
         ProfileVo profileVo = new ProfileVo(profileUser, roleGroup, postGroup);
         return R.ok(profileVo);
@@ -69,7 +75,7 @@ public class SysProfileController extends BaseController {
         user.setUserId(LoginHelper.getUserId());
         String username = LoginHelper.getUsername();
         if (StringUtils.isNotEmpty(user.getPhonenumber()) && !userService.checkPhoneUnique(user)) {
-            return R.fail("修改用户'" + username + "'失败，手机号码已存在");
+            return R.fail("修改用户'" + username + "'失败，手机号已存在");
         }
         if (StringUtils.isNotEmpty(user.getEmail()) && !userService.checkEmailUnique(user)) {
             return R.fail("修改用户'" + username + "'失败，邮箱账号已存在");
@@ -120,15 +126,15 @@ public class SysProfileController extends BaseController {
             if (!StringUtils.equalsAnyIgnoreCase(extension, MimeTypeUtils.IMAGE_EXTENSION)) {
                 return R.fail("文件格式不正确，请上传" + Arrays.toString(MimeTypeUtils.IMAGE_EXTENSION) + "格式");
             }
-            SysOssVo oss = ossService.upload(avatarfile);
-            String avatar = oss.getUrl();
+            SysOssVo oss = ossService.uploadLocalAvatar(avatarfile);
             boolean updateSuccess = DataPermissionHelper.ignore(() -> userService.updateUserAvatar(LoginHelper.getUserId(), oss.getOssId()));
             if (updateSuccess) {
-                return R.ok(new AvatarVo(avatar));
+                return R.ok(new AvatarVo(oss.getUrl()));
             }
         }
         return R.fail("上传图片异常，请联系管理员");
     }
+
 
     /**
      * 用户头像信息
@@ -140,10 +146,9 @@ public class SysProfileController extends BaseController {
     /**
      * 用户个人信息
      *
-     * @param user      用户信息
+     * @param user 用户信息
      * @param roleGroup 用户所属角色组
      * @param postGroup 用户所属岗位组
      */
     public record ProfileVo(ProfileUserVo user, String roleGroup, String postGroup) {}
-
 }

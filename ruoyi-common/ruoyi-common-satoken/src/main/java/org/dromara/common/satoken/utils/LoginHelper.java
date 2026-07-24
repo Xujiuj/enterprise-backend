@@ -184,7 +184,9 @@ public class LoginHelper {
         if (CollUtil.isEmpty(rolePermission)) {
             return false;
         }
-        return rolePermission.contains(TenantConstants.TENANT_ADMIN_ROLE_KEY);
+        return rolePermission.contains(TenantConstants.TENANT_ADMIN_ROLE_KEY)
+            || rolePermission.contains(TenantConstants.ENTERPRISE_ADMIN_ROLE_KEY)
+            || rolePermission.contains(TenantConstants.VENDOR_ADMIN_ROLE_KEY);
     }
 
     /**

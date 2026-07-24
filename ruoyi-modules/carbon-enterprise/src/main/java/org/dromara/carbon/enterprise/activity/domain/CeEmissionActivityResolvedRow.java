@@ -31,4 +31,8 @@ public class CeEmissionActivityResolvedRow {
     private String unit;
 
     private String emissionFactorCode;
+
+    private String responsibleDept;
+
+    private String dataSource;
 }

@@ -30,13 +30,15 @@ import org.dromara.carbon.enterprise.shared.service.ICeDimensionSyncService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.math.BigDecimal;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
+import java.util.Set;
 
 /**
  * 企业端维度同步服务实现.
@@ -49,6 +51,8 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
 
     private static final String LICENSE_STATUS_VALID = "VALID";
     private static final int PAGE_SIZE = 500;
+    private static final String PUBLISH_MODE_SINGLE = "SINGLE";
+    private static final String PUBLISH_MODE_ALL = "ALL";
 
     /** 可同步的7个厂商维度编码 */
     private static final List<String> VENDOR_DIMENSION_CODES = List.of(
@@ -70,6 +74,7 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
     private final CeElectricityFactorVersionMapMapper electricityFactorVersionMapMapper;
     private final CeElectricityFactorScopeMapper electricityFactorScopeMapper;
     private final CeGreenhouseGasMapper greenhouseGasMapper;
+    private final TransactionTemplate transactionTemplate;
 
     /** 最近一次同步状态（内存存储，重启后清空） */
     private volatile CeDimensionSyncStatus lastSyncStatus;
@@ -122,6 +127,12 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
         log.info("开始同步维度: dimensionCode={}, licenseId={}", dimensionCode, license.getLicenseId());
         Date syncedTime = new Date();
         int recordCount = 0;
+        Set<String> vendorRecordKeys = new HashSet<>();
+        List<CeVendorDimensionRecord> vendorRecords = new ArrayList<>();
+        String publicationId = null;
+        String publishMode = null;
+        Set<String> publishedVersions = new HashSet<>();
+        Long expectedTotal = null;
 
         CeDimensionRecordBo query = new CeDimensionRecordBo();
         query.setDimensionCode(dimensionCode);
@@ -136,17 +147,37 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
                 pageNum,
                 PAGE_SIZE
             );
+            if ("emission-source-category".equals(dimensionCode)) {
+                validatePublicationBoundary(vendorResponse, publicationId, publishMode, publishedVersions, expectedTotal);
+                publicationId = vendorResponse.getPublicationId();
+                publishMode = vendorResponse.getPublishMode();
+                publishedVersions = new HashSet<>(vendorResponse.getPublishedVersions());
+                expectedTotal = vendorResponse.getTotal();
+            }
             List<CeVendorDimensionRecord> records = vendorResponse.getRecords();
             if (records == null || records.isEmpty()) {
                 break;
             }
             for (CeVendorDimensionRecord record : records) {
-                upsertDimensionRecord(dimensionCode, record);
+                vendorRecords.add(record);
+                String recordKey = dimensionRecordKey(dimensionCode, record);
+                if (StringUtils.isNotBlank(recordKey)) {
+                    vendorRecordKeys.add(recordKey);
+                }
                 recordCount++;
             }
             hasMore = records.size() >= PAGE_SIZE;
             pageNum++;
         }
+
+        String synchronizedPublishMode = publishMode;
+        Set<String> synchronizedPublishedVersions = Set.copyOf(publishedVersions);
+        transactionTemplate.executeWithoutResult(status -> {
+            for (CeVendorDimensionRecord record : vendorRecords) {
+                upsertDimensionRecord(dimensionCode, record);
+            }
+            deleteMissingDimensionRecords(dimensionCode, vendorRecordKeys, synchronizedPublishMode, synchronizedPublishedVersions);
+        });
 
         log.info("维度同步完成: dimensionCode={}, recordCount={}", dimensionCode, recordCount);
         CeDimensionSyncResponse response = new CeDimensionSyncResponse();
@@ -209,10 +240,12 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
         if (StringUtils.isBlank(categorySk)) {
             return;
         }
+        String versionNo = normalizeVersionNo(record.getVersionNo());
         String businessKey = StringUtils.isNotBlank(record.getBusinessKey()) ? record.getBusinessKey() : categorySk;
         CeEmissionSourceCategory existing = emissionSourceCategoryMapper.selectOne(
             Wrappers.<CeEmissionSourceCategory>lambdaQuery()
-                .eq(CeEmissionSourceCategory::getCategorySk, categorySk), false);
+                .eq(CeEmissionSourceCategory::getCategorySk, categorySk)
+                .eq(CeEmissionSourceCategory::getVersionNo, versionNo), false);
         if (existing == null) {
             CeEmissionSourceCategory entity = new CeEmissionSourceCategory();
             entity.setCategorySk(categorySk);
@@ -233,8 +266,8 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             entity.setGbSubcategory(record.getGbSubcategory());
             entity.setEffectiveDate(formatDate(record.getEffectiveDate()));
             entity.setExpiryDate(formatDate(record.getExpireDate()));
-            entity.setIsCurrent(record.getCurrentFlag());
-            entity.setVersionNo(record.getVersionNo());
+            entity.setIsCurrent(isCurrentFlag(record.getCurrentFlag()) ? "Y" : "N");
+            entity.setVersionNo(versionNo);
             entity.setUnifiedStandardCategory(record.getStandardCategory());
             entity.setSortOrder(record.getSortOrder());
             entity.setStatus(record.getStatus());
@@ -259,8 +292,8 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
             existing.setGbSubcategory(record.getGbSubcategory());
             existing.setEffectiveDate(formatDate(record.getEffectiveDate()));
             existing.setExpiryDate(formatDate(record.getExpireDate()));
-            existing.setIsCurrent(record.getCurrentFlag());
-            existing.setVersionNo(record.getVersionNo());
+            existing.setIsCurrent(isCurrentFlag(record.getCurrentFlag()) ? "Y" : "N");
+            existing.setVersionNo(versionNo);
             existing.setUnifiedStandardCategory(record.getStandardCategory());
             existing.setSortOrder(record.getSortOrder());
             existing.setStatus(record.getStatus());
@@ -347,38 +380,166 @@ public class CeDimensionSyncServiceImpl implements ICeDimensionSyncService {
     }
 
     private void upsertElectricityFactorVersionMap(CeVendorDimensionRecord record) {
-        String factorVersion = record.getRecordCode();
-        if (StringUtils.isBlank(factorVersion)) {
+        String factorVersion = record.getFactorVersion();
+        Integer effectiveYear = record.getEffectiveYear();
+        if (StringUtils.isBlank(factorVersion) || effectiveYear == null) {
             return;
         }
-        List<CeElectricityFactorVersionMap> existingRecords = electricityFactorVersionMapMapper.selectList(
+        CeElectricityFactorVersionMap existing = electricityFactorVersionMapMapper.selectOne(
             Wrappers.<CeElectricityFactorVersionMap>lambdaQuery()
                 .eq(CeElectricityFactorVersionMap::getFactorVersion, factorVersion)
-                .orderByAsc(CeElectricityFactorVersionMap::getId));
-        CeElectricityFactorVersionMap existing = existingRecords.stream()
-            .filter(item -> Objects.equals(item.getEffectiveYear(), record.getEffectiveYear()))
-            .findFirst()
-            .orElse(existingRecords.isEmpty() ? null : existingRecords.get(0));
+                .eq(CeElectricityFactorVersionMap::getEffectiveYear, effectiveYear), false);
         if (existing == null) {
             CeElectricityFactorVersionMap entity = new CeElectricityFactorVersionMap();
             entity.setFactorVersion(factorVersion);
-            entity.setEffectiveYear(record.getEffectiveYear());
+            entity.setEffectiveYear(effectiveYear);
             entity.setSortOrder(record.getSortOrder());
             entity.setStatus(record.getStatus());
             entity.setRemark(record.getRemark());
             electricityFactorVersionMapMapper.insert(entity);
         } else {
-            for (CeElectricityFactorVersionMap duplicate : existingRecords) {
-                if (!Objects.equals(duplicate.getId(), existing.getId())) {
-                    electricityFactorVersionMapMapper.deleteById(duplicate.getId());
-                }
-            }
-            existing.setEffectiveYear(record.getEffectiveYear());
+            existing.setFactorVersion(factorVersion);
+            existing.setEffectiveYear(effectiveYear);
             existing.setSortOrder(record.getSortOrder());
             existing.setStatus(record.getStatus());
             existing.setUpdateTime(new Date());
             existing.setRemark(record.getRemark());
             electricityFactorVersionMapMapper.updateById(existing);
+        }
+    }
+
+    private String dimensionRecordKey(String dimensionCode, CeVendorDimensionRecord record) {
+        return switch (dimensionCode) {
+            case "admin-division" -> record.getRecordCode();
+            case "emission-source-category" -> compositeKey(
+                StringUtils.isNotBlank(record.getCategorySk()) ? record.getCategorySk() : record.getRecordCode(),
+                normalizeVersionNo(record.getVersionNo()));
+            case "base-year" -> StringUtils.isNotBlank(record.getBaseYearKey()) ? record.getBaseYearKey() : record.getRecordCode();
+            case "ef-electricity-factor" -> StringUtils.isNotBlank(record.getVersionProvinceCode()) ? record.getVersionProvinceCode() : record.getRecordCode();
+            case "ef-electricity-version" -> compositeKey(record.getEffectiveYear(), record.getFactorVersion());
+            case "ef-electricity-scope" -> StringUtils.isNotBlank(record.getScopeKey()) ? record.getScopeKey() : record.getRecordCode();
+            case "greenhouse-gas" -> StringUtils.isNotBlank(record.getGasCode()) ? record.getGasCode() : record.getRecordCode();
+            default -> null;
+        };
+    }
+
+    private void deleteMissingDimensionRecords(String dimensionCode, Set<String> vendorRecordKeys,
+                                               String publishMode, Set<String> publishedVersions) {
+        switch (dimensionCode) {
+            case "admin-division" -> deleteMissingAdminDivisions(vendorRecordKeys);
+            case "emission-source-category" -> {
+                Set<String> reconciliationVersions = PUBLISH_MODE_ALL.equals(publishMode)
+                    ? null : publishedVersions;
+                if (!PUBLISH_MODE_ALL.equals(publishMode) && reconciliationVersions.isEmpty()) {
+                    throw new ServiceException("厂商端未返回103发布版本边界");
+                }
+                List<Long> ids = emissionSourceCategoryMapper.selectList(null).stream()
+                    .filter(item -> reconciliationVersions == null || reconciliationVersions.contains(normalizeVersionNo(item.getVersionNo())))
+                    .filter(item -> !vendorRecordKeys.contains(compositeKey(item.getCategorySk(), normalizeVersionNo(item.getVersionNo()))))
+                    .map(CeEmissionSourceCategory::getId).toList();
+                if (!ids.isEmpty()) emissionSourceCategoryMapper.deleteByIds(ids);
+                normalizeEmissionSourceCategoryCurrentVersion();
+            }
+            case "base-year" -> {
+                List<Long> ids = baseYearMapper.selectList(null).stream()
+                    .filter(item -> !vendorRecordKeys.contains(item.getBaseYearKey()))
+                    .map(CeBaseYear::getId).toList();
+                if (!ids.isEmpty()) baseYearMapper.deleteByIds(ids);
+            }
+            case "ef-electricity-factor" -> {
+                List<Long> ids = electricityFactorMapper.selectList(null).stream()
+                    .filter(item -> !vendorRecordKeys.contains(item.getVersionProvinceCode()))
+                    .map(CeElectricityFactor::getId).toList();
+                if (!ids.isEmpty()) electricityFactorMapper.deleteByIds(ids);
+            }
+            case "ef-electricity-version" -> {
+                List<Long> ids = electricityFactorVersionMapMapper.selectList(null).stream()
+                    .filter(item -> !vendorRecordKeys.contains(compositeKey(item.getEffectiveYear(), item.getFactorVersion())))
+                    .map(CeElectricityFactorVersionMap::getId).toList();
+                if (!ids.isEmpty()) electricityFactorVersionMapMapper.deleteByIds(ids);
+            }
+            case "ef-electricity-scope" -> {
+                List<Long> ids = electricityFactorScopeMapper.selectList(null).stream()
+                    .filter(item -> !vendorRecordKeys.contains(item.getScopeKey()))
+                    .map(CeElectricityFactorScope::getId).toList();
+                if (!ids.isEmpty()) electricityFactorScopeMapper.deleteByIds(ids);
+            }
+            case "greenhouse-gas" -> {
+                List<Long> ids = greenhouseGasMapper.selectList(null).stream()
+                    .filter(item -> !vendorRecordKeys.contains(item.getGasCode()))
+                    .map(CeGreenhouseGas::getId).toList();
+                if (!ids.isEmpty()) greenhouseGasMapper.deleteByIds(ids);
+            }
+            default -> log.warn("未知的维度编码: {}", dimensionCode);
+        }
+    }
+
+    private void deleteMissingAdminDivisions(Set<String> vendorRecordKeys) {
+        List<Long> ids = adminDivisionMapper.selectList(null).stream()
+            .filter(item -> !vendorRecordKeys.contains(item.getDivisionCode()))
+            .map(CeAdminDivision::getId).toList();
+        if (!ids.isEmpty()) adminDivisionMapper.deleteByIds(ids);
+    }
+
+    private String compositeKey(Object first, Object second) {
+        if (first == null || second == null || StringUtils.isBlank(String.valueOf(second))) {
+            return null;
+        }
+        return first + "\u001f" + String.valueOf(second).trim();
+    }
+
+    private String normalizeVersionNo(String versionNo) {
+        return StringUtils.isBlank(versionNo) ? "1" : versionNo.trim();
+    }
+
+    private boolean isCurrentFlag(String value) {
+        return "Y".equalsIgnoreCase(value) || "1".equals(value) || "TRUE".equalsIgnoreCase(value);
+    }
+
+    private void normalizeEmissionSourceCategoryCurrentVersion() {
+        List<CeEmissionSourceCategory> records = emissionSourceCategoryMapper.selectList(
+            Wrappers.<CeEmissionSourceCategory>lambdaQuery().eq(CeEmissionSourceCategory::getStatus, "0"));
+        if (records.isEmpty()) {
+            return;
+        }
+        String latestVersion = records.stream()
+            .map(item -> normalizeVersionNo(item.getVersionNo()))
+            .max(this::compareVersionNo).orElse(null);
+        if (latestVersion == null) {
+            return;
+        }
+        emissionSourceCategoryMapper.update(null,
+            Wrappers.<CeEmissionSourceCategory>update().set("is_current", "N"));
+        emissionSourceCategoryMapper.update(null,
+            Wrappers.<CeEmissionSourceCategory>update()
+                .set("is_current", "Y")
+                .eq("version_no", latestVersion));
+    }
+
+    private int compareVersionNo(String left, String right) {
+        try {
+            return new BigDecimal(left).compareTo(new BigDecimal(right));
+        } catch (NumberFormatException ignored) {
+            return left.compareToIgnoreCase(right);
+        }
+    }
+
+    private void validatePublicationBoundary(CeVendorDimensionListResponse response, String expectedPublicationId,
+                                             String expectedPublishMode, Set<String> expectedVersions,
+                                             Long expectedTotal) {
+        if (StringUtils.isBlank(response.getPublicationId())
+            || (!PUBLISH_MODE_SINGLE.equals(response.getPublishMode()) && !PUBLISH_MODE_ALL.equals(response.getPublishMode()))) {
+            throw new ServiceException("厂商端未提供有效的103发布策略");
+        }
+        Set<String> actualVersions = new HashSet<>(response.getPublishedVersions() == null ? List.of() : response.getPublishedVersions());
+        if (PUBLISH_MODE_SINGLE.equals(response.getPublishMode()) && actualVersions.size() != 1) {
+            throw new ServiceException("厂商端返回的单版本发布范围无效");
+        }
+        if (expectedPublicationId != null && (!expectedPublicationId.equals(response.getPublicationId())
+            || !expectedPublishMode.equals(response.getPublishMode())
+            || !expectedVersions.equals(actualVersions)
+            || !expectedTotal.equals(response.getTotal()))) {
+            throw new ServiceException("103发布策略或数据已变化，请重新同步");
         }
     }
 

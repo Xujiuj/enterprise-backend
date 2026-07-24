@@ -94,6 +94,7 @@ public class CeExtensionFieldServiceImpl implements ICeExtensionFieldService {
             .eq(StringUtils.isNotBlank(bo.getModuleCode()), CeExtensionField::getModuleCode, bo.getModuleCode())
             .eq(bo.getSheetId() != null, CeExtensionField::getSheetId, bo.getSheetId())
             .eq(StringUtils.isNotBlank(bo.getFieldCode()), CeExtensionField::getFieldCode, bo.getFieldCode())
+            .like(StringUtils.isNotBlank(bo.getFieldName()), CeExtensionField::getFieldName, bo.getFieldName())
             .eq(bo.getEnabledFlag() != null, CeExtensionField::getEnabledFlag, bo.getEnabledFlag());
     }
 

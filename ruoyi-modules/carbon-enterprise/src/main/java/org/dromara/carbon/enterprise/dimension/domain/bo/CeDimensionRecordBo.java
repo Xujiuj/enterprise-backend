@@ -24,7 +24,7 @@ public class CeDimensionRecordBo implements Serializable {
     @NotBlank(message = "dimensionCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String dimensionCode;
 
-    @NotBlank(message = "recordCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "recordCode cannot be blank", groups = { EditGroup.class })
     private String recordCode;
 
     @NotBlank(message = "recordName cannot be blank", groups = { AddGroup.class, EditGroup.class })
@@ -67,6 +67,10 @@ public class CeDimensionRecordBo implements Serializable {
     private String levelType;
 
     private String categoryNameEn;
+
+    private String currentFlag;
+
+    private String versionNo;
 
     private String baseYear;
 

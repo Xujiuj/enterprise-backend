@@ -38,11 +38,16 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
+import java.util.UUID;
 
 /**
  * 文件上传 服务层实现
@@ -52,6 +57,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Service
 public class SysOssServiceImpl implements ISysOssService, OssService {
+
+    private static final String LOCAL_AVATAR_SERVICE = "local-avatar";
+    private static final String DEFAULT_LOCAL_AVATAR_DIR = "/opt/fx/www/uploads/avatar";
+    private static final String DEFAULT_LOCAL_AVATAR_URL_PREFIX = "/uploads/avatar";
 
     private final SysOssMapper baseMapper;
 
@@ -218,6 +227,47 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
      * @return 上传成功后的 SysOssVo 对象，包含文件信息
      */
     @Override
+    public SysOssVo uploadLocalAvatar(MultipartFile file) {
+        if (ObjectUtil.isNull(file) || file.isEmpty()) {
+            throw new ServiceException("上传头像不能为空");
+        }
+        String originalfileName = StringUtils.blankToDefault(file.getOriginalFilename(), "avatar");
+        int suffixIndex = originalfileName.lastIndexOf(".");
+        String suffix = suffixIndex >= 0 ? originalfileName.substring(suffixIndex).toLowerCase(Locale.ROOT) : "";
+        String storedFileName = System.currentTimeMillis() + "-" + UUID.randomUUID().toString().replace("-", "") + suffix;
+        Path storageDir = Path.of(localAvatarStorageDir());
+        try {
+            Files.createDirectories(storageDir);
+            Files.copy(file.getInputStream(), storageDir.resolve(storedFileName), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new ServiceException("头像保存失败: " + e.getMessage());
+        }
+        SysOssExt ext1 = new SysOssExt();
+        ext1.setFileSize(file.getSize());
+        ext1.setContentType(file.getContentType());
+        UploadResult uploadResult = UploadResult.builder()
+            .url(localAvatarUrlPrefix() + StringUtils.SLASH + storedFileName)
+            .filename(storedFileName)
+            .eTag("")
+            .build();
+        return buildResultEntity(originalfileName, suffix, LOCAL_AVATAR_SERVICE, uploadResult, ext1);
+    }
+
+    private String localAvatarStorageDir() {
+        return StringUtils.blankToDefault(System.getProperty("fx.avatar.storage-dir"),
+            StringUtils.blankToDefault(System.getenv("FX_AVATAR_STORAGE_DIR"), DEFAULT_LOCAL_AVATAR_DIR));
+    }
+
+    private String localAvatarUrlPrefix() {
+        String prefix = StringUtils.blankToDefault(System.getProperty("fx.avatar.url-prefix"),
+            StringUtils.blankToDefault(System.getenv("FX_AVATAR_URL_PREFIX"), DEFAULT_LOCAL_AVATAR_URL_PREFIX));
+        while (prefix.endsWith(StringUtils.SLASH)) {
+            prefix = prefix.substring(0, prefix.length() - 1);
+        }
+        return prefix;
+    }
+
+    @Override
     public SysOssVo upload(File file) {
         if (ObjectUtil.isNull(file) || !file.isFile() || file.length() <= 0) {
             throw new ServiceException("上传文件不能为空");
@@ -274,6 +324,9 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
      * @return oss 匹配Url的OSS对象
      */
     private SysOssVo matchingUrl(SysOssVo oss) {
+        if (LOCAL_AVATAR_SERVICE.equals(oss.getService())) {
+            return oss;
+        }
         OssClient storage = OssFactory.instance(oss.getService());
         // 仅修改桶类型为 private 的URL，临时URL时长为120s
         if (AccessPolicyType.PRIVATE == storage.getAccessPolicy()) {

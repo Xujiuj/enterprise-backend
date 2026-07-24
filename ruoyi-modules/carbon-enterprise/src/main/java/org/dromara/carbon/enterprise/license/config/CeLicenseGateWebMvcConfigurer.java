@@ -23,8 +23,10 @@ public class CeLicenseGateWebMvcConfigurer implements WebMvcConfigurer {
                 "/enterprise/factor-cache-record/**",
                 "/enterprise/factor-cache-version/**",
                 "/enterprise/factor-confirmation/**",
+                "/enterprise/dimension-sync/**",
                 "/enterprise/data-validation/**",
                 "/enterprise/report-template-sync/**",
+                "/enterprise/report-content/sync",
                 "/enterprise/report-template-file/download/**"
             )
             .excludePathPatterns(

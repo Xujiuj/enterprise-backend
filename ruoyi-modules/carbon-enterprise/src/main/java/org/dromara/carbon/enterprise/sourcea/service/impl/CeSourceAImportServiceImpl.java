@@ -321,6 +321,7 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         Set<String> factorKeys = keySet(data.efFactorRows, row -> text(row.get("SK_排放因子")));
         Set<String> sourceCodes = keySet(data.emissionRows, this::sourceCode);
         Map<String, Map<String, Object>> sourceByCode = sourceByCode(data);
+        Map<String, String> categoryKeyBySubcategory = categoryKeyBySubcategory(data);
 
         requireNoDuplicate(result, "admin.primary", data.adminRows, row -> text(row.get("行政区划代码")));
         requireNoDuplicate(result, "company.factory", data.companyRows, row -> text(row.get("BK_工厂编号")));
@@ -333,12 +334,12 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
 
         countOrphans(result, "company.province", data.companyRows, row -> text(row.get("省份编码")), adminCodes);
         countOrphans(result, "emission-source.company", data.emissionRows, this::factoryCode, factoryCodes);
-        countOrphans(result, "emission-source.category", data.emissionRows, this::sourceCategoryKey, categoryKeys);
+        countOrphans(result, "emission-source.category", data.emissionRows, row -> normalizedSourceCategoryKey(row, categoryKeyBySubcategory), categoryKeys);
         countOrphans(result, "activity.source", data.activityRows, this::sourceCode, sourceCodes);
         countOrphans(result, "activity.company", data.activityRows, this::factoryCode, factoryCodes);
-        countOrphans(result, "activity.category", data.activityRows, this::sourceCategoryKey, categoryKeys);
+        countOrphans(result, "activity.category", data.activityRows, row -> normalizedSourceCategoryKey(row, categoryKeyBySubcategory), categoryKeys);
         countOrphans(result, "green-power.factory", data.greenPowerRows, row -> text(row.get("FK_工厂编号")), factoryCodes);
-        countOrphans(result, "green-power.category", data.greenPowerRows, row -> text(row.get("排放源分类")), categoryKeys);
+        countOrphans(result, "green-power.category", data.greenPowerRows, row -> normalizedSourceCategoryKey(row, categoryKeyBySubcategory), categoryKeys);
         countOrphans(result, "denominator-fact.factory", data.denominatorFactRows, row -> text(row.get("工厂编号")), factoryCodes);
 
         Set<String> nonEfEmissionFactors = nonEfFactors(data.emissionRows, this::factorKey, factorKeys);
@@ -498,6 +499,7 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
     private void insertEmissionRows(SourceAData data, CeSourceAImportResult result) {
         Map<String, String> factorUnits = factorUnits(data);
         Map<String, Map<String, Object>> factoryByCode = factoryByCode(data);
+        Map<String, String> categoryKeyBySubcategory = categoryKeyBySubcategory(data);
         insertRows(result, "ce_emission_source", List.of("company_code", "company_name", "factory_code", "factory_name", "source_category_key",
                 "scope_name", "scope_subcategory", "source_identification_code", "source_identification_name", "emission_source_name",
                 "responsible_dept", "data_frequency", "responsible_user_id", "responsible_user_name", "data_source", "factor_key", "source_unit", "enabled_flag", "remark"),
@@ -505,7 +507,7 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
                 String factorKey = factorKey(row);
                 String factoryCode = factoryCode(row);
                 Map<String, Object> factory = factoryByCode.getOrDefault(factoryCode, Map.of());
-                return values(companyCode(row, factory), first(value(row, "公司名称", "公司"), factory.get("公司")), factoryCode, first(row.get("工厂"), factory.get("工厂")), sourceCategoryKey(row),
+                return values(companyCode(row, factory), first(value(row, "公司名称", "公司"), factory.get("公司")), factoryCode, first(row.get("工厂"), factory.get("工厂")), normalizedSourceCategoryKey(row, categoryKeyBySubcategory),
                     row.get("范围"), row.get("范围子类别"), sourceCode(row), row.get("排放源识别"), row.get("排放源"),
                     row.get("负责部门"), "monthly", null, null, row.get("数据来源"), factorKey, factorUnits.get(factorKey), 1, MARK);
             }));
@@ -516,6 +518,7 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
         Map<String, Long> sourceIdsByCode = currentEmissionSourceIds();
         Map<String, String> factorUnits = factorUnits(data);
         Map<String, Map<String, Object>> factoryByCode = factoryByCode(data);
+        Map<String, String> categoryKeyBySubcategory = categoryKeyBySubcategory(data);
         insertRows(result, "ce_activity_data", List.of("emission_source_id", "activity_period", "source_sheet_code", "source_identification_code", "company_code", "company_name",
                 "factory_code", "factory_name", "source_category_key", "scope_name", "scope_subcategory", "source_identification_name", "emission_source_name",
                 "activity_unit", "activity_year", "activity_month", "activity_date", "activity_value", "responsible_dept", "data_source",
@@ -531,7 +534,7 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
                 String rowFactorKey = activityFactorKey(row, sourceByCode, keySet(data.efFactorRows, factor -> text(factor.get("SK_排放因子"))));
                 return values(sourceIdsByCode.get(sourceKey(factoryCode, sourceCode)), activityPeriod(year, month), "source-a-activity", sourceCode, companyCode,
                     first(value(row, "公司名称", "公司"), first(value(source, "公司名称", "公司"), factory.get("公司"))), factoryCode, first(row.get("工厂"), first(source.get("工厂"), factory.get("工厂"))),
-                    first(sourceCategoryKey(row), sourceCategoryKey(source)), first(row.get("范围"), source.get("范围")),
+                    first(normalizedSourceCategoryKey(row, categoryKeyBySubcategory), normalizedSourceCategoryKey(source, categoryKeyBySubcategory)), first(row.get("范围"), source.get("范围")),
                     first(row.get("范围子类别"), source.get("范围子类别")), first(row.get("排放源识别"), source.get("排放源识别")),
                     first(row.get("排放源"), source.get("排放源")), first(row.get("单位"), factorUnits.get(rowFactorKey)), year, month, sqlDate(first(row.get("日期"), firstDay(year, month))),
                     decimal(row.get("活动数据")), first(row.get("负责部门"), source.get("负责部门")), first(row.get("数据来源"), source.get("数据来源")),
@@ -558,12 +561,13 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
     }
 
     private void insertGreenPowerRows(SourceAData data, CeSourceAImportResult result) {
+        Map<String, String> categoryKeyBySubcategory = categoryKeyBySubcategory(data);
         insertRows(result, "ce_green_power_certificate", List.of("factory_code", "factory_name", "activity_year", "activity_month",
                 "source_category_key", "scope_name", "scope_subcategory", "electricity_type", "electricity_type_desc", "quantity_kwh",
                 "certificate_code", "issuing_org", "purchase_date", "expiry_date", "power_grid_region", "offset_power_source", "data_source",
                 "source_remark", "emission_source_name", "factor_key", "proof_status", "remark"),
             mapRows(data.greenPowerRows, row -> values(row.get("FK_工厂编号"), row.get("工厂名称"), integer(row.get("年度")), integer(row.get("月份")),
-                sourceCategoryKey(row), row.get("范围"), row.get("范围子类别"), row.get("电力类型"), row.get("电力类型说明"),
+                normalizedSourceCategoryKey(row, categoryKeyBySubcategory), row.get("范围"), row.get("范围子类别"), row.get("电力类型"), row.get("电力类型说明"),
                 decimal(row.get("数量_kWh")), row.get("证书编号"), row.get("证书签发机构"), sqlDate(row.get("购买日期")), sqlDate(row.get("到期日期")),
                 row.get("对应电网区域"), row.get("抵消电力来源"), row.get("数据来源"), row.get("备注"), row.get("排放源"), factorKey(row),
                 "verified", MARK)));
@@ -759,6 +763,29 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
 
     private String sourceCategoryKey(Map<String, Object> row) {
         return text(value(row, "排放源分类", "FK_排放源分类"));
+    }
+
+    private String normalizedSourceCategoryKey(Map<String, Object> row, Map<String, String> categoryKeyBySubcategory) {
+        String subcategory = text(row.get("范围子类别"));
+        if (StringUtils.isNotBlank(subcategory)) {
+            String normalized = categoryKeyBySubcategory.get(subcategory);
+            if (StringUtils.isNotBlank(normalized)) {
+                return normalized;
+            }
+        }
+        return sourceCategoryKey(row);
+    }
+
+    private Map<String, String> categoryKeyBySubcategory(SourceAData data) {
+        return data.categoryRows.stream()
+            .filter(row -> StringUtils.isNotBlank(text(row.get("SK_排放源分类")))
+                && StringUtils.isNotBlank(text(row.get("GHG Protocol范围子类别"))))
+            .collect(Collectors.toMap(
+                row -> text(row.get("GHG Protocol范围子类别")),
+                row -> text(row.get("SK_排放源分类")),
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
     }
 
     private String sourceCode(Map<String, Object> row) {

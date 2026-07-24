@@ -54,6 +54,7 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         seedEmissionActivityTemplateIfMissing();
         addUniqueConstraintIfMissing("ce_template_field", "uk_ce_template_field_business_code", "sheet_id, business_field_code");
         backfillSourceARelationshipColumns();
+        backfillEfFactorRecordCodes();
         removeIndustryMenuIfPresent();
         seedEnterpriseDeptMenuIfMissing();
         syncCompanyFactoriesToSysDept();
@@ -813,6 +814,114 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
              """);
         } catch (Exception e) {
             log.warn("[SchemaMigration] Source(A) relationship column backfill skipped: {}", e.getMessage());
+        }
+    }
+
+    private void backfillEfFactorRecordCodes() {
+        try {
+            jdbcTemplate.update("""
+                IF OBJECT_ID(N'dbo.ce_ef_factor', N'U') IS NOT NULL
+                BEGIN
+                    ;WITH existing AS (
+                        SELECT ISNULL(MAX(TRY_CONVERT(INT, factor_sk)), 0) AS max_no
+                          FROM dbo.ce_ef_factor
+                         WHERE TRY_CONVERT(INT, factor_sk) IS NOT NULL
+                    ),
+                    blank_rows AS (
+                        SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS rn
+                          FROM dbo.ce_ef_factor
+                         WHERE NULLIF(LTRIM(RTRIM(factor_sk)), N'') IS NULL
+                    )
+                    UPDATE f
+                       SET factor_sk = CONVERT(NVARCHAR(64), blank_rows.rn + existing.max_no)
+                      FROM dbo.ce_ef_factor f
+                      JOIN blank_rows ON blank_rows.id = f.id
+                     CROSS JOIN existing;
+
+                    IF OBJECT_ID(N'dbo.ce_emission_source', N'U') IS NOT NULL
+                    BEGIN
+                        ;WITH mapped AS (
+                            SELECT
+                                factor_sk AS old_key,
+                                CONVERT(NVARCHAR(64), TRY_CONVERT(INT, RIGHT(factor_sk, 4))) AS new_key
+                              FROM dbo.ce_ef_factor f
+                             WHERE factor_sk LIKE N'EF201-[0-9][0-9][0-9][0-9]'
+                               AND TRY_CONVERT(INT, RIGHT(factor_sk, 4)) IS NOT NULL
+                               AND NOT EXISTS (
+                                   SELECT 1
+                                     FROM dbo.ce_ef_factor existing
+                                    WHERE existing.factor_sk = CONVERT(NVARCHAR(64), TRY_CONVERT(INT, RIGHT(f.factor_sk, 4)))
+                               )
+                        )
+                        UPDATE es
+                           SET factor_key = mapped.new_key
+                          FROM dbo.ce_emission_source es
+                          JOIN mapped ON es.factor_key = mapped.old_key;
+                    END
+
+                    IF OBJECT_ID(N'dbo.ce_activity_data', N'U') IS NOT NULL
+                    BEGIN
+                        ;WITH mapped AS (
+                            SELECT
+                                factor_sk AS old_key,
+                                CONVERT(NVARCHAR(64), TRY_CONVERT(INT, RIGHT(factor_sk, 4))) AS new_key
+                              FROM dbo.ce_ef_factor f
+                             WHERE factor_sk LIKE N'EF201-[0-9][0-9][0-9][0-9]'
+                               AND TRY_CONVERT(INT, RIGHT(factor_sk, 4)) IS NOT NULL
+                               AND NOT EXISTS (
+                                   SELECT 1
+                                     FROM dbo.ce_ef_factor existing
+                                    WHERE existing.factor_sk = CONVERT(NVARCHAR(64), TRY_CONVERT(INT, RIGHT(f.factor_sk, 4)))
+                               )
+                        )
+                        UPDATE ad
+                           SET factor_key = mapped.new_key
+                          FROM dbo.ce_activity_data ad
+                          JOIN mapped ON ad.factor_key = mapped.old_key;
+                    END
+
+                    IF OBJECT_ID(N'dbo.ce_green_power_certificate', N'U') IS NOT NULL
+                    BEGIN
+                        ;WITH mapped AS (
+                            SELECT
+                                factor_sk AS old_key,
+                                CONVERT(NVARCHAR(64), TRY_CONVERT(INT, RIGHT(factor_sk, 4))) AS new_key
+                              FROM dbo.ce_ef_factor f
+                             WHERE factor_sk LIKE N'EF201-[0-9][0-9][0-9][0-9]'
+                               AND TRY_CONVERT(INT, RIGHT(factor_sk, 4)) IS NOT NULL
+                               AND NOT EXISTS (
+                                   SELECT 1
+                                     FROM dbo.ce_ef_factor existing
+                                    WHERE existing.factor_sk = CONVERT(NVARCHAR(64), TRY_CONVERT(INT, RIGHT(f.factor_sk, 4)))
+                               )
+                        )
+                        UPDATE gp
+                           SET factor_key = mapped.new_key
+                          FROM dbo.ce_green_power_certificate gp
+                          JOIN mapped ON gp.factor_key = mapped.old_key;
+                    END
+
+                    ;WITH mapped AS (
+                        SELECT
+                            id,
+                            CONVERT(NVARCHAR(64), TRY_CONVERT(INT, RIGHT(factor_sk, 4))) AS new_key
+                          FROM dbo.ce_ef_factor f
+                         WHERE factor_sk LIKE N'EF201-[0-9][0-9][0-9][0-9]'
+                           AND TRY_CONVERT(INT, RIGHT(factor_sk, 4)) IS NOT NULL
+                           AND NOT EXISTS (
+                               SELECT 1
+                                 FROM dbo.ce_ef_factor existing
+                                WHERE existing.factor_sk = CONVERT(NVARCHAR(64), TRY_CONVERT(INT, RIGHT(f.factor_sk, 4)))
+                           )
+                    )
+                    UPDATE f
+                       SET factor_sk = mapped.new_key
+                      FROM dbo.ce_ef_factor f
+                      JOIN mapped ON mapped.id = f.id;
+                END
+                """);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] EF factor code backfill skipped: {}", e.getMessage());
         }
     }
 

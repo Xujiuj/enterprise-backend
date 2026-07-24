@@ -503,7 +503,8 @@ public class SysUserServiceImpl implements ISysUserService, UserService {
         }
 
         // 校验是否有权限访问这些角色（含数据权限控制）
-        if (roleMapper.selectRoleCount(roleList) != roleList.size()) {
+        if (!LoginHelper.isSuperAdmin() && !LoginHelper.isTenantAdmin()
+            && roleMapper.selectRoleCount(roleList) != roleList.size()) {
             throw new ServiceException("没有权限访问角色的数据");
         }
 

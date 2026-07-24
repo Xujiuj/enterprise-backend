@@ -29,6 +29,8 @@ public class CeEmissionSourceBo implements Serializable {
 
     private String companyName;
 
+    private String factoryCode;
+
     private String factoryName;
 
     @NotBlank(message = "sourceCategoryKey cannot be blank", groups = { AddGroup.class, EditGroup.class })
@@ -38,11 +40,13 @@ public class CeEmissionSourceBo implements Serializable {
 
     private String scopeSubcategory;
 
-    @NotBlank(message = "sourceIdentificationCode cannot be blank", groups = { AddGroup.class, EditGroup.class })
+    @NotBlank(message = "sourceIdentificationCode cannot be blank", groups = { EditGroup.class })
     private String sourceIdentificationCode;
 
+    @NotBlank(message = "sourceIdentificationName cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String sourceIdentificationName;
 
+    @NotBlank(message = "emissionSourceName cannot be blank", groups = { AddGroup.class, EditGroup.class })
     private String emissionSourceName;
 
     private String responsibleDept;

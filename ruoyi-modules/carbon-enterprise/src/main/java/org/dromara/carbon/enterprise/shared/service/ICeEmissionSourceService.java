@@ -4,6 +4,7 @@ import org.dromara.carbon.enterprise.emission.domain.bo.CeEmissionSourceBo;
 import org.dromara.carbon.enterprise.emission.domain.vo.CeEmissionSourceVo;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collection;
 import java.util.List;
@@ -24,4 +25,6 @@ public interface ICeEmissionSourceService {
     Boolean updateByBo(CeEmissionSourceBo bo);
 
     Boolean deleteByIds(Collection<Long> ids);
+
+    int importExcel(MultipartFile file);
 }

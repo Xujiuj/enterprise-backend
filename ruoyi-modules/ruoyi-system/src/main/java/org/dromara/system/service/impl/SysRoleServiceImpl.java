@@ -264,7 +264,7 @@ public class SysRoleServiceImpl implements ISysRoleService, RoleService {
      */
     @Override
     public void checkRoleDataScope(List<Long> roleIds) {
-        if (CollUtil.isEmpty(roleIds) || LoginHelper.isSuperAdmin()) {
+        if (CollUtil.isEmpty(roleIds) || LoginHelper.isSuperAdmin() || LoginHelper.isTenantAdmin()) {
             return;
         }
         long count = baseMapper.selectRoleCount(roleIds);

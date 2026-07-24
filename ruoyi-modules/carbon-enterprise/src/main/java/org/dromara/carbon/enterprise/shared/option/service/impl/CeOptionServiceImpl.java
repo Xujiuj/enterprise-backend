@@ -123,6 +123,17 @@ public class CeOptionServiceImpl implements ICeOptionService {
         "status"
     );
 
+    private static final Set<String> ALLOWED_INDUSTRY_PARENT_FIELDS = Set.of(
+        "industrySectionCode",
+        "industrySectionName",
+        "industryDivisionCode",
+        "industryDivisionName",
+        "industryGroupCode",
+        "industryGroupName",
+        "industryClassCode",
+        "industryClassName"
+    );
+
     private final CeActivityDataMapper activityDataMapper;
     private final CeCompanyFactoryMapper companyFactoryMapper;
     private final CeEmissionSourceMapper emissionSourceMapper;
@@ -146,56 +157,27 @@ public class CeOptionServiceImpl implements ICeOptionService {
         switch (optionCode) {
             case "company-code" -> {
                 collectCompanyCodeOptions(options);
-                collectDistinctWithLabel(options, activityDataMapper, CeActivityData::getCompanyCode, CeActivityData::getCompanyName);
-                collectDistinctWithLabel(options, emissionSourceMapper, CeEmissionSource::getCompanyCode, CeEmissionSource::getCompanyName);
             }
             case "company-name" -> {
                 collectDistinct(options, companyFactoryMapper, CeCompanyFactory::getCompanyName, this::labelForRaw);
-                collectDistinct(options, activityDataMapper, CeActivityData::getCompanyName, this::labelForRaw);
-                collectDistinct(options, emissionSourceMapper, CeEmissionSource::getCompanyName, this::labelForRaw);
             }
             case "factory-code" -> {
                 collectCompanyFactoryCodeOptions(options);
-                collectDistinctWithLabel(options, activityDataMapper, CeActivityData::getFactoryCode, CeActivityData::getFactoryName);
-                collectDistinctWithLabel(
-                    options,
-                    greenPowerCertificateMapper,
-                    CeGreenPowerCertificate::getFactoryCode,
-                    CeGreenPowerCertificate::getFactoryName
-                );
             }
             case "factory-name" -> {
                 collectCompanyFactoryNameOptions(options);
-                collectDistinct(options, activityDataMapper, CeActivityData::getFactoryName, this::labelForRaw);
-                collectDistinct(options, emissionSourceMapper, CeEmissionSource::getFactoryName, this::labelForRaw);
-                collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getFactoryName, this::labelForRaw);
             }
             case "source-category-key" -> {
                 collectSourceCategoryOptions(options);
-                collectSourceCategoryOptionsFromRows(
-                    options,
-                    activityDataMapper,
-                    CeActivityData::getSourceCategoryKey,
-                    CeActivityData::getScopeName,
-                    CeActivityData::getScopeSubcategory
-                );
-                collectSourceCategoryOptionsFromRows(
-                    options,
-                    emissionSourceMapper,
-                    CeEmissionSource::getSourceCategoryKey,
-                    CeEmissionSource::getScopeName,
-                    CeEmissionSource::getScopeSubcategory
-                );
-                collectSourceCategoryOptionsFromRows(
-                    options,
-                    greenPowerCertificateMapper,
-                    CeGreenPowerCertificate::getSourceCategoryKey,
-                    CeGreenPowerCertificate::getScopeName,
-                    CeGreenPowerCertificate::getScopeSubcategory
-                );
+            }
+            case "source-scope" -> {
+                collectSourceScopeOptions(options);
+            }
+            case "source-subcategory" -> {
+                collectSourceSubcategoryOptions(options, safeQuery);
             }
             case "responsible-dept" -> {
-                collectSystemDeptOptions(options);
+                collectSystemDeptOptions(options, safeQuery);
             }
             case "data-frequency" -> collectDataFrequencyOptions(options);
             case "responsible-user" -> collectSystemUserOptions(options);
@@ -215,6 +197,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             }
             case "factor-table-code" -> collectDistinct(options, factorCacheRecordMapper, CeFactorCacheRecord::getFactorTableCode, this::labelForRaw);
             case "factor-key" -> collectFactorKeyOptions(options);
+            case "ef-factor-emission-source" -> collectEfFactorEmissionSourceOptions(options);
             case "activity-year" -> {
                 collectDistinct(options, activityDataMapper, CeActivityData::getActivityYear, this::labelForYear);
                 collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getActivityYear, this::labelForYear);
@@ -254,7 +237,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "activity-entry-source-identification" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getSourceIdentificationName, safeQuery);
             case "activity-entry-source-category" -> collectSourceCategoryOptions(options);
             case "activity-entry-source-leaf" -> collectEmissionSourceLeafOptions(options, safeQuery);
-            case DIMENSION_FIELD_OPTION -> collectDimensionFieldOptions(options, safeQuery.getDimensionCode(), safeQuery.getField());
+            case DIMENSION_FIELD_OPTION -> collectDimensionFieldOptions(options, safeQuery);
             default -> throw new ServiceException("不支持的企业选项编码：" + optionCode);
         }
         return dedupeAndSort(options);
@@ -283,9 +266,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             Object value = valueColumn.apply(row);
             String rawLabel = normalizeValue(labelColumn.apply(row));
             String rawValue = normalizeValue(value);
-            String label = StringUtils.isBlank(rawLabel) || rawLabel.equals(rawValue)
-                ? rawValue
-                : rawValue + " / " + rawLabel;
+            String label = StringUtils.isBlank(rawLabel) ? rawValue : rawLabel;
             addOption(target, label, value);
         }
     }
@@ -297,7 +278,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             .orderByAsc(CeCompanyFactory::getCompanyCode)
             .orderByAsc(CeCompanyFactory::getFactoryCode));
         for (CeCompanyFactory row : rows) {
-            addOption(target, labelWithName(row.getCompanyCode(), row.getCompanyName()), row.getCompanyCode(), companyFactoryRecord(row));
+            addOption(target, businessNameLabel(row.getCompanyCode(), row.getCompanyName()), row.getCompanyCode(), companyFactoryRecord(row));
         }
     }
 
@@ -308,7 +289,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             .orderByAsc(CeCompanyFactory::getCompanyCode)
             .orderByAsc(CeCompanyFactory::getFactoryCode));
         for (CeCompanyFactory row : rows) {
-            addOption(target, labelWithName(row.getFactoryCode(), row.getFactoryName()), row.getFactoryCode(), companyFactoryRecord(row));
+            addOption(target, businessNameLabel(row.getFactoryCode(), row.getFactoryName()), row.getFactoryCode(), companyFactoryRecord(row));
         }
     }
 
@@ -319,7 +300,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             .orderByAsc(CeCompanyFactory::getCompanyCode)
             .orderByAsc(CeCompanyFactory::getFactoryCode));
         for (CeCompanyFactory row : rows) {
-            addOption(target, labelWithName(row.getFactoryName(), row.getFactoryCode()), row.getFactoryName(), companyFactoryRecord(row));
+            addOption(target, labelForRaw(row.getFactoryName()), row.getFactoryName(), companyFactoryRecord(row));
         }
     }
 
@@ -328,17 +309,13 @@ public class CeOptionServiceImpl implements ICeOptionService {
             .select(
                 CeEmissionSourceCategory::getCategorySk,
                 CeEmissionSourceCategory::getGhgScope,
-                CeEmissionSourceCategory::getGhgScopeCategory
+                CeEmissionSourceCategory::getGhgScopeCategory,
+                CeEmissionSourceCategory::getUnifiedStandardCategory
             )
             .isNotNull(CeEmissionSourceCategory::getCategorySk)
             .orderByAsc(CeEmissionSourceCategory::getCategorySk));
         for (CeEmissionSourceCategory row : rows) {
-            String label = Stream.of(row.getGhgScope(), row.getGhgScopeCategory())
-                .map(this::normalizeValue)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .reduce((left, right) -> left + " / " + right)
-                .orElse(normalizeValue(row.getCategorySk()));
+            String label = businessNameLabel(row.getCategorySk(), row.getUnifiedStandardCategory());
             Map<String, Object> record = new LinkedHashMap<>();
             record.put("sourceCategoryKey", row.getCategorySk());
             record.put("scopeName", row.getGhgScope());
@@ -347,24 +324,50 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
-    private <T> void collectSourceCategoryOptionsFromRows(List<CeOptionVo> target, BaseMapper<T> mapper,
-                                                          SFunction<T, ?> valueColumn,
-                                                          SFunction<T, ?> scopeColumn,
-                                                          SFunction<T, ?> subcategoryColumn) {
-        List<T> rows = mapper.selectList(new LambdaQueryWrapper<T>()
-            .select(valueColumn, scopeColumn, subcategoryColumn)
-            .isNotNull(valueColumn)
-            .groupBy(valueColumn, scopeColumn, subcategoryColumn)
-            .orderByAsc(valueColumn));
-        for (T row : rows) {
-            Object value = valueColumn.apply(row);
-            String label = Stream.of(scopeColumn.apply(row), subcategoryColumn.apply(row))
-                .map(this::normalizeValue)
-                .filter(StringUtils::isNotBlank)
-                .distinct()
-                .reduce((left, right) -> left + " / " + right)
-                .orElse(normalizeValue(value));
-            addOption(target, label, value);
+    private void collectSourceScopeOptions(List<CeOptionVo> target) {
+        List<CeEmissionSourceCategory> rows = emissionSourceCategoryMapper.selectList(new LambdaQueryWrapper<CeEmissionSourceCategory>()
+            .select(CeEmissionSourceCategory::getGhgScope)
+            .isNotNull(CeEmissionSourceCategory::getGhgScope)
+            .groupBy(CeEmissionSourceCategory::getGhgScope)
+            .orderByAsc(CeEmissionSourceCategory::getGhgScope));
+        for (CeEmissionSourceCategory row : rows) {
+            String scopeName = normalizeValue(row.getGhgScope());
+            if (StringUtils.isBlank(scopeName)) {
+                continue;
+            }
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("scopeName", scopeName);
+            addOption(target, scopeName, scopeName, record);
+        }
+    }
+
+    private void collectSourceSubcategoryOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
+        LambdaQueryWrapper<CeEmissionSourceCategory> wrapper = new LambdaQueryWrapper<CeEmissionSourceCategory>()
+            .select(
+                CeEmissionSourceCategory::getCategorySk,
+                CeEmissionSourceCategory::getGhgScope,
+                CeEmissionSourceCategory::getGhgScopeCategory,
+                CeEmissionSourceCategory::getUnifiedStandardCategory
+            )
+            .isNotNull(CeEmissionSourceCategory::getCategorySk)
+            .isNotNull(CeEmissionSourceCategory::getGhgScopeCategory)
+            .orderByAsc(CeEmissionSourceCategory::getCategorySk);
+        String scopeName = normalizeValue(query.getScopeName());
+        if (StringUtils.isNotBlank(scopeName)) {
+            wrapper.eq(CeEmissionSourceCategory::getGhgScope, scopeName);
+        }
+        List<CeEmissionSourceCategory> rows = emissionSourceCategoryMapper.selectList(wrapper);
+        for (CeEmissionSourceCategory row : rows) {
+            String subcategory = normalizeValue(row.getGhgScopeCategory());
+            if (StringUtils.isBlank(subcategory)) {
+                continue;
+            }
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("sourceCategoryKey", row.getCategorySk());
+            record.put("scopeName", row.getGhgScope());
+            record.put("scopeSubcategory", subcategory);
+            record.put("sourceCategoryName", row.getUnifiedStandardCategory());
+            addOption(target, subcategory, row.getCategorySk(), record);
         }
     }
 
@@ -373,7 +376,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
         Map<String, String> factorNameCache = loadFactorDisplayNameCache(rows);
         Map<String, String> efFactorUnitCache = loadEfFactorActivityUnitCache(rows);
         for (CeEmissionSource row : rows) {
-            String label = labelWithName(row.getSourceIdentificationCode(), row.getSourceIdentificationName());
+            String label = businessNameLabel(row.getSourceIdentificationCode(), row.getSourceIdentificationName());
             addOption(target, label, row.getSourceIdentificationCode(), emissionSourceRecord(row, factorNameCache, efFactorUnitCache));
         }
     }
@@ -417,23 +420,52 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
-    private void collectDimensionStatusOptions(List<CeOptionVo> target) {
-        for (String dimensionCode : ALLOWED_DIMENSION_CODES) {
-            for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
-                addOption(target, labelForStatus(record.getStatus()), record.getStatus());
+    private void collectEfFactorEmissionSourceOptions(List<CeOptionVo> target) {
+        for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode("ef-factor")) {
+            String sourceName = normalizeValue(record.getRecordName());
+            if (StringUtils.isBlank(sourceName)) {
+                continue;
             }
+            addOption(target, sourceName, sourceName, efFactorRecord(record));
         }
     }
 
-    private void collectSystemDeptOptions(List<CeOptionVo> target) {
-        for (SysDept dept : sysDeptMapper.selectList(new LambdaQueryWrapper<SysDept>()
-            .select(SysDept::getDeptId, SysDept::getParentId, SysDept::getDeptName, SysDept::getStatus)
+    private void collectDimensionStatusOptions(List<CeOptionVo> target) {
+        addOption(target, labelForStatus("0"), "0");
+        addOption(target, labelForStatus("1"), "1");
+    }
+
+    private void collectSystemDeptOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
+        Map<Long, SysDept> activeDeptById = sysDeptMapper.selectList(new LambdaQueryWrapper<SysDept>()
+            .select(SysDept::getDeptId, SysDept::getParentId, SysDept::getDeptName, SysDept::getDeptCategory, SysDept::getStatus)
             .eq(SysDept::getStatus, "0")
             .isNotNull(SysDept::getDeptName)
             .orderByAsc(SysDept::getOrderNum)
-            .orderByAsc(SysDept::getDeptId))) {
-            addOption(target, labelForRaw(dept.getDeptName()), dept.getDeptName(), systemDeptRecord(dept));
+            .orderByAsc(SysDept::getDeptId))
+            .stream()
+            .collect(LinkedHashMap::new, (map, dept) -> map.put(dept.getDeptId(), dept), Map::putAll);
+        for (SysDept dept : activeDeptById.values()) {
+            SysDept factory = activeDeptById.get(dept.getParentId());
+            if (!isFactoryDept(factory, activeDeptById) || !matchesFactoryFilter(factory, query)) {
+                continue;
+            }
+            String label = normalizeValue(factory.getDeptName()) + " / " + normalizeValue(dept.getDeptName());
+            String value = normalizeValue(factory.getDeptName()) + "|" + normalizeValue(dept.getDeptName());
+            addOption(target, label, value, systemDeptRecord(dept, factory));
         }
+    }
+
+    private boolean isFactoryDept(SysDept dept, Map<Long, SysDept> activeDeptById) {
+        if (dept == null || dept.getParentId() == null) {
+            return false;
+        }
+        SysDept company = activeDeptById.get(dept.getParentId());
+        return company != null && dept.getDeptCategory() != null && dept.getDeptCategory().equals(company.getDeptCategory());
+    }
+
+    private boolean matchesFactoryFilter(SysDept factory, CeOptionQueryBo query) {
+        String factoryName = normalizeValue(query.getFactoryName());
+        return StringUtils.isBlank(factoryName) || factoryName.equals(normalizeValue(factory.getDeptName()));
     }
 
     private void collectDataFrequencyOptions(List<CeOptionVo> target) {
@@ -452,13 +484,10 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
-    private String labelWithName(Object value, Object name) {
+    private String businessNameLabel(Object value, Object name) {
         String rawValue = normalizeValue(value);
         String rawName = normalizeValue(name);
-        if (StringUtils.isBlank(rawName) || rawName.equals(rawValue)) {
-            return rawValue;
-        }
-        return rawValue + " / " + rawName;
+        return StringUtils.isBlank(rawName) ? rawValue : rawName;
     }
 
     private void collectIntensityTargetOptions(List<CeOptionVo> target) {
@@ -543,11 +572,15 @@ public class CeOptionServiceImpl implements ICeOptionService {
         return record;
     }
 
-    private Map<String, Object> systemDeptRecord(SysDept dept) {
+    private Map<String, Object> systemDeptRecord(SysDept dept, SysDept factory) {
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("deptId", dept.getDeptId());
         record.put("parentId", dept.getParentId());
         record.put("deptName", normalizeValue(dept.getDeptName()));
+        record.put("responsibleDept", normalizeValue(dept.getDeptName()));
+        record.put("factoryDeptId", factory == null ? null : factory.getDeptId());
+        record.put("factoryName", factory == null ? "" : normalizeValue(factory.getDeptName()));
+        record.put("companyCode", normalizeValue(dept.getDeptCategory()));
         record.put("status", normalizeValue(dept.getStatus()));
         return record;
     }
@@ -578,7 +611,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             .filter(StringUtils::isNotBlank)
             .findFirst()
             .orElse("");
-        String label = labelWithName(rawValue, name);
+        String label = businessNameLabel(rawValue, name);
         String normalizedUnit = normalizeValue(unit);
         return StringUtils.isNotBlank(normalizedUnit) ? label + " (" + normalizedUnit + ")" : label;
     }
@@ -658,6 +691,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
         record.put("id", source.getId());
         record.put("companyCode", source.getCompanyCode());
         record.put("companyName", source.getCompanyName());
+        record.put("factoryCode", source.getFactoryCode());
         record.put("factoryName", source.getFactoryName());
         record.put("sourceCategoryKey", source.getSourceCategoryKey());
         record.put("scopeName", source.getScopeName());
@@ -787,18 +821,21 @@ public class CeOptionServiceImpl implements ICeOptionService {
         return cache;
     }
 
-    private void collectDimensionFieldOptions(List<CeOptionVo> target, String dimensionCode, String field) {
+    private void collectDimensionFieldOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
+        String dimensionCode = query.getDimensionCode();
+        String field = query.getField();
         validateDimensionOptionRequest(dimensionCode, field);
+        validateIndustryParentFilter(query);
         if ("company".equals(dimensionCode) && ("provinceCode".equals(field) || "provinceName".equals(field))) {
             collectCompanyProvinceOptions(target, field);
             return;
         }
         if ("company".equals(dimensionCode) && companyIndustryPair(field) != null) {
-            collectIndustryOptions(target, field);
+            collectIndustryOptions(target, field, query);
             return;
         }
         if ("industry".equals(dimensionCode) && companyIndustryPair(field) != null) {
-            collectIndustryOptions(target, field);
+            collectIndustryOptions(target, field, query);
             return;
         }
         for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode(dimensionCode)) {
@@ -818,21 +855,45 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
-    private void collectIndustryOptions(List<CeOptionVo> target, String field) {
+    private void collectIndustryOptions(List<CeOptionVo> target, String field, CeOptionQueryBo query) {
         String pairedField = companyIndustryPair(field);
         if (pairedField == null) {
             return;
         }
+        String parentField = normalizeValue(query.getParentField());
+        String parentValue = normalizeValue(query.getParentValue());
+        String requiredParentField = requiredIndustryParentField(field);
+        if (StringUtils.isNotBlank(requiredParentField)) {
+            if (StringUtils.isBlank(parentField) || StringUtils.isBlank(parentValue)) {
+                return;
+            }
+            if (!requiredParentField.equals(parentField)) {
+                throw new ServiceException("行业字段 " + field + " 需要按 " + requiredParentField + " 筛选");
+            }
+        }
+        boolean hasParentFilter = StringUtils.isNotBlank(parentField) && StringUtils.isNotBlank(parentValue);
         boolean codeSelected = field.endsWith("Code");
         String codeField = codeSelected ? field : pairedField;
         String nameField = codeSelected ? pairedField : field;
         for (CeDimensionRecordVo record : dimensionProjectionMapper.selectByDimensionCode("industry")) {
+            if (hasParentFilter && !parentValue.equals(normalizeValue(dimensionValue(record, parentField)))) {
+                continue;
+            }
             String code = normalizeValue(dimensionValue(record, codeField));
             String name = normalizeValue(dimensionValue(record, nameField));
             Object value = codeSelected ? code : name;
-            String label = codeSelected ? labelWithName(code, name) : labelWithName(name, code);
-            addOption(target, label, value, dimensionRecordMap(record));
+            String label = businessNameLabel(code, name);
+            addOption(target, label, value, industryRecordMap(record));
         }
+    }
+
+    private String requiredIndustryParentField(String field) {
+        return switch (field) {
+            case "industryDivisionCode", "industryDivisionName" -> "industrySectionCode";
+            case "industryGroupCode", "industryGroupName" -> "industryDivisionCode";
+            case "industryClassCode", "industryClassName" -> "industryGroupCode";
+            default -> null;
+        };
     }
 
     private String companyIndustryPair(String field) {
@@ -851,20 +912,37 @@ public class CeOptionServiceImpl implements ICeOptionService {
 
     private String provinceOptionLabel(String field, String provinceCode, String provinceName) {
         if ("provinceCode".equals(field) && StringUtils.isNotBlank(provinceCode) && StringUtils.isNotBlank(provinceName)) {
-            return provinceCode + " / " + provinceName;
+            return provinceName;
         }
         if ("provinceName".equals(field) && StringUtils.isNotBlank(provinceName) && StringUtils.isNotBlank(provinceCode)) {
-            return provinceName + " / " + provinceCode;
+            return provinceName;
         }
         return "provinceCode".equals(field) ? provinceCode : provinceName;
     }
 
     private Map<String, Object> provinceRecordMap(CeDimensionRecordVo record, String provinceCode, String provinceName) {
-        Map<String, Object> values = dimensionRecordMap(record);
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("recordCode", normalizeValue(record.getRecordCode()));
+        values.put("recordName", normalizeValue(record.getRecordName()));
         values.put("divisionCode", provinceCode);
         values.put("divisionName", provinceName);
         values.put("provinceCode", provinceCode);
         values.put("provinceName", provinceName);
+        return values;
+    }
+
+    private Map<String, Object> industryRecordMap(CeDimensionRecordVo record) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("recordCode", normalizeValue(record.getRecordCode()));
+        values.put("recordName", normalizeValue(record.getRecordName()));
+        values.put("industrySectionCode", normalizeValue(record.getIndustrySectionCode()));
+        values.put("industrySectionName", normalizeValue(record.getIndustrySectionName()));
+        values.put("industryDivisionCode", normalizeValue(record.getIndustryDivisionCode()));
+        values.put("industryDivisionName", normalizeValue(record.getIndustryDivisionName()));
+        values.put("industryGroupCode", normalizeValue(record.getIndustryGroupCode()));
+        values.put("industryGroupName", normalizeValue(record.getIndustryGroupName()));
+        values.put("industryClassCode", normalizeValue(record.getIndustryClassCode()));
+        values.put("industryClassName", normalizeValue(record.getIndustryClassName()));
         return values;
     }
 
@@ -988,6 +1066,16 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
         if (StringUtils.isBlank(field) || !ALLOWED_DIMENSION_FIELDS.contains(field)) {
             throw new ServiceException("不支持的维度字段：" + field);
+        }
+    }
+
+    private void validateIndustryParentFilter(CeOptionQueryBo query) {
+        String parentField = query.getParentField();
+        if (StringUtils.isBlank(parentField)) {
+            return;
+        }
+        if (!ALLOWED_INDUSTRY_PARENT_FIELDS.contains(parentField)) {
+            throw new ServiceException("不支持的行业父级字段：" + parentField);
         }
     }
 

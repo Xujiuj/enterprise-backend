@@ -5,6 +5,7 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.system.domain.bo.SysDeptBo;
 import org.dromara.system.domain.vo.SysDeptVo;
+import org.dromara.system.domain.vo.SysDeptImportVo;
 
 import java.util.List;
 
@@ -126,6 +127,14 @@ public interface ISysDeptService {
      * @return 结果
      */
     int insertDept(SysDeptBo bo);
+
+    /**
+     * Import departments and resolve their company/factory hierarchy.
+     *
+     * @param rows Excel rows
+     * @return imported row count
+     */
+    int importDeptList(List<SysDeptImportVo> rows);
 
     /**
      * 修改保存部门信息

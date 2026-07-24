@@ -32,6 +32,7 @@ public class CeLicenseGateInterceptor implements HandlerInterceptor {
         "/enterprise/factor-cache-version/", "factor-sync",
         "/enterprise/factor-confirmation/", "factor-confirm",
         "/enterprise/report-template-sync/", "report-template-download",
+        "/enterprise/report-content/sync", "report-template-download",
         "/enterprise/report-template-file/", "report-template-download",
         "/enterprise/data-validation/", "report-gate"
     );

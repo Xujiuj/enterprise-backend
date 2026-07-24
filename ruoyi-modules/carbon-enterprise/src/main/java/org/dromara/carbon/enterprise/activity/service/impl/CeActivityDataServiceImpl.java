@@ -25,6 +25,8 @@ import org.dromara.carbon.enterprise.intensity.mapper.CeIntensityDenominatorFact
 import org.dromara.carbon.enterprise.template.mapper.CeTemplateFieldMapper;
 import org.dromara.carbon.enterprise.template.mapper.CeTemplateSheetMapper;
 import org.dromara.carbon.enterprise.shared.service.ICeActivityDataService;
+import org.dromara.carbon.enterprise.shared.support.CeEnterpriseDataScopeSupport;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -60,6 +62,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     private static final String STATUS_SUBMITTED = "submitted";
     private static final String STATUS_LOCKED = "locked";
     private static final String STATUS_DRAFT = "draft";
+    private static final String STATUS_MISSING = "missing";
     private static final String TARGET_TABLE_CODE = "emission_activity";
     private static final String FIELD_SOURCE_CODE = "sourceIdentificationCode";
     private static final String FIELD_YEAR = "activityYear";
@@ -80,17 +83,18 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     private final CeCaptureRowMapper captureRowMapper;
     private final CeCaptureCellMapper captureCellMapper;
     private final CeCaptureBatchMapper captureBatchMapper;
+    private final CeEnterpriseDataScopeSupport dataScopeSupport;
 
     @Override
     public TableDataInfo<CeActivityDataVo> queryPageList(CeActivityDataBo bo, PageQuery pageQuery) {
-        LambdaQueryWrapper<CeActivityData> wrapper = applyDefaultListOrder(buildQueryWrapper(bo));
+        LambdaQueryWrapper<CeActivityData> wrapper = applyDefaultListOrder(applyResponsibleDeptScope(buildQueryWrapper(bo)));
         IPage<CeActivityDataVo> page = activityDataMapper.selectVoPage(pageQuery.build(), wrapper);
         return TableDataInfo.build(page);
     }
 
     @Override
     public List<CeActivityDataVo> queryList(CeActivityDataBo bo) {
-        return activityDataMapper.selectVoList(applyDefaultListOrder(buildQueryWrapper(bo)));
+        return activityDataMapper.selectVoList(applyDefaultListOrder(applyResponsibleDeptScope(buildQueryWrapper(bo))));
     }
 
     private LambdaQueryWrapper<CeActivityData> applyDefaultListOrder(LambdaQueryWrapper<CeActivityData> wrapper) {
@@ -208,11 +212,13 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
 
     @Override
     public CeActivityDataVo queryById(Long id) {
-        return activityDataMapper.selectVoById(id);
+        CeActivityDataVo row = activityDataMapper.selectVoById(id);
+        return row == null || dataScopeSupport.canAccessDept(row.getResponsibleDept()) ? row : null;
     }
 
     @Override
     public Boolean insertByBo(CeActivityDataBo bo) {
+        syncActivityFromEmissionSource(bo);
         CeActivityData add = MapstructUtils.convert(bo, CeActivityData.class);
         if (add.getDataStatus() == null) {
             add.setDataStatus(STATUS_DRAFT);
@@ -226,13 +232,24 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
 
     @Override
     public Boolean updateByBo(CeActivityDataBo bo) {
+        CeActivityData existing = activityDataMapper.selectById(bo.getId());
+        if (existing != null && !dataScopeSupport.canAccessDept(existing.getResponsibleDept())) {
+            throw new ServiceException("无权修改其他部门的活动数据");
+        }
+        syncActivityFromEmissionSource(bo);
         CeActivityData update = MapstructUtils.convert(bo, CeActivityData.class);
         return activityDataMapper.updateById(update) > 0;
     }
 
     @Override
     public Boolean deleteByIds(Collection<Long> ids) {
-        return activityDataMapper.deleteByIds(ids) > 0;
+        if (ids == null || ids.isEmpty()) {
+            return false;
+        }
+        LambdaQueryWrapper<CeActivityData> wrapper = new LambdaQueryWrapper<CeActivityData>()
+            .in(CeActivityData::getId, ids);
+        applyResponsibleDeptScope(wrapper);
+        return activityDataMapper.delete(wrapper) > 0;
     }
 
     @Override
@@ -242,8 +259,20 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         }
         CeActivityData update = new CeActivityData();
         update.setDataStatus(dataStatus);
-        return activityDataMapper.update(update, new LambdaQueryWrapper<CeActivityData>()
-            .in(CeActivityData::getId, ids)) > 0;
+        LambdaQueryWrapper<CeActivityData> wrapper = new LambdaQueryWrapper<CeActivityData>()
+            .in(CeActivityData::getId, ids);
+        applyResponsibleDeptScope(wrapper);
+        if (STATUS_SUBMITTED.equals(dataStatus)) {
+            wrapper.and(status -> status
+                .isNull(CeActivityData::getDataStatus)
+                .or()
+                .eq(CeActivityData::getDataStatus, "")
+                .or()
+                .eq(CeActivityData::getDataStatus, STATUS_DRAFT)
+                .or()
+                .eq(CeActivityData::getDataStatus, STATUS_MISSING));
+        }
+        return activityDataMapper.update(update, wrapper) > 0;
     }
 
     private LambdaQueryWrapper<CeActivityData> buildQueryWrapper(CeActivityDataBo bo) {
@@ -265,6 +294,45 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
             .eq(bo.getActivityYear() != null, CeActivityData::getActivityYear, bo.getActivityYear())
             .eq(bo.getActivityMonth() != null, CeActivityData::getActivityMonth, bo.getActivityMonth())
             .eq(StringUtils.isNotBlank(bo.getDataStatus()), CeActivityData::getDataStatus, bo.getDataStatus());
+    }
+
+    private LambdaQueryWrapper<CeActivityData> applyResponsibleDeptScope(LambdaQueryWrapper<CeActivityData> wrapper) {
+        if (dataScopeSupport.unrestricted()) {
+            return wrapper;
+        }
+        List<String> deptNames = dataScopeSupport.allowedDeptNames();
+        if (deptNames.isEmpty()) {
+            return wrapper.apply("1 = 0");
+        }
+        return wrapper.in(CeActivityData::getResponsibleDept, deptNames);
+    }
+
+    private void syncActivityFromEmissionSource(CeActivityDataBo bo) {
+        if (bo == null || StringUtils.isBlank(bo.getCompanyCode()) || StringUtils.isBlank(bo.getSourceIdentificationCode())) {
+            return;
+        }
+        CeEmissionSource source = emissionSourceMapper.selectList(new LambdaQueryWrapper<CeEmissionSource>()
+                .eq(CeEmissionSource::getCompanyCode, bo.getCompanyCode().trim())
+                .eq(CeEmissionSource::getSourceIdentificationCode, bo.getSourceIdentificationCode().trim())
+                .eq(CeEmissionSource::getEnabledFlag, Boolean.TRUE)
+                .orderByAsc(CeEmissionSource::getId))
+            .stream()
+            .findFirst()
+            .orElse(null);
+        if (source == null) {
+            return;
+        }
+        bo.setCompanyName(firstNonBlank(bo.getCompanyName(), source.getCompanyName()));
+        bo.setFactoryCode(firstNonBlank(bo.getFactoryCode(), source.getFactoryCode()));
+        bo.setFactoryName(firstNonBlank(bo.getFactoryName(), source.getFactoryName()));
+        bo.setSourceCategoryKey(firstNonBlank(bo.getSourceCategoryKey(), source.getSourceCategoryKey()));
+        bo.setScopeName(firstNonBlank(bo.getScopeName(), source.getScopeName()));
+        bo.setScopeSubcategory(firstNonBlank(bo.getScopeSubcategory(), source.getScopeSubcategory()));
+        bo.setSourceIdentificationName(firstNonBlank(bo.getSourceIdentificationName(), source.getSourceIdentificationName()));
+        bo.setEmissionSourceName(firstNonBlank(bo.getEmissionSourceName(), source.getEmissionSourceName()));
+        bo.setResponsibleDept(firstNonBlank(bo.getResponsibleDept(), source.getResponsibleDept()));
+        bo.setDataSource(firstNonBlank(bo.getDataSource(), source.getDataSource()));
+        bo.setFactorKey(firstNonBlank(bo.getFactorKey(), source.getFactorKey()));
     }
 
     private ActivityPeriod resolvePeriod(CeActivityDataBo bo) {
@@ -297,8 +365,10 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     }
 
     private List<CeEmissionSource> listEnabledEmissionSources() {
-        return emissionSourceMapper.selectList(new LambdaQueryWrapper<CeEmissionSource>()
-            .eq(CeEmissionSource::getEnabledFlag, true)
+        LambdaQueryWrapper<CeEmissionSource> wrapper = new LambdaQueryWrapper<CeEmissionSource>()
+            .eq(CeEmissionSource::getEnabledFlag, true);
+        applyEmissionSourceDeptScope(wrapper);
+        return emissionSourceMapper.selectList(wrapper
             .orderByAsc(CeEmissionSource::getSourceIdentificationCode)
             .orderByAsc(CeEmissionSource::getId));
     }
@@ -335,12 +405,25 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     }
 
     private List<CeActivityData> listActivities(ActivityPeriod period) {
-        return activityDataMapper.selectList(new LambdaQueryWrapper<CeActivityData>()
+        LambdaQueryWrapper<CeActivityData> wrapper = new LambdaQueryWrapper<CeActivityData>()
             .eq(CeActivityData::getActivityYear, period.year())
-            .eq(period.month() != null, CeActivityData::getActivityMonth, period.month())
+            .eq(period.month() != null, CeActivityData::getActivityMonth, period.month());
+        applyResponsibleDeptScope(wrapper);
+        return activityDataMapper.selectList(wrapper
             .orderByDesc(CeActivityData::getUpdateTime)
             .orderByDesc(CeActivityData::getCreateTime)
             .orderByDesc(CeActivityData::getId));
+    }
+
+    private LambdaQueryWrapper<CeEmissionSource> applyEmissionSourceDeptScope(LambdaQueryWrapper<CeEmissionSource> wrapper) {
+        if (dataScopeSupport.unrestricted()) {
+            return wrapper;
+        }
+        List<String> deptNames = dataScopeSupport.allowedDeptNames();
+        if (deptNames.isEmpty()) {
+            return wrapper.apply("1 = 0");
+        }
+        return wrapper.in(CeEmissionSource::getResponsibleDept, deptNames);
     }
 
     private List<CeGreenPowerCertificate> listGreenPowerCertificates(ActivityPeriod period) {
@@ -695,6 +778,10 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
             return source.getSourceIdentificationName();
         }
         return "--";
+    }
+
+    private static String firstNonBlank(String preferred, String fallback) {
+        return StringUtils.isNotBlank(preferred) ? preferred : fallback;
     }
 
     private static class SubmissionAggregate {

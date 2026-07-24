@@ -13,6 +13,7 @@ import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.web.core.BaseController;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +22,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -52,6 +55,12 @@ public class CeEmissionSourceController extends BaseController {
     @PostMapping
     public R<Void> add(@Validated(AddGroup.class) @RequestBody CeEmissionSourceBo bo) {
         return toAjax(emissionSourceService.insertByBo(bo));
+    }
+
+    @SaCheckPermission("enterprise:emissionSource:add")
+    @PostMapping(value = "/importData", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<Integer> importData(@RequestPart("file") MultipartFile file) {
+        return R.ok(emissionSourceService.importExcel(file));
     }
 
     @SaCheckPermission("enterprise:emissionSource:edit")

@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CeEmissionActivityValidationTest {
 
     private static final List<String> DERIVED_CODES = List.of(
-        "sourceIdentificationCode", "companyCode", "sourceCategoryKey", "activityUnit", "factorKey"
+        "sourceIdentificationCode", "companyCode", "sourceCategoryKey", "activityUnit", "factorKey",
+        "responsibleDept", "dataSource"
     );
 
     @Test
@@ -39,12 +40,10 @@ class CeEmissionActivityValidationTest {
         List<CeEmissionActivityFieldDescriptor> fields = service.listEntryFields();
 
         assertEquals(List.of(
-            "sourceIdentificationCode", "companyCode", "companyName", "factoryName", "sourceCategoryKey",
-            "scopeName", "scopeSubcategory", "sourceIdentificationName", "emissionSourceName", "activityUnit",
-            "activityYear", "activityMonth", "activityDate", "activityValue", "responsibleDept", "dataSource",
-            "sourceRemark", "factorKey"
+            "companyName", "factoryName", "scopeName", "scopeSubcategory", "sourceIdentificationName",
+            "emissionSourceName", "activityPeriod", "activityDate", "activityValue"
         ), fields.stream().map(CeEmissionActivityFieldDescriptor::getFieldCode).toList());
-        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18),
+        assertEquals(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9),
             fields.stream().map(CeEmissionActivityFieldDescriptor::getFieldOrder).toList());
     }
 
@@ -106,14 +105,12 @@ class CeEmissionActivityValidationTest {
             values.put("activityMonth", "13");
             values.put("activityDate", "bad-date");
             values.put("activityValue", "0");
-            values.put("responsibleDept", "");
         }));
 
         assertFalse(result.isValid());
         assertTrue(result.isBlocking());
         assertFalse(result.isDraftSavable());
         assertEquals(List.of(
-            "REQUIRED_FIELD_MISSING:responsibleDept:负责部门",
             "INVALID_TYPE:activityYear:年度",
             "INVALID_VALUE_DOMAIN:activityMonth:月份",
             "INVALID_TYPE:activityDate:日期",
@@ -178,6 +175,22 @@ class CeEmissionActivityValidationTest {
     }
 
     @Test
+    void boundDepartmentAndSourceDoNotRequireUserValidation() {
+        CeEmissionActivityValidationServiceImpl service = new CeEmissionActivityValidationServiceImpl(resolverWithoutDeptAndSource());
+
+        CeEmissionActivityValidationResult result = service.validate(request(values -> {
+            values.put("responsibleDept", "历史部门");
+            values.put("dataSource", "历史来源");
+        }));
+
+        assertTrue(result.isValid());
+        assertFalse(result.isBlocking());
+        assertTrue(result.getIssues().isEmpty());
+        assertFalse(resolvedValueMap(result).containsKey("responsibleDept"));
+        assertFalse(resolvedValueMap(result).containsKey("dataSource"));
+    }
+
+    @Test
     void missingMasterDataMatchBlocksRow() {
         CeEmissionActivityValidationServiceImpl service = new CeEmissionActivityValidationServiceImpl(code -> Optional.empty());
 
@@ -186,7 +199,7 @@ class CeEmissionActivityValidationTest {
 
         assertFalse(result.isValid());
         assertTrue(result.isBlocking());
-        assertEquals(List.of("MASTER_DATA_NOT_FOUND:sourceIdentificationCode:PK_排放源识别编号"), issueSummaries(result));
+        assertEquals(List.of("MASTER_DATA_NOT_FOUND:sourceIdentificationCode:排放源识别编号"), issueSummaries(result));
         assertFalse(resolvedValueMap(result).containsKey("companyCode"));
         assertEquals("2026", resolvedValueMap(result).get("activityYear"));
     }
@@ -232,7 +245,35 @@ class CeEmissionActivityValidationTest {
         values.put("emissionSourceName", "天然气");
         values.put("activityUnit", "Nm3");
         values.put("factorKey", "EF-2026-001");
+        values.put("responsibleDept", "生产部");
+        values.put("dataSource", "计量台账");
         return values;
+    }
+
+    private ICeEmissionActivityDerivedFieldResolver resolverWithoutDeptAndSource() {
+        return new ICeEmissionActivityDerivedFieldResolver() {
+            @Override
+            public Optional<CeEmissionActivityResolvedRow> resolve(String code) {
+                return "SRC-001".equals(code) ? Optional.of(resolvedRowWithoutDeptAndSource()) : Optional.empty();
+            }
+
+            @Override
+            public List<CeEmissionActivityResolvedRow> resolveByEntryFields(String companyName, String factoryName, String scope,
+                                                                            String scopeSubcategory, String sourceIdentificationName,
+                                                                            String emissionSourceName) {
+                return fakeResolver().resolveByEntryFields(companyName, factoryName, scope, scopeSubcategory, sourceIdentificationName,
+                    emissionSourceName).stream()
+                    .map(row -> resolvedRowWithoutDeptAndSource())
+                    .toList();
+            }
+
+            private CeEmissionActivityResolvedRow resolvedRowWithoutDeptAndSource() {
+                CeEmissionActivityResolvedRow row = fakeResolver().resolve("SRC-001").orElseThrow();
+                row.setResponsibleDept(null);
+                row.setDataSource(null);
+                return row;
+            }
+        };
     }
 
     private CeEmissionActivityValidationRequest request(Consumer<Map<String, String>> customizer) {
@@ -307,6 +348,8 @@ class CeEmissionActivityValidationTest {
                 row.setEmissionSourceName("天然气");
                 row.setUnit("Nm3");
                 row.setEmissionFactorCode("EF-2026-001");
+                row.setResponsibleDept("生产部");
+                row.setDataSource("计量台账");
                 return row;
             }
         };

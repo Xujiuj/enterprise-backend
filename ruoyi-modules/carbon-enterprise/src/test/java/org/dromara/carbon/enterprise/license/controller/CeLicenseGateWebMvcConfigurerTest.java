@@ -7,6 +7,7 @@ import org.dromara.carbon.enterprise.license.domain.CeLicenseGateResult;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseImportResult;
 import org.dromara.carbon.enterprise.activity.domain.vo.CeActivityDataVo;
 import org.dromara.carbon.enterprise.dimension.controller.CeDimensionRecordController;
+import org.dromara.carbon.enterprise.dimension.controller.CeDimensionSyncController;
 import org.dromara.carbon.enterprise.emission.controller.CeEmissionSourceController;
 import org.dromara.carbon.enterprise.extension.controller.CeExtensionFieldController;
 import org.dromara.carbon.enterprise.extension.controller.CeExtensionFieldValueController;
@@ -22,6 +23,7 @@ import org.dromara.carbon.enterprise.report.controller.CeReportTemplateSyncContr
 import org.dromara.carbon.enterprise.shared.controller.CeDataValidationController;
 import org.dromara.carbon.enterprise.shared.service.ICeActivityDataService;
 import org.dromara.carbon.enterprise.shared.service.ICeDimensionRecordService;
+import org.dromara.carbon.enterprise.shared.service.ICeDimensionSyncService;
 import org.dromara.carbon.enterprise.shared.service.ICeEmissionSourceService;
 import org.dromara.carbon.enterprise.shared.service.ICeFactorConfirmationService;
 import org.dromara.carbon.enterprise.shared.service.ICeFactorSyncService;
@@ -130,6 +132,9 @@ class CeLicenseGateWebMvcConfigurerTest {
     private ICeDimensionRecordService dimensionRecordService;
 
     @Autowired
+    private ICeDimensionSyncService dimensionSyncService;
+
+    @Autowired
     private ICeFactorSyncService factorSyncService;
 
     @Autowired
@@ -155,6 +160,7 @@ class CeLicenseGateWebMvcConfigurerTest {
             intensityMetricService,
             reportTemplateFileService,
             dimensionRecordService,
+            dimensionSyncService,
             factorSyncService,
             reportTemplateSyncService
         );
@@ -283,7 +289,7 @@ class CeLicenseGateWebMvcConfigurerTest {
             mockMvc.perform(get(route))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code", is(403)))
-                .andExpect(jsonPath("$.msg", is("enterprise license gate denied access")))
+                .andExpect(jsonPath("$.msg", is("\u4f01\u4e1a\u6388\u6743\u7f51\u5173\u62d2\u7edd\u8bbf\u95ee")))
                 .andExpect(jsonPath("$.data.gate.reason", is("EXPIRED")));
         }
 
@@ -318,10 +324,10 @@ class CeLicenseGateWebMvcConfigurerTest {
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect(content().encoding("UTF-8"))
             .andExpect(jsonPath("$.code", is(403)))
-            .andExpect(jsonPath("$.msg", is("enterprise license gate denied access")))
+            .andExpect(jsonPath("$.msg", is("\u4f01\u4e1a\u6388\u6743\u7f51\u5173\u62d2\u7edd\u8bbf\u95ee")))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.data.gate.reason", is("FEATURE_NOT_ENABLED")))
-            .andExpect(jsonPath("$.data.gate.message", is("license does not include the required feature")));
+            .andExpect(jsonPath("$.data.gate.message", is("\u5f53\u524d\u6388\u6743\u672a\u5305\u542b\u6240\u9700\u529f\u80fd")));
 
         verify(licenseGateService).evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("report-template-download"));
         verifyNoInteractions(reportTemplateFileService);
@@ -338,6 +344,20 @@ class CeLicenseGateWebMvcConfigurerTest {
 
         verify(licenseGateService).evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class), eq("factor-sync"));
         verifyNoInteractions(factorSyncService);
+    }
+
+    @Test
+    void deniesVendorDimensionSyncWhenLicenseIsDenied() throws Exception {
+        when(licenseGateService.evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class)))
+            .thenReturn(new CeLicenseGateResult("DENY", "INSTALL_ID_MISMATCH", null));
+
+        mockMvc.perform(post("/enterprise/dimension-sync/refresh")
+                .param("dimensionCode", "admin-division"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.data.gate.reason", is("INSTALL_ID_MISMATCH")));
+
+        verify(licenseGateService).evaluateCurrent(eq(EXPECTED_INSTALL_ID), any(Date.class));
+        verifyNoInteractions(dimensionSyncService);
     }
 
     @Test
@@ -368,7 +388,7 @@ class CeLicenseGateWebMvcConfigurerTest {
             .andExpect(jsonPath("$.code", is(200)))
             .andExpect(jsonPath("$.data.valid", is(false)))
             .andExpect(jsonPath("$.data.status", is("EXPIRED")))
-            .andExpect(jsonPath("$.data.message", is("license has expired")));
+            .andExpect(jsonPath("$.data.message", is("\u6388\u6743\u5df2\u8fc7\u671f")));
 
         verifyNoInteractions(licenseGateService);
     }
@@ -440,6 +460,11 @@ class CeLicenseGateWebMvcConfigurerTest {
         @Bean
         ICeDimensionRecordService dimensionRecordService() {
             return mock(ICeDimensionRecordService.class);
+        }
+
+        @Bean
+        ICeDimensionSyncService dimensionSyncService() {
+            return mock(ICeDimensionSyncService.class);
         }
 
         @Bean
@@ -531,6 +556,11 @@ class CeLicenseGateWebMvcConfigurerTest {
         }
 
         @Bean
+        CeDimensionSyncController ceDimensionSyncController(ICeDimensionSyncService dimensionSyncService) {
+            return new CeDimensionSyncController(dimensionSyncService);
+        }
+
+        @Bean
         CeFactorSyncController ceFactorSyncController(ICeFactorSyncService factorSyncService) {
             return new CeFactorSyncController(factorSyncService);
         }
@@ -553,8 +583,9 @@ class CeLicenseGateWebMvcConfigurerTest {
         }
 
         @Bean
-        CeLicenseGateController ceLicenseGateController(ICeLicenseGateService licenseGateService) {
-            return new CeLicenseGateController(licenseGateService);
+        CeLicenseGateController ceLicenseGateController(ICeLicenseGateService licenseGateService,
+                                                        CeLicenseInstallIdProvider installIdProvider) {
+            return new CeLicenseGateController(licenseGateService, installIdProvider);
         }
 
         @Bean

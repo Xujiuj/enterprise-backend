@@ -5,6 +5,8 @@ import org.dromara.carbon.enterprise.license.domain.CeLicenseGateResult;
 import org.dromara.carbon.enterprise.license.domain.vo.CeLicenseStateVo;
 import org.dromara.carbon.enterprise.shared.service.ICeLicenseGateService;
 import org.dromara.carbon.enterprise.shared.service.ICeLicenseStateService;
+import org.dromara.carbon.enterprise.vendor.client.CeVendorLicenseOpenClient;
+import org.dromara.carbon.enterprise.vendor.domain.CeVendorLicenseCurrentResponse;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +25,7 @@ public class CeLicenseGateServiceImpl implements ICeLicenseGateService {
     private static final long STATE_CACHE_TTL_NANOS = TimeUnit.SECONDS.toNanos(5);
 
     private final ICeLicenseStateService licenseStateService;
+    private final CeVendorLicenseOpenClient vendorLicenseOpenClient;
     private volatile CeLicenseStateVo cachedCurrentState;
     private volatile long cachedCurrentStateAtNanos;
     private volatile boolean cachedCurrentStateLoaded;
@@ -49,7 +52,34 @@ public class CeLicenseGateServiceImpl implements ICeLicenseGateService {
         if (StringUtils.isNotBlank(requiredFeatureCode) && !hasFeature(currentState.getFeatureCodes(), requiredFeatureCode)) {
             return new CeLicenseGateResult("DENY", "FEATURE_NOT_ENABLED", currentState);
         }
+        CeLicenseGateResult vendorResult = evaluateVendorBinding(currentState, requiredFeatureCode);
+        if (vendorResult != null) {
+            return vendorResult;
+        }
         return new CeLicenseGateResult("ALLOW", "VALID", currentState);
+    }
+
+    private CeLicenseGateResult evaluateVendorBinding(CeLicenseStateVo currentState, String requiredFeatureCode) {
+        try {
+            CeVendorLicenseCurrentResponse response = vendorLicenseOpenClient.currentLicense(
+                currentState.getLicenseId(),
+                currentState.getInstallId(),
+                currentState.getKeyId(),
+                currentState.getCurrentSummary()
+            );
+            if (response == null || !"active".equalsIgnoreCase(response.getStatus())) {
+                return new CeLicenseGateResult("DENY", "VENDOR_LICENSE_NOT_ACTIVE", currentState);
+            }
+            if (!Objects.equals(currentState.getLicenseId(), response.getLicenseId())) {
+                return new CeLicenseGateResult("DENY", "LICENSE_BINDING_FAILED", currentState);
+            }
+            if (StringUtils.isNotBlank(requiredFeatureCode) && !hasFeature(response.getFeatureCodes(), requiredFeatureCode)) {
+                return new CeLicenseGateResult("DENY", "FEATURE_NOT_ENABLED", currentState);
+            }
+            return null;
+        } catch (Exception e) {
+            return new CeLicenseGateResult("DENY", "LICENSE_BINDING_FAILED", currentState);
+        }
     }
 
     private CeLicenseStateVo queryCurrentStateCached() {
@@ -76,7 +106,11 @@ public class CeLicenseGateServiceImpl implements ICeLicenseGateService {
         if (StringUtils.isBlank(featureCodes)) {
             return false;
         }
-        return Arrays.stream(featureCodes.split("[,;\\s]+"))
+        String normalized = featureCodes
+            .replace("[", "")
+            .replace("]", "")
+            .replace("\"", "");
+        return Arrays.stream(normalized.split("[,;\\s]+"))
             .filter(StringUtils::isNotBlank)
             .anyMatch(requiredFeatureCode::equals);
     }

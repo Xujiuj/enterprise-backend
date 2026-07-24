@@ -20,6 +20,79 @@ IF OBJECT_ID(N'dbo.sys_role_menu', N'U') IS NULL
     THROW 51000, 'Missing dbo.sys_role_menu. Run the RuoYi base SQL before carbon_enterprise_init.sql.', 1;
 GO
 
+IF OBJECT_ID(N'dbo.ce_dynamic_module', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ce_dynamic_module (
+        id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_ce_dynamic_module PRIMARY KEY,
+        module_code NVARCHAR(50) NOT NULL,
+        module_name NVARCHAR(100) NOT NULL,
+        table_name NVARCHAR(64) NOT NULL,
+        sheet_name NVARCHAR(100) NULL,
+        permission_prefix NVARCHAR(100) NOT NULL,
+        menu_id BIGINT NULL,
+        status NCHAR(1) NOT NULL CONSTRAINT df_ce_dynamic_module_status DEFAULT (N'0'),
+        create_by BIGINT NULL,
+        create_time DATETIME2 NULL,
+        update_by BIGINT NULL,
+        update_time DATETIME2 NULL
+    );
+    CREATE UNIQUE INDEX ux_ce_dynamic_module_code ON dbo.ce_dynamic_module(module_code);
+    CREATE UNIQUE INDEX ux_ce_dynamic_module_table ON dbo.ce_dynamic_module(table_name);
+END;
+
+IF OBJECT_ID(N'dbo.ce_dynamic_field', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ce_dynamic_field (
+        id BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_ce_dynamic_field PRIMARY KEY,
+        module_id BIGINT NOT NULL,
+        field_code NVARCHAR(64) NOT NULL,
+        field_name NVARCHAR(120) NOT NULL,
+        db_column NVARCHAR(64) NOT NULL,
+        value_type NVARCHAR(20) NOT NULL,
+        ui_type NVARCHAR(20) NOT NULL,
+        required_flag BIT NOT NULL CONSTRAINT df_ce_dynamic_field_required DEFAULT (0),
+        searchable_flag BIT NOT NULL CONSTRAINT df_ce_dynamic_field_searchable DEFAULT (0),
+        list_visible_flag BIT NOT NULL CONSTRAINT df_ce_dynamic_field_list DEFAULT (1),
+        form_visible_flag BIT NOT NULL CONSTRAINT df_ce_dynamic_field_form DEFAULT (1),
+        sort_order INT NOT NULL,
+        max_length INT NULL,
+        numeric_precision INT NULL,
+        numeric_scale INT NULL,
+        CONSTRAINT fk_ce_dynamic_field_module FOREIGN KEY (module_id) REFERENCES dbo.ce_dynamic_module(id)
+    );
+    CREATE UNIQUE INDEX ux_ce_dynamic_field_code ON dbo.ce_dynamic_field(module_id, field_code);
+END;
+GO
+
+IF OBJECT_ID(N'dbo.ce_report_setting', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ce_report_setting (
+        setting_key NVARCHAR(100) NOT NULL CONSTRAINT pk_ce_report_setting PRIMARY KEY,
+        setting_value NVARCHAR(MAX) NOT NULL,
+        update_by BIGINT NULL,
+        update_time DATETIME2 NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT 1 FROM dbo.ce_report_setting WHERE setting_key = N'powerbi.embedUrl')
+    INSERT INTO dbo.ce_report_setting(setting_key, setting_value, update_by, update_time)
+    VALUES (
+        N'powerbi.embedUrl',
+        N'https://app.powerbi.com/view?r=eyJrIjoiYjQzODVjYmEtYzFiMy00NDQ0LWIwZTAtMjM2YmVjOWNlZDAyIiwidCI6ImU2NDExZmRiLTZkNzctNGZmZC1iMDE1LTYxOWM3NWIxMzc2OCIsImMiOjEwfQ%3D%3D',
+        NULL,
+        SYSDATETIME()
+    );
+
+IF OBJECT_ID(N'dbo.ce_emission_source_category', N'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1 FROM sys.indexes
+        WHERE object_id = OBJECT_ID(N'dbo.ce_emission_source_category')
+          AND name = N'ix_ce_emission_source_category_version'
+   )
+    CREATE INDEX ix_ce_emission_source_category_version
+        ON dbo.ce_emission_source_category(version_no, category_sk, is_current);
+GO
+
 IF OBJECT_ID(N'dbo.ce_extension_field', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ce_extension_field (
@@ -98,7 +171,7 @@ BEGIN
                    license_number = NULL,
                    package_id = NULL,
                    expire_time = NULL,
-                   account_count = NULL,
+                   account_count = -1,
                    status = source.status,
                    del_flag = source.del_flag,
                    update_by = @createBy,
@@ -108,7 +181,7 @@ BEGIN
                 expire_time, account_count, license_number, create_dept, status, del_flag, create_by, update_by,
                 create_time, update_time, remark)
         VALUES (source.id, source.tenant_id, source.contact_user_name, source.contact_phone, source.company_name,
-                NULL, source.intro, NULL, NULL, NULL, NULL, NULL, source.create_dept, source.status,
+                NULL, source.intro, NULL, NULL, NULL, -1, NULL, source.create_dept, source.status,
                 source.del_flag, @createBy, NULL, @now, NULL, NULL);
 END;
 
@@ -171,8 +244,8 @@ IF OBJECT_ID(N'dbo.sys_client', N'U') IS NOT NULL
 BEGIN
     MERGE dbo.sys_client AS target
     USING (VALUES
-        (1, N'e5cd7e4891bf95d1d19206ce24a7b32e', N'pc', N'pc123', N'password,social', N'pc', 1800, 604800, N'0', N'0'),
-        (2, N'428a8310cd442757ae699df5d894f051', N'app', N'app123', N'password,sms,social', N'android', 1800, 604800, N'0', N'0')
+        (1, N'e5cd7e4891bf95d1d19206ce24a7b32e', N'pc', N'pc123', N'password,social', N'pc', 3600, 3600, N'0', N'0'),
+        (2, N'428a8310cd442757ae699df5d894f051', N'app', N'app123', N'password,sms,social', N'android', 3600, 3600, N'0', N'0')
     ) AS source(id, client_id, client_key, client_secret, grant_type, device_type, active_timeout, timeout, status, del_flag)
     ON target.client_id = source.client_id
     WHEN MATCHED THEN
@@ -415,6 +488,11 @@ VALUES
     (101, N'角色管理', 1, 2, N'role', N'system/role/index', N'', 1, 0, N'C', N'0', N'0', N'system:role:list', N'peoples', N'角色管理'),
     (102, N'菜单管理', 1, 3, N'menu', N'system/menu/index', N'', 1, 0, N'C', N'0', N'0', N'system:menu:list', N'tree-table', N'菜单管理'),
     (900107, N'扩展字段配置', 1, 5, N'extension-field', N'enterprise/extensionField/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:extensionField:list', N'form', N'扩展字段配置'),
+    (900280, N'动态数据管理', 0, 7, N'dynamic-data', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'table', N'Excel动态页面目录'),
+    (900281, N'页面生成管理', 900280, 1, N'module-generator', N'enterprise/dynamicModule/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:dynamicModule:list', N'upload', N'上传Excel生成管理页面'),
+    (900282, N'Excel预览', 900281, 1, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:dynamicModule:preview', N'#', N'Excel页面结构预览权限'),
+    (900283, N'生成页面', 900281, 2, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:dynamicModule:generate', N'#', N'生成动态页面权限'),
+    (900284, N'Power BI链接配置', 900164, 1, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:reports:powerbi:edit', N'#', N'配置企业Power BI嵌入链接'),
 
     (900100, N'系统授权', 0, 1, N'system-auth', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'link', N'系统授权目录'),
     (900102, N'授权管理', 900100, 1, N'license-import', N'enterprise/licenseImport/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:licenseImport:import', N'link', N'授权管理'),
@@ -454,6 +532,7 @@ VALUES
     (900164, N'温室气体核算报表', 900160, 2, N'powerbi-report', N'enterprise/reports/powerbi', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reports:view', N'chart', N'Power BI温室气体核算报表'),
     (900162, N'数据验证', 900160, 3, N'data-validation', N'enterprise/dataValidation/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:dataValidation:view', N'validCode', N'数据验证'),
     (900163, N'报表模板下载', 900160, 4, N'report-template-download', N'enterprise/reportTemplateFile/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:reportTemplateFile:list', N'link', N'报表模板下载'),
+    (900165, N'103版本记录', 900160, 5, N'emission-source-category-history', N'enterprise/dimension/index', N'{"code":"emission-source-category-history"}', 1, 0, N'C', N'0', N'0', N'enterprise:dimension:list', N'history', N'103排放源分类全部历史版本'),
 
     (900230, N'日志', 0, 9, N'log', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'log', N'日志目录'),
     (900231, N'操作日志', 900230, 1, N'operlog', N'monitor/operlog/index', N'', 1, 0, N'C', N'0', N'0', N'monitor:operlog:list', N'form', N'操作日志'),
@@ -676,7 +755,7 @@ SELECT 900002, menu_id
     900107, 900249, 900250, 900254, 900255, 900256, 900272,
     900110, 900175, 900176,
     900120, 900121, 900122, 900123, 900124, 900125, 900200, 900201, 900205, 900206, 900207, 900208,
-    900160, 900161, 900164, 900162, 900163, 900240, 900241, 900242, 900243, 900244, 900245, 900246, 900247, 900248,
+    900160, 900161, 900164, 900162, 900163, 900165, 900240, 900241, 900242, 900243, 900244, 900245, 900246, 900247, 900248,
     900268, 900269, 900270, 900271,
     900230, 900231, 900232
  );
@@ -717,7 +796,7 @@ SELECT 900005, menu_id
   FROM @menus
  WHERE menu_id IN (
     900106,
-    900160, 900161, 900164, 900162, 900163, 900240, 900241, 900243, 900244, 900245,
+    900160, 900161, 900164, 900162, 900163, 900165, 900240, 900241, 900243, 900244, 900245,
     900246, 900247, 900248, 900269, 900270, 900271
  );
 

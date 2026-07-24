@@ -22,5 +22,12 @@ public class CeVendorDimensionListResponse implements Serializable {
 
     private long total;
 
+    /** Vendor-controlled synchronization boundary for 103 versions. */
+    private String publicationId;
+
+    private String publishMode;
+
+    private List<String> publishedVersions = new ArrayList<>();
+
     private List<CeVendorDimensionRecord> records = new ArrayList<>();
 }

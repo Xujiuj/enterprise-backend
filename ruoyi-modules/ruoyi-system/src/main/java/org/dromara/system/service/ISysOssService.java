@@ -53,6 +53,14 @@ public interface ISysOssService {
     SysOssVo upload(MultipartFile file);
 
     /**
+     * Upload a user avatar to local static storage and save an OSS record.
+     *
+     * @param file avatar image file
+     * @return saved OSS record with public URL
+     */
+    SysOssVo uploadLocalAvatar(MultipartFile file);
+
+    /**
      * 上传文件到对象存储服务，并保存文件信息到数据库
      *
      * @param file 要上传的文件对象

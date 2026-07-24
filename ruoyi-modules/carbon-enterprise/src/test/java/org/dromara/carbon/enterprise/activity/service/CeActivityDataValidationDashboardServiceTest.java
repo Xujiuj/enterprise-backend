@@ -24,6 +24,7 @@ import org.dromara.carbon.enterprise.intensity.mapper.CeIntensityDenominatorFact
 import org.dromara.carbon.enterprise.template.mapper.CeTemplateFieldMapper;
 import org.dromara.carbon.enterprise.template.mapper.CeTemplateSheetMapper;
 import org.dromara.carbon.enterprise.activity.service.impl.CeActivityDataServiceImpl;
+import org.dromara.carbon.enterprise.shared.support.CeEnterpriseDataScopeSupport;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -76,6 +77,8 @@ class CeActivityDataValidationDashboardServiceTest {
         CeCaptureRowMapper captureRowMapper = mock(CeCaptureRowMapper.class);
         CeCaptureCellMapper captureCellMapper = mock(CeCaptureCellMapper.class);
         CeCaptureBatchMapper captureBatchMapper = mock(CeCaptureBatchMapper.class);
+        CeEnterpriseDataScopeSupport dataScopeSupport = mock(CeEnterpriseDataScopeSupport.class);
+        when(dataScopeSupport.unrestricted()).thenReturn(true);
 
         service = new CeActivityDataServiceImpl(
             activityDataMapper,
@@ -86,7 +89,8 @@ class CeActivityDataValidationDashboardServiceTest {
             templateFieldMapper,
             captureRowMapper,
             captureCellMapper,
-            captureBatchMapper
+            captureBatchMapper,
+            dataScopeSupport
         );
     }
 
@@ -186,6 +190,20 @@ class CeActivityDataValidationDashboardServiceTest {
         String orderSegment = wrapperCaptor.getValue().getExpression().getOrderBy().getSqlSegment();
         Assertions.assertTrue(orderSegment.contains("create_time DESC"), orderSegment);
         Assertions.assertTrue(orderSegment.contains("id DESC"), orderSegment);
+    }
+
+    @Test
+    void submitsOnlyUnsubmittedActivityData() {
+        when(activityDataMapper.update(any(), any())).thenReturn(1);
+
+        service.updateStatusByIds(List.of(1L, 2L), "submitted");
+
+        ArgumentCaptor<LambdaQueryWrapper<CeActivityData>> wrapperCaptor = ArgumentCaptor.captor();
+        verify(activityDataMapper).update(any(CeActivityData.class), wrapperCaptor.capture());
+        String sqlSegment = wrapperCaptor.getValue().getExpression().getSqlSegment();
+        Assertions.assertTrue(sqlSegment.contains("id IN"), sqlSegment);
+        Assertions.assertTrue(sqlSegment.contains("data_status IS NULL"), sqlSegment);
+        Assertions.assertTrue(sqlSegment.contains("data_status ="), sqlSegment);
     }
 
     private CeEmissionSource emissionSource(Long id, String code, String name) {

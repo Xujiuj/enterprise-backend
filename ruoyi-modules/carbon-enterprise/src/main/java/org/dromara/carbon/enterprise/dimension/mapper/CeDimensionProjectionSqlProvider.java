@@ -15,7 +15,14 @@ public class CeDimensionProjectionSqlProvider {
 
     public String selectPageByDimensionCode(Map<String, Object> params) {
         CeDimensionRecordBo query = (CeDimensionRecordBo) params.get("query");
-        String baseSql = stripTrailingOrderBy(projectionSql(query == null ? null : query.getDimensionCode()));
+        String dimensionCode = query == null ? null : query.getDimensionCode();
+        String baseSql = stripTrailingOrderBy(projectionSql(dimensionCode));
+        String orderBy = switch (dimensionCode) {
+            case "ef-factor" -> "create_time desc, id desc";
+            case "emission-source-category-history" ->
+                "try_convert(decimal(30, 10), version_no) desc, version_no desc, sort_order, record_code";
+            default -> "sort_order, record_code";
+        };
         return """
             <script>
             select *
@@ -35,7 +42,13 @@ public class CeDimensionProjectionSqlProvider {
             <if test="query.status != null and query.status != ''">
                and status = #{query.status}
             </if>
-             order by sort_order, record_code
+            <if test="query.currentFlag != null and query.currentFlag != ''">
+               and current_flag = #{query.currentFlag}
+            </if>
+            <if test="query.versionNo != null and query.versionNo != ''">
+               and version_no = #{query.versionNo}
+            </if>
+            """ + " order by " + orderBy + "\n" + """
             </script>
             """;
     }
@@ -109,40 +122,8 @@ public class CeDimensionProjectionSqlProvider {
                   from ce_industry_classification
                  order by coalesce(sort_order, id), industry_section_code, industry_division_code, industry_group_code, industry_class_code
                 """;
-            case "emission-source-category" -> """
-                select id,
-                       'emission-source-category' as dimension_code,
-                       category_sk as record_code,
-                       coalesce(unified_standard_category, ghg_scope_category, iso_category, gb_scope_category, business_key) as record_name,
-                       parent_code as parent_code,
-                       category_sk as category_sk,
-                       business_key as business_key,
-                       category_name_en as category_name_en,
-                       ghg_scope as ghg_scope,
-                       cast(ghg_scope_category_sort as char) as ghg_scope_category_sort,
-                       ghg_scope_category as ghg_scope_category,
-                       ghg_scope_en as ghg_scope_en,
-                       ghg_scope_category_en as ghg_scope_category_en,
-                       iso_category as iso_category,
-                       iso_category_en as iso_category_en,
-                       iso_category_description as iso_category_description,
-                       iso_category_description_en as iso_category_description_en,
-                       iso_custom_subcategory as iso_custom_subcategory,
-                       gb_scope_category as gb_scope_category,
-                       gb_subcategory as gb_subcategory,
-                       cast(effective_date as char) as effective_date,
-                       cast(expiry_date as char) as expiry_date,
-                       is_current as current_flag,
-                       version_no as version_no,
-                       unified_standard_category as unified_standard_category,
-                       coalesce(sort_order, ghg_scope_category_sort, id) as sort_order,
-                       coalesce(status, case when is_current = 'Y' then '0' else '1' end) as status,
-                       create_time,
-                       update_time,
-                       remark
-                  from ce_emission_source_category
-                 order by coalesce(sort_order, ghg_scope_category_sort, id), business_key
-                """;
+            case "emission-source-category" -> emissionSourceCategoryProjection(true);
+            case "emission-source-category-history" -> emissionSourceCategoryProjection(false);
             case "base-year" -> """
                 select id,
                        'base-year' as dimension_code,
@@ -194,7 +175,7 @@ public class CeDimensionProjectionSqlProvider {
                        update_time,
                        remark
                   from ce_ef_factor
-                 order by factor_sk
+                 order by create_time desc, id desc
                 """;
             case "ef-electricity-factor" -> """
                 select id,
@@ -222,8 +203,8 @@ public class CeDimensionProjectionSqlProvider {
             case "ef-electricity-version" -> """
                 select id,
                        'ef-electricity-version' as dimension_code,
-                       factor_version as record_code,
-                       concat(factor_version, ' ', effective_year) as record_name,
+                       cast(effective_year as char) as record_code,
+                       factor_version as record_name,
                        null as parent_code,
                        factor_version as factor_version,
                        cast(effective_year as char) as effective_year,
@@ -362,6 +343,55 @@ public class CeDimensionProjectionSqlProvider {
         };
     }
 
+    private String emissionSourceCategoryProjection(boolean latestOnly) {
+        String latestVersionFilter = latestOnly ? """
+             where coalesce(nullif(ltrim(rtrim(version_no)), ''), '1') = (
+                   select top 1 coalesce(nullif(ltrim(rtrim(latest.version_no)), ''), '1')
+                     from ce_emission_source_category latest
+                    order by try_convert(decimal(30, 10), latest.version_no) desc,
+                             latest.effective_date desc,
+                             latest.version_no desc,
+                             case when upper(ltrim(rtrim(latest.is_current))) in ('Y', '1', 'TRUE') then 1 else 0 end desc,
+                             latest.id desc
+                 )
+            """ : "";
+        return """
+            select id,
+                   'emission-source-category' as dimension_code,
+                   category_sk as record_code,
+                   coalesce(unified_standard_category, ghg_scope_category, iso_category, gb_scope_category, business_key) as record_name,
+                   parent_code as parent_code,
+                   category_sk as category_sk,
+                   business_key as business_key,
+                   category_name_en as category_name_en,
+                   ghg_scope as ghg_scope,
+                   cast(ghg_scope_category_sort as char) as ghg_scope_category_sort,
+                   ghg_scope_category as ghg_scope_category,
+                   ghg_scope_en as ghg_scope_en,
+                   ghg_scope_category_en as ghg_scope_category_en,
+                   iso_category as iso_category,
+                   iso_category_en as iso_category_en,
+                   iso_category_description as iso_category_description,
+                   iso_category_description_en as iso_category_description_en,
+                   iso_custom_subcategory as iso_custom_subcategory,
+                   gb_scope_category as gb_scope_category,
+                   gb_subcategory as gb_subcategory,
+                   cast(effective_date as char) as effective_date,
+                   cast(expiry_date as char) as expiry_date,
+                   case when upper(ltrim(rtrim(is_current))) in ('Y', '1', 'TRUE') then 'Y' else 'N' end as current_flag,
+                   coalesce(nullif(ltrim(rtrim(version_no)), ''), '1') as version_no,
+                   unified_standard_category as unified_standard_category,
+                   coalesce(sort_order, ghg_scope_category_sort, id) as sort_order,
+                   coalesce(status, '0') as status,
+                   create_time,
+                   update_time,
+                   remark
+              from ce_emission_source_category
+            """ + latestVersionFilter + """
+             order by coalesce(sort_order, ghg_scope_category_sort, id), business_key
+            """;
+    }
+
     public String selectByDimensionCodeAndId(Map<String, Object> params) {
         return "select * from (" + stripTrailingOrderBy(projectionSql((String) params.get("dimensionCode"))) + ") dimension_projection where id = #{id}";
     }
@@ -443,7 +473,7 @@ public class CeDimensionProjectionSqlProvider {
                 insert into ce_electricity_factor_version_map (
                   factor_version, effective_year, remark
                 ) values (
-                  #{record.recordCode}, #{record.effectiveYear}, #{record.remark}
+                  #{record.recordName}, #{record.recordCode}, #{record.remark}
                 )
               </when>
               <when test="record.dimensionCode == 'intensity-denominator'">
@@ -580,8 +610,8 @@ public class CeDimensionProjectionSqlProvider {
               </when>
               <when test="record.dimensionCode == 'ef-electricity-version'">
                 update ce_electricity_factor_version_map
-                   set factor_version = #{record.recordCode},
-                       effective_year = #{record.effectiveYear},
+                   set factor_version = #{record.recordName},
+                       effective_year = #{record.recordCode},
                        update_time = SYSDATETIME(),
                        remark = #{record.remark}
                  where id = #{record.id}

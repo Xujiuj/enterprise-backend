@@ -18,10 +18,12 @@ import org.dromara.carbon.enterprise.vendor.domain.CeVendorDimensionRecord;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -46,7 +48,8 @@ class CeDimensionSyncServiceTest {
         mock(CeElectricityFactorMapper.class),
         electricityFactorVersionMapMapper,
         mock(CeElectricityFactorScopeMapper.class),
-        mock(CeGreenhouseGasMapper.class)
+        mock(CeGreenhouseGasMapper.class),
+        mock(TransactionTemplate.class)
     );
 
     @Test
@@ -58,6 +61,8 @@ class CeDimensionSyncServiceTest {
         record.setBusinessKey("101");
         record.setGhgScope("范围1");
         record.setGhgScopeCategory("1.1 固定源燃烧");
+        record.setVersionNo("2");
+        record.setCurrentFlag("1");
 
         when(emissionSourceCategoryMapper.selectOne(any(), eq(false))).thenReturn(null);
 
@@ -69,6 +74,8 @@ class CeDimensionSyncServiceTest {
         assertEquals("1", entity.getCategorySk());
         assertEquals("101", entity.getBusinessKey());
         assertEquals("范围1", entity.getGhgScope());
+        assertEquals("2", entity.getVersionNo());
+        assertEquals("Y", entity.getIsCurrent());
     }
 
     @Test
@@ -96,31 +103,75 @@ class CeDimensionSyncServiceTest {
     }
 
     @Test
-    void electricityVersionSyncRemovesDuplicateFactorVersionRows() throws Exception {
+    void electricityVersionSyncKeepsDifferentYearsForTheSameFactorVersion() throws Exception {
         CeVendorDimensionRecord record = new CeVendorDimensionRecord();
-        record.setRecordCode("2023");
+        record.setFactorVersion("2023");
         record.setEffectiveYear(2025);
         record.setStatus("0");
         record.setRemark("source(A)");
 
-        CeElectricityFactorVersionMap stale = new CeElectricityFactorVersionMap();
-        stale.setId(8L);
-        stale.setFactorVersion("2023");
-        stale.setEffectiveYear(2026);
-        CeElectricityFactorVersionMap current = new CeElectricityFactorVersionMap();
-        current.setId(7L);
-        current.setFactorVersion("2023");
-        current.setEffectiveYear(2025);
-        when(electricityFactorVersionMapMapper.selectList(any())).thenReturn(List.of(stale, current));
+        when(electricityFactorVersionMapMapper.selectOne(any(), eq(false))).thenReturn(null);
 
         invoke("upsertElectricityFactorVersionMap", record);
 
-        verify(electricityFactorVersionMapMapper).deleteById(8L);
         ArgumentCaptor<CeElectricityFactorVersionMap> captor = ArgumentCaptor.forClass(CeElectricityFactorVersionMap.class);
-        verify(electricityFactorVersionMapMapper).updateById(captor.capture());
-        CeElectricityFactorVersionMap updated = captor.getValue();
-        assertEquals(7L, updated.getId());
-        assertEquals(2025, updated.getEffectiveYear());
+        verify(electricityFactorVersionMapMapper).insert(captor.capture());
+        CeElectricityFactorVersionMap inserted = captor.getValue();
+        assertEquals("2023", inserted.getFactorVersion());
+        assertEquals(2025, inserted.getEffectiveYear());
+    }
+
+    @Test
+    void fullSyncDeletesRowsMissingFromVendorSnapshot() throws Exception {
+        CeElectricityFactorVersionMap retained = new CeElectricityFactorVersionMap();
+        retained.setId(7L);
+        retained.setFactorVersion("2023");
+        retained.setEffectiveYear(2025);
+        CeElectricityFactorVersionMap deleted = new CeElectricityFactorVersionMap();
+        deleted.setId(8L);
+        deleted.setFactorVersion("2023");
+        deleted.setEffectiveYear(2026);
+        when(electricityFactorVersionMapMapper.selectList(any())).thenReturn(List.of(retained, deleted));
+
+        Method method = CeDimensionSyncServiceImpl.class.getDeclaredMethod("deleteMissingDimensionRecords", String.class, Set.class);
+        method.setAccessible(true);
+        method.invoke(service, "ef-electricity-version", Set.of("2025\u001f2023"));
+
+        verify(electricityFactorVersionMapMapper).deleteByIds(List.of(8L));
+    }
+
+    @Test
+    void categorySyncPreservesOlderVersionsAndReconcilesReceivedVersion() throws Exception {
+        CeEmissionSourceCategory olderVersion = category(1L, "101", "1");
+        CeEmissionSourceCategory retained = category(2L, "101", "2");
+        CeEmissionSourceCategory missing = category(3L, "102", "2");
+        when(emissionSourceCategoryMapper.selectList(any())).thenReturn(List.of(olderVersion, retained, missing));
+
+        Method method = CeDimensionSyncServiceImpl.class.getDeclaredMethod("deleteMissingDimensionRecords", String.class, Set.class);
+        method.setAccessible(true);
+        method.invoke(service, "emission-source-category", Set.of("101\u001f2"));
+
+        verify(emissionSourceCategoryMapper).deleteByIds(List.of(3L));
+    }
+
+    @Test
+    void categorySnapshotKeyIncludesVersionNumber() throws Exception {
+        CeVendorDimensionRecord record = new CeVendorDimensionRecord();
+        record.setCategorySk("101");
+        record.setVersionNo("3");
+        Method method = CeDimensionSyncServiceImpl.class.getDeclaredMethod(
+            "dimensionRecordKey", String.class, CeVendorDimensionRecord.class);
+        method.setAccessible(true);
+
+        assertEquals("101\u001f3", method.invoke(service, "emission-source-category", record));
+    }
+
+    private CeEmissionSourceCategory category(Long id, String categorySk, String versionNo) {
+        CeEmissionSourceCategory category = new CeEmissionSourceCategory();
+        category.setId(id);
+        category.setCategorySk(categorySk);
+        category.setVersionNo(versionNo);
+        return category;
     }
 
     private void invoke(String methodName, CeVendorDimensionRecord record) throws Exception {

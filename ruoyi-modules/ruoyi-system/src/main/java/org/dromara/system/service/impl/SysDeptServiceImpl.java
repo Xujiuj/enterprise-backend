@@ -5,6 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.convert.Convert;
 import cn.hutool.core.lang.tree.Tree;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.lang.Validator;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -26,6 +27,7 @@ import org.dromara.system.domain.SysRole;
 import org.dromara.system.domain.SysUser;
 import org.dromara.system.domain.bo.SysDeptBo;
 import org.dromara.system.domain.vo.SysDeptVo;
+import org.dromara.system.domain.vo.SysDeptImportVo;
 import org.dromara.system.mapper.SysDeptMapper;
 import org.dromara.system.mapper.SysRoleMapper;
 import org.dromara.system.mapper.SysUserMapper;
@@ -37,6 +39,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * 部门管理 服务实现
@@ -309,7 +312,79 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
     @CacheEvict(cacheNames = CacheNames.SYS_DEPT_AND_CHILD, allEntries = true)
     @Override
     public int insertDept(SysDeptBo bo) {
+        return baseMapper.insert(prepareDeptForInsert(bo));
+    }
+
+    @CacheEvict(cacheNames = CacheNames.SYS_DEPT_AND_CHILD, allEntries = true)
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int importDeptList(List<SysDeptImportVo> rows) {
+        List<SysDeptImportVo> sourceRows = rows == null ? List.of() : rows.stream()
+            .filter(this::hasImportContent)
+            .toList();
+        if (sourceRows.isEmpty()) {
+            throw new ServiceException("导入文件没有可新增的部门数据");
+        }
+        if (sourceRows.size() > 2000) {
+            throw new ServiceException("单次最多导入2000个部门");
+        }
+
+        List<SysDept> organization = new ArrayList<>(baseMapper.selectList(new LambdaQueryWrapper<SysDept>()
+            .eq(SysDept::getDelFlag, SystemConstants.NORMAL)));
+        List<DeptImportRow> pending = new ArrayList<>();
+        for (int index = 0; index < sourceRows.size(); index++) {
+            pending.add(new DeptImportRow(index + 2, sourceRows.get(index)));
+        }
+
+        int imported = 0;
+        while (!pending.isEmpty()) {
+            int before = pending.size();
+            Iterator<DeptImportRow> iterator = pending.iterator();
+            while (iterator.hasNext()) {
+                DeptImportRow pendingRow = iterator.next();
+                SysDeptImportVo row = pendingRow.row();
+                validateImportRow(pendingRow.excelRow(), row);
+                Map<Long, SysDept> byId = StreamUtils.toMap(organization, SysDept::getDeptId, item -> item);
+                SysDept company = resolveCompany(pendingRow.excelRow(), row.getCompany(), organization, byId);
+                SysDept factory = resolveFactory(pendingRow.excelRow(), row.getFactory(), company, organization);
+                SysDept parent = resolveImportParent(row.getParentDepartment(), factory, organization);
+                if (parent == null) {
+                    continue;
+                }
+                if (departmentExists(parent.getDeptId(), company.getDeptCategory(), row.getDeptName(), organization)) {
+                    throw importError(pendingRow.excelRow(), "同一上级下已存在部门“" + row.getDeptName().trim() + "”");
+                }
+
+                SysDeptBo bo = new SysDeptBo();
+                bo.setParentId(parent.getDeptId());
+                bo.setDeptName(row.getDeptName().trim());
+                bo.setDeptCategory(company.getDeptCategory());
+                bo.setOrderNum(row.getOrderNum() == null ? 0 : row.getOrderNum());
+                bo.setLeader(resolveLeaderId(pendingRow.excelRow(), row.getLeaderUserName()));
+                bo.setPhone(StringUtils.trimToNull(row.getPhone()));
+                bo.setEmail(StringUtils.trimToNull(row.getEmail()));
+                bo.setStatus(normalizeImportStatus(pendingRow.excelRow(), row.getStatus()));
+
+                SysDept inserted = prepareDeptForInsert(bo);
+                baseMapper.insert(inserted);
+                organization.add(inserted);
+                imported++;
+                iterator.remove();
+            }
+            if (pending.size() == before) {
+                DeptImportRow unresolved = pending.get(0);
+                throw importError(unresolved.excelRow(), "找不到上级部门“" + unresolved.row().getParentDepartment() +
+                    "”，请使用工厂下的部门名称或“一级部门/二级部门”路径");
+            }
+        }
+        return imported;
+    }
+
+    private SysDept prepareDeptForInsert(SysDeptBo bo) {
         SysDept info = baseMapper.selectById(bo.getParentId());
+        if (ObjectUtil.isNull(info)) {
+            throw new ServiceException("请选择有效的上级部门");
+        }
         // 如果父节点不为正常状态,则不允许新增子节点
         if (!SystemConstants.NORMAL.equals(info.getStatus())) {
             throw new ServiceException("部门停用，不允许新增");
@@ -318,7 +393,136 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
         validateSameCompanyParent(dept, info);
         validateNotCompanyDirectParent(info);
         dept.setAncestors(info.getAncestors() + StringUtils.SEPARATOR + dept.getParentId());
-        return baseMapper.insert(dept);
+        return dept;
+    }
+
+    private boolean hasImportContent(SysDeptImportVo row) {
+        return row != null && Stream.of(row.getCompany(), row.getFactory(), row.getParentDepartment(), row.getDeptName(),
+                row.getLeaderUserName(), row.getPhone(), row.getEmail(), row.getStatus())
+            .anyMatch(StringUtils::isNotBlank);
+    }
+
+    private void validateImportRow(int excelRow, SysDeptImportVo row) {
+        if (StringUtils.isBlank(row.getCompany())) {
+            throw importError(excelRow, "所属公司不能为空");
+        }
+        if (StringUtils.isBlank(row.getFactory())) {
+            throw importError(excelRow, "所属工厂不能为空");
+        }
+        if (StringUtils.isBlank(row.getDeptName())) {
+            throw importError(excelRow, "部门名称不能为空");
+        }
+        if (row.getDeptName().trim().length() > 30) {
+            throw importError(excelRow, "部门名称长度不能超过30个字符");
+        }
+        if (row.getOrderNum() != null && row.getOrderNum() < 0) {
+            throw importError(excelRow, "显示排序不能小于0");
+        }
+        String phone = StringUtils.trimToEmpty(row.getPhone());
+        if (phone.length() > 11) {
+            throw importError(excelRow, "联系电话长度不能超过11个字符");
+        }
+        String email = StringUtils.trimToEmpty(row.getEmail());
+        if (StringUtils.isNotBlank(email) && (email.length() > 50 || !Validator.isEmail(email))) {
+            throw importError(excelRow, "邮箱格式不正确");
+        }
+    }
+
+    private SysDept resolveCompany(int excelRow, String companyValue, List<SysDept> organization,
+                                   Map<Long, SysDept> byId) {
+        String value = companyValue.trim();
+        List<SysDept> matches = organization.stream()
+            .filter(item -> isCompanyNode(item, byId))
+            .filter(item -> value.equalsIgnoreCase(item.getDeptCategory()) || value.equalsIgnoreCase(item.getDeptName()))
+            .toList();
+        if (matches.size() != 1) {
+            throw importError(excelRow, matches.isEmpty() ? "找不到所属公司“" + value + "”" : "所属公司“" + value + "”不唯一，请填写公司编号");
+        }
+        return matches.get(0);
+    }
+
+    private SysDept resolveFactory(int excelRow, String factoryValue, SysDept company, List<SysDept> organization) {
+        String value = factoryValue.trim();
+        List<SysDept> matches = organization.stream()
+            .filter(item -> company.getDeptId().equals(item.getParentId()))
+            .filter(item -> StringUtils.equals(company.getDeptCategory(), item.getDeptCategory()))
+            .filter(item -> value.equalsIgnoreCase(item.getDeptName()) || value.equals(String.valueOf(item.getDeptId())))
+            .toList();
+        if (matches.size() != 1) {
+            throw importError(excelRow, matches.isEmpty()
+                ? "公司“" + company.getDeptName() + "”下找不到工厂“" + value + "”"
+                : "工厂“" + value + "”不唯一");
+        }
+        return matches.get(0);
+    }
+
+    private SysDept resolveImportParent(String parentPath, SysDept factory, List<SysDept> organization) {
+        if (StringUtils.isBlank(parentPath)) {
+            return factory;
+        }
+        SysDept current = factory;
+        String[] segments = parentPath.trim().split("[/\\\\>]+");
+        for (String segment : segments) {
+            String name = segment.trim();
+            if (StringUtils.isBlank(name)) {
+                continue;
+            }
+            SysDept parent = current;
+            List<SysDept> matches = organization.stream()
+                .filter(item -> parent.getDeptId().equals(item.getParentId()))
+                .filter(item -> name.equalsIgnoreCase(item.getDeptName()))
+                .toList();
+            if (matches.size() != 1) {
+                return null;
+            }
+            current = matches.get(0);
+        }
+        return current;
+    }
+
+    private boolean departmentExists(Long parentId, String companyCode, String deptName, List<SysDept> organization) {
+        String normalizedName = deptName.trim();
+        return organization.stream().anyMatch(item -> parentId.equals(item.getParentId())
+            && StringUtils.equals(companyCode, item.getDeptCategory())
+            && normalizedName.equalsIgnoreCase(item.getDeptName()));
+    }
+
+    private boolean isCompanyNode(SysDept dept, Map<Long, SysDept> byId) {
+        if (StringUtils.isBlank(dept.getDeptCategory())) {
+            return false;
+        }
+        SysDept parent = byId.get(dept.getParentId());
+        return parent == null || StringUtils.isBlank(parent.getDeptCategory());
+    }
+
+    private Long resolveLeaderId(int excelRow, String userName) {
+        if (StringUtils.isBlank(userName)) {
+            return null;
+        }
+        List<SysUser> users = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+            .eq(SysUser::getUserName, userName.trim())
+            .eq(SysUser::getDelFlag, SystemConstants.NORMAL));
+        if (users.size() != 1) {
+            throw importError(excelRow, "找不到唯一的负责人账号“" + userName.trim() + "”");
+        }
+        return users.get(0).getUserId();
+    }
+
+    private String normalizeImportStatus(int excelRow, String status) {
+        if (StringUtils.isBlank(status) || Set.of("正常", "启用", "0").contains(status.trim())) {
+            return SystemConstants.NORMAL;
+        }
+        if (Set.of("停用", "禁用", "1").contains(status.trim())) {
+            return SystemConstants.DISABLE;
+        }
+        throw importError(excelRow, "状态只能填写正常或停用");
+    }
+
+    private ServiceException importError(int excelRow, String message) {
+        return new ServiceException("Excel第" + excelRow + "行：" + message);
+    }
+
+    private record DeptImportRow(int excelRow, SysDeptImportVo row) {
     }
 
     /**

@@ -39,6 +39,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private static final String LICENSE_STATUS_VALID = "VALID";
     private static final String COMPANY_DIMENSION_CODE = "company";
+    private static final String EF_FACTOR_DIMENSION_CODE = "ef-factor";
 
     private static final Set<String> ALLOWED_VENDOR_DIMENSION_CODES = Set.of(
         "admin-division",
@@ -56,6 +57,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         "company",
         "industry",
         "emission-source-category",
+        "emission-source-category-history",
         "base-year",
         "ef-factor",
         "ef-electricity-factor",
@@ -205,6 +207,12 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         if (StringUtils.isNotBlank(bo.getStatus())) {
             stream = stream.filter(row -> bo.getStatus().equals(row.getStatus()));
         }
+        if (StringUtils.isNotBlank(bo.getCurrentFlag())) {
+            stream = stream.filter(row -> bo.getCurrentFlag().equalsIgnoreCase(row.getCurrentFlag()));
+        }
+        if (StringUtils.isNotBlank(bo.getVersionNo())) {
+            stream = stream.filter(row -> bo.getVersionNo().equalsIgnoreCase(row.getVersionNo()));
+        }
         return stream.toList();
     }
 
@@ -213,12 +221,20 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     }
 
     private void normalizeEditableRecord(CeDimensionRecordBo bo) {
+        normalizeRequiredRecordCode(bo);
         normalizeCompanyRecord(bo);
         normalizeIndustryRecord(bo);
         normalizeBaseYearRecord(bo);
+        normalizeEfFactorRecord(bo);
         normalizeIntensityDenominatorRecord(bo);
         normalizeIntensityTargetRecord(bo);
         normalizeIntensityToleranceRecord(bo);
+    }
+
+    private void normalizeRequiredRecordCode(CeDimensionRecordBo bo) {
+        if (!EF_FACTOR_DIMENSION_CODE.equals(bo.getDimensionCode())) {
+            requireNotBlank(bo.getRecordCode(), "编码不能为空");
+        }
     }
 
     private void normalizeCompanyRecord(CeDimensionRecordBo bo) {
@@ -272,6 +288,16 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         bo.setBaseYear(bo.getRecordName());
         if (StringUtils.isBlank(bo.getCurrentBaseFlag())) {
             bo.setCurrentBaseFlag("1".equals(bo.getIsCurrent()) ? "Y" : "N");
+        }
+    }
+
+    private void normalizeEfFactorRecord(CeDimensionRecordBo bo) {
+        if (!EF_FACTOR_DIMENSION_CODE.equals(bo.getDimensionCode())) {
+            return;
+        }
+        requireNotBlank(bo.getRecordName(), "排放源名称不能为空");
+        if (StringUtils.isBlank(bo.getRecordCode())) {
+            bo.setRecordCode(nextEfFactorCode());
         }
     }
 
@@ -329,6 +355,18 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private String normalizeKeyPart(String value) {
         return StringUtils.trimToEmpty(value).replaceAll("\\s+", "_");
+    }
+
+    private String nextEfFactorCode() {
+        int maxCode = dimensionProjectionMapper.selectByDimensionCode(EF_FACTOR_DIMENSION_CODE).stream()
+            .map(CeDimensionRecordVo::getRecordCode)
+            .filter(StringUtils::isNotBlank)
+            .map(String::trim)
+            .filter(code -> code.matches("\\d+"))
+            .map(Integer::valueOf)
+            .max(Integer::compareTo)
+            .orElse(0);
+        return String.valueOf(maxCode + 1);
     }
 
     private TableDataInfo<CeDimensionRecordVo> queryVendorPageList(CeDimensionRecordBo bo, PageQuery pageQuery) {

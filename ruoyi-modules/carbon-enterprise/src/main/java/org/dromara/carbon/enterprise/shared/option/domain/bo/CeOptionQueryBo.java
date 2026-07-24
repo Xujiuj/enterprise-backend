@@ -14,6 +14,10 @@ public class CeOptionQueryBo {
 
     private String fieldName;
 
+    private String parentField;
+
+    private String parentValue;
+
     private String companyName;
 
     private String factoryName;

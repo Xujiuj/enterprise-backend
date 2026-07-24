@@ -7,17 +7,24 @@ import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.excel.utils.ExcelUtil;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysDeptBo;
 import org.dromara.system.domain.vo.SysDeptVo;
+import org.dromara.system.domain.vo.SysDeptImportVo;
 import org.dromara.system.service.ISysDeptService;
 import org.dromara.system.service.ISysPostService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * 部门信息
@@ -81,6 +88,27 @@ public class SysDeptController extends BaseController {
             return R.fail("新增部门'" + dept.getDeptName() + "'失败，部门名称已存在");
         }
         return toAjax(deptService.insertDept(dept));
+    }
+
+    /**
+     * Import departments under an existing company and factory hierarchy.
+     */
+    @SaCheckPermission("system:dept:add")
+    @Log(title = "部门管理", businessType = BusinessType.IMPORT)
+    @RepeatSubmit()
+    @PostMapping(value = "/importData", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public R<Integer> importData(@RequestPart("file") MultipartFile file) throws Exception {
+        List<SysDeptImportVo> rows = ExcelUtil.importExcel(file.getInputStream(), SysDeptImportVo.class);
+        return R.ok(deptService.importDeptList(rows));
+    }
+
+    /**
+     * Download the department import template.
+     */
+    @SaCheckPermission("system:dept:add")
+    @PostMapping("/importTemplate")
+    public void importTemplate(HttpServletResponse response) {
+        ExcelUtil.exportExcel(new ArrayList<>(), "部门导入", SysDeptImportVo.class, response);
     }
 
     /**

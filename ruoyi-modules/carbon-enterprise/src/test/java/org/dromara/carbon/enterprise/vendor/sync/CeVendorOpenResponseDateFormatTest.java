@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.dromara.carbon.enterprise.vendor.domain.CeVendorAnnouncementListResponse;
 import org.dromara.carbon.enterprise.vendor.domain.CeVendorDimensionListResponse;
 import org.dromara.carbon.enterprise.vendor.domain.CeVendorFactorSyncResponse;
+import org.dromara.carbon.enterprise.vendor.domain.CeVendorLicenseCurrentResponse;
 import org.dromara.carbon.enterprise.report.domain.CeVendorReportTemplateDownloadResponse;
 import org.dromara.carbon.enterprise.report.domain.CeVendorReportTemplateListResponse;
 import org.junit.jupiter.api.Tag;
@@ -35,6 +36,24 @@ class CeVendorOpenResponseDateFormatTest {
 
         assertNotNull(response.getPublishedTime());
         assertEquals("FV-2026", response.getVersionCode());
+    }
+
+    @Test
+    void parsesVendorOpenLicenseCurrentTimeFormat() throws Exception {
+        CeVendorLicenseCurrentResponse response = objectMapper.readValue(
+            """
+                {
+                  "licenseId": "LIC-001",
+                  "status": "active",
+                  "validFrom": "2026-07-01 00:00:00",
+                  "validTo": "2027-07-01 00:00:00"
+                }
+                """,
+            CeVendorLicenseCurrentResponse.class
+        );
+
+        assertNotNull(response.getValidFrom());
+        assertNotNull(response.getValidTo());
     }
 
     @Test

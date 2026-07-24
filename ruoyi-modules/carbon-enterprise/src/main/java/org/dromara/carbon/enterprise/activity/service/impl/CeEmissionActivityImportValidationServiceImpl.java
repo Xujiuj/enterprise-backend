@@ -207,10 +207,13 @@ public class CeEmissionActivityImportValidationServiceImpl implements ICeEmissio
         List<CeEmissionActivityFieldValue> fieldValues = new ArrayList<>(allFields.size());
         boolean blankRow = true;
         Map<Integer, String> rowValues = sheetRow == null ? Collections.emptyMap() : sheetRow.values();
+        Map<String, String> valuesByCode = normalizeEntryValues(rowValues, bindingsByCode);
 
         for (CeEmissionActivityFieldDescriptor descriptor : allFields) {
-            HeaderBinding binding = bindingsByCode.get(descriptor.getFieldCode());
-            String value = binding == null ? "" : normalize(rowValues.get(binding.columnIndex()));
+            String value = normalize(valuesByCode.get(descriptor.getFieldCode()));
+            if (value == null) {
+                value = "";
+            }
             if (StringUtils.isNotBlank(value)) {
                 blankRow = false;
             }
@@ -225,6 +228,44 @@ public class CeEmissionActivityImportValidationServiceImpl implements ICeEmissio
         request.setRowNumber(importRowNumber);
         request.setFieldValues(fieldValues);
         return request;
+    }
+
+    private Map<String, String> normalizeEntryValues(Map<Integer, String> rowValues, Map<String, HeaderBinding> bindingsByCode) {
+        Map<String, String> valuesByCode = new LinkedHashMap<>();
+        for (HeaderBinding binding : bindingsByCode.values()) {
+            String fieldCode = binding.descriptor().getFieldCode();
+            String value = normalize(rowValues.get(binding.columnIndex()));
+            if ("activityPeriod".equals(fieldCode)) {
+                String[] period = splitActivityPeriod(value);
+                valuesByCode.put("activityYear", period[0]);
+                valuesByCode.put("activityMonth", period[1]);
+                continue;
+            }
+            valuesByCode.put(fieldCode, value);
+        }
+        return valuesByCode;
+    }
+
+    private String[] splitActivityPeriod(String value) {
+        String text = normalize(value);
+        if (StringUtils.isBlank(text)) {
+            return new String[] { "", "" };
+        }
+        String normalized = text
+            .replace('\u5e74', '-')
+            .replace('\u6708', ' ')
+            .replace('/', '-')
+            .replace('.', '-')
+            .trim();
+        String[] parts = normalized.split("-", 2);
+        if (parts.length < 2) {
+            return new String[] { normalized, "" };
+        }
+        String month = parts[1].trim().replaceAll("[^0-9].*$", "");
+        if (month.length() == 2 && month.startsWith("0")) {
+            month = month.substring(1);
+        }
+        return new String[] { parts[0].trim(), month };
     }
 
     private List<CeEmissionActivityFieldDescriptor> copyExpectedHeaderFields() {

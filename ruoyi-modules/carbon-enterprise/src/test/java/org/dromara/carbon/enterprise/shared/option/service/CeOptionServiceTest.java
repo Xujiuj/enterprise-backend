@@ -43,6 +43,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @Tag("dev")
@@ -107,6 +109,16 @@ class CeOptionServiceTest {
             sysDeptMapper,
             sysUserMapper
         );
+    }
+
+    @Test
+    void recordStatusOptionsAreStaticAndDoNotScanDimensionRecords() {
+        var options = service.listOptions("record-status", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("0", "1");
+        verify(dimensionProjectionMapper, never()).selectByDimensionCode(any());
     }
 
     @Test
@@ -463,7 +475,7 @@ class CeOptionServiceTest {
             .containsExactly("FC-ELECTRICITY", "KEY-DIESEL");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .containsExactly("FC-ELECTRICITY / Electricity factor (kgCO2e/MWh)", "KEY-DIESEL / Diesel combustion (kgCO2e/t)");
+            .containsExactly("Electricity factor (kgCO2e/MWh)", "Diesel combustion (kgCO2e/t)");
         assertThat(options.get(1).getRecord())
             .containsEntry("factorKey", "KEY-DIESEL")
             .containsEntry("factorCode", "FC-DIESEL")
@@ -493,7 +505,7 @@ class CeOptionServiceTest {
             .containsExactly("EF-201-DIESEL");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .containsExactly("EF-201-DIESEL / Diesel combustion (kgCO2e/t)");
+            .containsExactly("Diesel combustion (kgCO2e/t)");
         assertThat(options.get(0).getRecord())
             .containsEntry("factorKey", "EF-201-DIESEL")
             .containsEntry("factorCode", "EF-201-DIESEL")
@@ -505,6 +517,27 @@ class CeOptionServiceTest {
             .containsEntry("applicableScope", "Scope 1")
             .containsEntry("factorSource", "Source A")
             .containsEntry("factorUnit", "kgCO2e/t");
+    }
+
+    @Test
+    void efFactorEmissionSourceOptionsComeOnlyFrom201FactorDimension() {
+        CeDimensionRecordVo factor = new CeDimensionRecordVo();
+        factor.setRecordCode("EF-201-GAS");
+        factor.setRecordName("天然气");
+        factor.setSourceUnit("m3");
+        factor.setFactorUnit("kgCO2e/m3");
+        when(dimensionProjectionMapper.selectByDimensionCode("ef-factor")).thenReturn(List.of(factor));
+
+        var options = service.listOptions("ef-factor-emission-source", null);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("天然气");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("factorKey", "EF-201-GAS")
+            .containsEntry("emissionSourceName", "天然气")
+            .containsEntry("sourceUnit", "m3")
+            .containsEntry("factorUnit", "kgCO2e/m3");
     }
 
     @Test
@@ -524,7 +557,7 @@ class CeOptionServiceTest {
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .contains("C / 制造业");
+            .contains("制造业");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
             .contains("C");
@@ -536,18 +569,21 @@ class CeOptionServiceTest {
     @Test
     void companyIndustryNameOptionsCarryPairedCodeAndName() {
         CeDimensionRecordVo industry = new CeDimensionRecordVo();
+        industry.setIndustrySectionCode("C");
         industry.setIndustryDivisionCode("26");
         industry.setIndustryDivisionName("化学原料和化学制品制造业");
         when(dimensionProjectionMapper.selectByDimensionCode("industry")).thenReturn(List.of(industry));
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
         query.setField("industryDivisionName");
+        query.setParentField("industrySectionCode");
+        query.setParentValue("C");
 
         var options = service.listOptions("dimension-field", query);
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .contains("化学原料和化学制品制造业 / 26");
+            .contains("化学原料和化学制品制造业");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
             .contains("化学原料和化学制品制造业");
@@ -587,6 +623,8 @@ class CeOptionServiceTest {
         CeOptionQueryBo query = new CeOptionQueryBo();
         query.setDimensionCode("company");
         query.setField("industryDivisionCode");
+        query.setParentField("industrySectionCode");
+        query.setParentValue("C");
 
         var options = service.listOptions("dimension-field", query);
 
@@ -602,6 +640,50 @@ class CeOptionServiceTest {
             .containsEntry("industrySectionName", "制造业")
             .containsEntry("industryDivisionCode", "26")
             .containsEntry("industryDivisionName", "化学原料和化学制品制造业");
+    }
+
+    @Test
+    void companyIndustryChildOptionsRequireParentFilter() {
+        CeDimensionRecordVo chemical = new CeDimensionRecordVo();
+        chemical.setIndustrySectionCode("C");
+        chemical.setIndustryDivisionCode("26");
+        when(dimensionProjectionMapper.selectByDimensionCode("industry")).thenReturn(List.of(chemical));
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setField("industryDivisionCode");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options).isEmpty();
+    }
+
+    @Test
+    void companyIndustryOptionsCanFilterByParentFieldAndValue() {
+        CeDimensionRecordVo chemical = new CeDimensionRecordVo();
+        chemical.setIndustryDivisionCode("26");
+        chemical.setIndustryDivisionName("Chemical manufacturing");
+        chemical.setIndustryGroupCode("2601");
+        chemical.setIndustryGroupName("Basic chemicals");
+        CeDimensionRecordVo metal = new CeDimensionRecordVo();
+        metal.setIndustryDivisionCode("31");
+        metal.setIndustryDivisionName("Metal products");
+        metal.setIndustryGroupCode("3101");
+        metal.setIndustryGroupName("Structural metal");
+        when(dimensionProjectionMapper.selectByDimensionCode("industry")).thenReturn(List.of(chemical, metal));
+        CeOptionQueryBo query = new CeOptionQueryBo();
+        query.setDimensionCode("company");
+        query.setField("industryGroupCode");
+        query.setParentField("industryDivisionCode");
+        query.setParentValue("26");
+
+        var options = service.listOptions("dimension-field", query);
+
+        assertThat(options)
+            .extracting(option -> String.valueOf(option.getValue()))
+            .containsExactly("2601");
+        assertThat(options.get(0).getRecord())
+            .containsEntry("industryDivisionCode", "26")
+            .containsEntry("industryGroupCode", "2601");
     }
 
     @Test
@@ -625,7 +707,7 @@ class CeOptionServiceTest {
             .contains("110000", "310000");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .contains("110000 / 北京市", "310000 / 上海市");
+            .contains("北京市", "上海市");
         assertThat(options.stream().filter(option -> "110000".equals(String.valueOf(option.getValue()))).findFirst().orElseThrow().getRecord())
             .containsEntry("provinceCode", "110000")
             .containsEntry("provinceName", "北京市");
@@ -648,7 +730,7 @@ class CeOptionServiceTest {
             .contains("北京市");
         assertThat(options)
             .extracting(option -> String.valueOf(option.getLabel()))
-            .contains("北京市 / 110000");
+            .contains("北京市");
         assertThat(options.stream().filter(option -> "北京市".equals(String.valueOf(option.getValue()))).findFirst().orElseThrow().getRecord())
             .containsEntry("provinceCode", "110000")
             .containsEntry("provinceName", "北京市");

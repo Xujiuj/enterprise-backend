@@ -1,10 +1,10 @@
 package org.dromara.carbon.enterprise.license.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseGateResponse;
 import org.dromara.carbon.enterprise.license.domain.CeLicenseGateResult;
+import org.dromara.carbon.enterprise.license.service.CeLicenseInstallIdProvider;
 import org.dromara.carbon.enterprise.shared.service.ICeLicenseGateService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.utils.StringUtils;
@@ -27,15 +27,18 @@ import java.util.Date;
 public class CeLicenseGateController extends BaseController {
 
     private final ICeLicenseGateService licenseGateService;
+    private final CeLicenseInstallIdProvider installIdProvider;
 
     @SaCheckPermission("enterprise:licenseState:query")
     @GetMapping("/current")
-    public R<CeLicenseGateResponse> current(@NotBlank(message = "部署指纹不能为空")
-                                            @RequestParam String expectedInstallId,
+    public R<CeLicenseGateResponse> current(@RequestParam(required = false) String expectedInstallId,
                                             @RequestParam(required = false) String featureCode) {
+        String effectiveInstallId = StringUtils.isBlank(expectedInstallId)
+            ? installIdProvider.getExpectedInstallId()
+            : expectedInstallId;
         CeLicenseGateResult result = StringUtils.isBlank(featureCode)
-            ? licenseGateService.evaluateCurrent(expectedInstallId, new Date())
-            : licenseGateService.evaluateCurrent(expectedInstallId, new Date(), featureCode);
+            ? licenseGateService.evaluateCurrent(effectiveInstallId, new Date())
+            : licenseGateService.evaluateCurrent(effectiveInstallId, new Date(), featureCode);
         return R.ok(CeLicenseGateResponse.from(result));
     }
 }

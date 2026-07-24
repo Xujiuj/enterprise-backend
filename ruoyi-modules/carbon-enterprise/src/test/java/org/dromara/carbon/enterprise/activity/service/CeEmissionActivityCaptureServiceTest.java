@@ -226,9 +226,9 @@ class CeEmissionActivityCaptureServiceTest {
             Files.readAllBytes(sample)
         ));
 
-        assertEquals(18, request.getHeaderFields().size());
+        assertEquals(9, request.getHeaderFields().size());
         assertFalse(request.getRows().isEmpty());
-        assertEquals("PK_排放源识别编号", request.getHeaderFields().get(0).getFieldName());
+        assertEquals("companyName", request.getHeaderFields().get(0).getFieldCode());
     }
 
     @Test
@@ -489,6 +489,8 @@ class CeEmissionActivityCaptureServiceTest {
             row.setEmissionSourceName("Natural Gas");
             row.setUnit("Nm3");
             row.setEmissionFactorCode("EF-2026-001");
+            row.setResponsibleDept("Production");
+            row.setDataSource("Meter");
             return Optional.of(row);
         };
     }
@@ -512,6 +514,8 @@ class CeEmissionActivityCaptureServiceTest {
             resolved.setEmissionSourceName(values.get("emissionSourceName"));
             resolved.setUnit(values.get("activityUnit"));
             resolved.setEmissionFactorCode(values.get("factorKey"));
+            resolved.setResponsibleDept(values.get("responsibleDept"));
+            resolved.setDataSource(values.get("dataSource"));
             rowsByCode.put(values.get("sourceIdentificationCode"), resolved);
         }
         return code -> Optional.ofNullable(rowsByCode.get(code));

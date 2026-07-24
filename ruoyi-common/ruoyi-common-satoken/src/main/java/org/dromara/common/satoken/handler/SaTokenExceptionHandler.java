@@ -45,8 +45,26 @@ public class SaTokenExceptionHandler {
     @ExceptionHandler(NotLoginException.class)
     public R<Void> handleNotLoginException(NotLoginException e, HttpServletRequest request) {
         String requestURI = request.getRequestURI();
-        log.error("请求地址'{}',认证失败'{}',无法访问系统资源", requestURI, e.getMessage());
-        return R.fail(HttpStatus.HTTP_UNAUTHORIZED, "认证失败，无法访问系统资源");
+        String message = getNotLoginMessage(e);
+        log.error("请求地址'{}',认证失败'{}',类型'{}'", requestURI, e.getMessage(), e.getType());
+        return R.fail(HttpStatus.HTTP_UNAUTHORIZED, message);
+    }
+
+    private String getNotLoginMessage(NotLoginException e) {
+        String type = e.getType();
+        if (NotLoginException.BE_REPLACED.equals(type)) {
+            return "当前账号已在其他设备登录，本次登录状态已失效，请重新登录。";
+        }
+        if (NotLoginException.KICK_OUT.equals(type)) {
+            return "当前账号已被管理员强制下线，请重新登录。";
+        }
+        if (NotLoginException.TOKEN_TIMEOUT.equals(type)) {
+            return "登录已超过 1 小时，请重新登录。";
+        }
+        if (NotLoginException.INVALID_TOKEN.equals(type) || NotLoginException.NOT_TOKEN.equals(type)) {
+            return "登录状态已失效，请重新登录。";
+        }
+        return "登录状态异常，请重新登录。";
     }
 
 }

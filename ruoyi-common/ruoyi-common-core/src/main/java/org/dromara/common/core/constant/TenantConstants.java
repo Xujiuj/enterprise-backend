@@ -23,6 +23,15 @@ public interface TenantConstants {
     String TENANT_ADMIN_ROLE_KEY = "admin";
 
     /**
+     * Carbon platform tenant administrator role keys.
+     *
+     * These roles are product-specific aliases of the framework tenant admin
+     * role and must receive the same tenant-scoped data access.
+     */
+    String ENTERPRISE_ADMIN_ROLE_KEY = "enterprise_admin";
+    String VENDOR_ADMIN_ROLE_KEY = "vendor_admin";
+
+    /**
      * 租户管理员角色名称
      */
     String TENANT_ADMIN_ROLE_NAME = "管理员";

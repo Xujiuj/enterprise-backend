@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -170,6 +171,26 @@ class CeDimensionRecordServiceTest {
     }
 
     @Test
+    void efFactorInsertGeneratesRecordCodeWhenTemplateOmitsSequence() {
+        CeDimensionRecordVo existing = new CeDimensionRecordVo();
+        existing.setRecordCode("67");
+        CeDimensionRecordVo legacyPrefixed = new CeDimensionRecordVo();
+        legacyPrefixed.setRecordCode("EF201-9999");
+        CeDimensionRecordBo bo = new CeDimensionRecordBo();
+        bo.setDimensionCode("ef-factor");
+        bo.setRecordName("天然气");
+        bo.setSourceUnit("m3");
+        when(dimensionProjectionMapper.selectByDimensionCode("ef-factor")).thenReturn(java.util.List.of(existing, legacyPrefixed));
+        when(dimensionProjectionMapper.insertByDimensionCode(any())).thenReturn(1);
+
+        service.insertByBo(bo);
+
+        verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record ->
+            "68".equals(record.getRecordCode()) && "天然气".equals(record.getRecordName())
+        ));
+    }
+
+    @Test
     void companyDeleteDisablesSyncedFactoryDepartment() {
         CeDimensionRecordVo previous = localCompany();
         previous.setFactoryName("Demo Factory");
@@ -213,6 +234,33 @@ class CeDimensionRecordServiceTest {
 
         assertTrue(insertSql.contains("case when #{record.enabledText} = '0' or #{record.status} = '1' then 0 else 1 end"));
         assertTrue(updateSql.contains("case when #{record.enabledText} = '0' or #{record.status} = '1' then 0 else 1 end"));
+    }
+
+    @Test
+    void electricityVersionSqlUsesYearAsCodeAndFactorVersionAsName() {
+        CeDimensionProjectionSqlProvider provider = new CeDimensionProjectionSqlProvider();
+        String selectSql = provider.selectByDimensionCode(java.util.Map.of("dimensionCode", "ef-electricity-version"));
+        String insertSql = provider.insertByDimensionCode();
+        String updateSql = provider.updateByDimensionCode();
+
+        assertTrue(selectSql.contains("cast(effective_year as char) as record_code"));
+        assertTrue(selectSql.contains("factor_version as record_name"));
+        assertTrue(insertSql.contains("#{record.recordName}, #{record.recordCode}, #{record.remark}"));
+        assertTrue(updateSql.contains("factor_version = #{record.recordName}"));
+        assertTrue(updateSql.contains("effective_year = #{record.recordCode}"));
+    }
+
+    @Test
+    void emissionSourceCategoryUsesLatestVersionWhileHistoryKeepsAllVersions() {
+        CeDimensionProjectionSqlProvider provider = new CeDimensionProjectionSqlProvider();
+
+        String currentSql = provider.selectByDimensionCode(java.util.Map.of("dimensionCode", "emission-source-category"));
+        String historySql = provider.selectByDimensionCode(java.util.Map.of("dimensionCode", "emission-source-category-history"));
+
+        assertTrue(currentSql.contains("select top 1"));
+        assertTrue(currentSql.contains("version_no"));
+        assertTrue(historySql.contains("from ce_emission_source_category"));
+        assertFalse(historySql.contains("select top 1"));
     }
 
     private CeDimensionRecordVo localCompany() {

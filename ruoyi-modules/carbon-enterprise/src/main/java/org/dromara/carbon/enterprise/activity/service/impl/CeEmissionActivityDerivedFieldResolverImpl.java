@@ -86,6 +86,8 @@ public class CeEmissionActivityDerivedFieldResolverImpl implements ICeEmissionAc
         row.setEmissionSourceName(source.getEmissionSourceName());
         row.setUnit(resolveActivityUnit(source));
         row.setEmissionFactorCode(source.getFactorKey());
+        row.setResponsibleDept(source.getResponsibleDept());
+        row.setDataSource(source.getDataSource());
         return row;
     }
 

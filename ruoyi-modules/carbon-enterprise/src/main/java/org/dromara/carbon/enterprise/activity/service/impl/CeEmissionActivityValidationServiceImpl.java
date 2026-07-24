@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Row-level validator for the semantic emission_activity entry contract.
@@ -35,12 +36,13 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
     private static final String SEVERITY_WARNING = "WARNING";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ROOT);
     private static final DateTimeFormatter PERIOD_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM", Locale.ROOT);
+    private static final Set<String> NON_VALIDATED_BOUND_FIELDS = Set.of("responsibleDept", "dataSource");
     private static final List<FieldDescriptor> ALL_FIELDS = List.of(
-        new FieldDescriptor(1, "sourceIdentificationCode", "PK_排放源识别编号", false, false, false),
-        new FieldDescriptor(2, "companyCode", "FK_公司编号", false, false, false),
+        new FieldDescriptor(1, "sourceIdentificationCode", "排放源识别编号", false, false, false),
+        new FieldDescriptor(2, "companyCode", "公司编号", false, false, false),
         new FieldDescriptor(3, "companyName", "公司名称", false, true, false),
         new FieldDescriptor(4, "factoryName", "工厂", false, true, false),
-        new FieldDescriptor(5, "sourceCategoryKey", "FK_排放源分类", false, false, false),
+        new FieldDescriptor(5, "sourceCategoryKey", "排放源分类", false, false, false),
         new FieldDescriptor(6, "scopeName", "范围", false, true, false),
         new FieldDescriptor(7, "scopeSubcategory", "范围子类别", false, true, false),
         new FieldDescriptor(8, "sourceIdentificationName", "排放源识别", false, true, false),
@@ -50,10 +52,21 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
         new FieldDescriptor(12, "activityMonth", "月份", false, true, false),
         new FieldDescriptor(13, "activityDate", "日期", false, true, false),
         new FieldDescriptor(14, "activityValue", "活动数据", false, true, false),
-        new FieldDescriptor(15, "responsibleDept", "负责部门", false, true, false),
-        new FieldDescriptor(16, "dataSource", "数据来源", false, true, false),
+        new FieldDescriptor(15, "responsibleDept", "负责部门", false, false, true),
+        new FieldDescriptor(16, "dataSource", "数据来源", false, false, true),
         new FieldDescriptor(17, "sourceRemark", "备注", false, false, false),
-        new FieldDescriptor(18, "factorKey", "FK_排放因子", false, false, false)
+        new FieldDescriptor(18, "factorKey", "排放因子", false, false, false)
+    );
+    private static final List<FieldDescriptor> ENTRY_FIELDS = List.of(
+        new FieldDescriptor(1, "companyName", "\u516c\u53f8", false, true, false),
+        new FieldDescriptor(2, "factoryName", "\u5de5\u5382", false, true, false),
+        new FieldDescriptor(3, "scopeName", "\u8303\u56f4", false, true, false),
+        new FieldDescriptor(4, "scopeSubcategory", "\u8303\u56f4\u5b50\u7c7b\u522b", false, true, false),
+        new FieldDescriptor(5, "sourceIdentificationName", "\u6392\u653e\u6e90\u8bc6\u522b", false, true, false),
+        new FieldDescriptor(6, "emissionSourceName", "\u6392\u653e\u6e90", false, true, false),
+        new FieldDescriptor(7, "activityPeriod", "\u6d3b\u52a8\u671f\u95f4", false, true, false),
+        new FieldDescriptor(8, "activityDate", "\u65e5\u671f", false, true, false),
+        new FieldDescriptor(9, "activityValue", "\u6d3b\u52a8\u6570\u636e", false, true, false)
     );
     private static final Map<String, FieldDescriptor> FIELD_BY_CODE = buildFieldIndex();
 
@@ -66,16 +79,9 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
     }
 
     public static List<CeEmissionActivityFieldDescriptor> entryFieldDescriptors() {
-        List<FieldDescriptor> entryFields = ALL_FIELDS.stream()
-            .filter(field -> !field.derivedField())
+        return ENTRY_FIELDS.stream()
+            .map(CeEmissionActivityValidationServiceImpl::toFieldDescriptor)
             .toList();
-        List<CeEmissionActivityFieldDescriptor> descriptors = new ArrayList<>(entryFields.size());
-        for (int index = 0; index < entryFields.size(); index++) {
-            CeEmissionActivityFieldDescriptor descriptor = toFieldDescriptor(entryFields.get(index));
-            descriptor.setFieldOrder(index + 1);
-            descriptors.add(descriptor);
-        }
-        return descriptors;
     }
 
     @Override
@@ -159,13 +165,19 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
         serverValues.put("emissionSourceName", resolvedRow.getEmissionSourceName());
         serverValues.put("activityUnit", resolvedRow.getUnit());
         serverValues.put("factorKey", resolvedRow.getEmissionFactorCode());
+        serverValues.put("responsibleDept", resolvedRow.getResponsibleDept());
+        serverValues.put("dataSource", resolvedRow.getDataSource());
 
         for (Map.Entry<String, String> entry : serverValues.entrySet()) {
             FieldDescriptor descriptor = descriptor(entry.getKey());
             String serverValue = normalize(entry.getValue());
             String clientValue = normalize(clientValues.get(entry.getKey()));
+            boolean nonValidatedBoundField = NON_VALIDATED_BOUND_FIELDS.contains(entry.getKey());
 
             if (StringUtils.isBlank(serverValue)) {
+                if (nonValidatedBoundField) {
+                    continue;
+                }
                 issues.add(issue(SEVERITY_ERROR, "MASTER_DATA_INCOMPLETE", rowNumber, descriptor,
                     "enterprise-local master data is missing a derived field value"));
                 continue;
@@ -173,17 +185,11 @@ public class CeEmissionActivityValidationServiceImpl implements ICeEmissionActiv
 
             resolvedFields.add(fieldValue(descriptor, serverValue));
 
-            if (StringUtils.isBlank(clientValue) && !descriptor.derivedField()) {
-                continue;
-            }
-
             if (StringUtils.isBlank(clientValue)) {
-                issues.add(issue(SEVERITY_WARNING, "DERIVED_FIELD_SERVER_FILLED", rowNumber, descriptor,
-                    "client value is ignored and will be filled from enterprise-local master data"));
                 continue;
             }
 
-            if (!serverValue.equals(clientValue)) {
+            if (!nonValidatedBoundField && !serverValue.equals(clientValue)) {
                 issues.add(issue(SEVERITY_ERROR, "DERIVED_FIELD_MISMATCH", rowNumber, descriptor,
                     "client value does not match enterprise-local derived value"));
             }

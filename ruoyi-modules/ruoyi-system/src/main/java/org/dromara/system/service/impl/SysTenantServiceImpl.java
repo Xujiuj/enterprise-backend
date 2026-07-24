@@ -345,8 +345,11 @@ public class SysTenantServiceImpl implements ISysTenantService {
     @Override
     public boolean checkAccountBalance(String tenantId) {
         SysTenantVo tenant = SpringUtils.getAopProxy(this).queryByTenantId(tenantId);
+        if (ObjectUtil.isNull(tenant)) {
+            return false;
+        }
         // 如果余额为-1代表不限制
-        if (tenant.getAccountCount() == -1) {
+        if (ObjectUtil.isNull(tenant.getAccountCount()) || tenant.getAccountCount() == -1) {
             return true;
         }
         Long userNumber = userMapper.selectCount(new LambdaQueryWrapper<>());

@@ -238,7 +238,8 @@ public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivity
         List<CeEmissionSource> sources = emissionSourceMapper.selectList(
             new LambdaQueryWrapper<CeEmissionSource>()
                 .select(CeEmissionSource::getId, CeEmissionSource::getCompanyCode, CeEmissionSource::getFactoryCode,
-                    CeEmissionSource::getCompanyName, CeEmissionSource::getFactoryName, CeEmissionSource::getSourceIdentificationCode)
+                    CeEmissionSource::getCompanyName, CeEmissionSource::getFactoryName, CeEmissionSource::getSourceIdentificationCode,
+                    CeEmissionSource::getResponsibleDept, CeEmissionSource::getDataSource)
                 .in(CeEmissionSource::getCompanyCode, companyCodes)
                 .in(CeEmissionSource::getSourceIdentificationCode, sourceCodes)
         );
@@ -276,8 +277,8 @@ public class CeEmissionActivityCaptureServiceImpl implements ICeEmissionActivity
         activityData.setActivityMonth(toIntegerValue(valuesByCode.get("activityMonth")));
         activityData.setActivityDate(toDateValue("activityDate", valuesByCode.get("activityDate")));
         activityData.setActivityValue(toDecimalValue("activityValue", valuesByCode.get("activityValue")));
-        activityData.setResponsibleDept(valuesByCode.get("responsibleDept"));
-        activityData.setDataSource(valuesByCode.get("dataSource"));
+        activityData.setResponsibleDept(firstNonBlank(valuesByCode.get("responsibleDept"), source == null ? null : source.getResponsibleDept()));
+        activityData.setDataSource(firstNonBlank(valuesByCode.get("dataSource"), source == null ? null : source.getDataSource()));
         activityData.setSourceRemark(valuesByCode.get("sourceRemark"));
         activityData.setFactorKey(valuesByCode.get("factorKey"));
         activityData.setDataStatus(DATA_STATUS_DRAFT);

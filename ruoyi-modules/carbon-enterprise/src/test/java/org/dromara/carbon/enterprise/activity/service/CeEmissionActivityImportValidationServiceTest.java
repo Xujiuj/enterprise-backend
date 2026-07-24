@@ -57,9 +57,9 @@ class CeEmissionActivityImportValidationServiceTest {
             Files.readAllBytes(sample)
         ));
 
-        assertEquals(18, request.getHeaderFields().size());
+        assertEquals(9, request.getHeaderFields().size());
         assertFalse(request.getRows().isEmpty());
-        assertEquals("PK_排放源识别编号", request.getHeaderFields().get(0).getFieldName());
+        assertEquals("companyName", request.getHeaderFields().get(0).getFieldCode());
     }
 
     @Test
@@ -72,20 +72,20 @@ class CeEmissionActivityImportValidationServiceTest {
             entryHeader().stream().map(CeEmissionActivityFieldDescriptor::getFieldCode).toList(),
             List.of(
                 rowValues("Company One", "Factory One", "Scope 1", "Stationary Combustion", "Natural Gas Boiler", "Natural Gas",
-                    "2026-06", "2026-06-05", "12.5", "Production", "Meter"),
+                    "2026-06", "2026-06-05", "12.5"),
                 blankRowValues(),
                 rowValues("Company One", "Factory One", "Scope 1", "Stationary Combustion", "Natural Gas Boiler", "Natural Gas",
-                    "2026-07", "2026-07-05", "18.5", "Production", "Meter")
+                    "2026-07", "2026-07-05", "18.5")
             )
         ));
 
-        assertEquals(18, request.getHeaderFields().size());
-        assertEquals("PK_排放源识别编号", request.getHeaderFields().get(0).getFieldName());
+        assertEquals(9, request.getHeaderFields().size());
+        assertEquals("companyName", request.getHeaderFields().get(0).getFieldCode());
         assertEquals(2, request.getRows().size());
         assertEquals(2, request.getRows().get(0).getRowNumber());
         assertEquals(3, request.getRows().get(1).getRowNumber());
         assertEquals("12.5", fieldValue(request.getRows().get(0), "activityValue"));
-        assertEquals(null, fieldValue(request.getRows().get(1), "sourceRemark"));
+        assertEquals("", fieldValue(request.getRows().get(1), "sourceRemark"));
     }
 
     @Test
@@ -105,22 +105,20 @@ class CeEmissionActivityImportValidationServiceTest {
                 "Natural Gas",
                 "2026-06",
                 "2026-06-05",
-                "12.5",
-                "Production",
-                "Meter"
+                "12.5"
             ))
         ));
 
-        assertEquals(18, request.getHeaderFields().size());
+        assertEquals(9, request.getHeaderFields().size());
         assertEquals(18, request.getRows().get(0).getFieldValues().size());
-        assertEquals(null, fieldValue(request.getRows().get(0), "sourceIdentificationCode"));
+        assertEquals("", fieldValue(request.getRows().get(0), "sourceIdentificationCode"));
         assertEquals("Company One", fieldValue(request.getRows().get(0), "companyName"));
         assertEquals("Natural Gas Boiler", fieldValue(request.getRows().get(0), "sourceIdentificationName"));
         assertEquals("2026", fieldValue(request.getRows().get(0), "activityYear"));
         assertEquals("6", fieldValue(request.getRows().get(0), "activityMonth"));
         assertEquals("12.5", fieldValue(request.getRows().get(0), "activityValue"));
-        assertEquals(null, fieldValue(request.getRows().get(0), "companyCode"));
-        assertEquals(null, fieldValue(request.getRows().get(0), "factorKey"));
+        assertEquals("", fieldValue(request.getRows().get(0), "companyCode"));
+        assertEquals("", fieldValue(request.getRows().get(0), "factorKey"));
 
         CeEmissionActivityImportValidationResult result = service.validateImport(request);
 
@@ -130,6 +128,8 @@ class CeEmissionActivityImportValidationServiceTest {
         assertEquals("COMP-001", fieldValueFromResolved(result, "companyCode"));
         assertEquals("2026", fieldValueFromResolved(result, "activityYear"));
         assertEquals("6", fieldValueFromResolved(result, "activityMonth"));
+        assertEquals("Production", fieldValueFromResolved(result, "responsibleDept"));
+        assertEquals("Meter", fieldValueFromResolved(result, "dataSource"));
         assertEquals("EF-2026-001", fieldValueFromResolved(result, "factorKey"));
     }
 
@@ -172,11 +172,11 @@ class CeEmissionActivityImportValidationServiceTest {
         ServiceException exception = assertThrows(ServiceException.class,
             () -> service.parseImportFile(xlsxFile(headers, List.of(
                 rowValues("Factory One", "Scope 1", "Stationary Combustion", "Natural Gas Boiler", "Natural Gas",
-                    "2026-06", "2026-06-05", "12.5", "Production", "Meter")
-            ))));
+                    "2026-06", "2026-06-05", "12.5")
+        ))));
 
         assertTrue(exception.getMessage().contains("缺少必要表头"));
-        assertTrue(exception.getMessage().contains("公司名称"));
+        assertTrue(exception.getMessage().contains(entryHeader().get(0).getFieldName()));
     }
 
     @Test
@@ -446,34 +446,11 @@ class CeEmissionActivityImportValidationServiceTest {
     }
 
     private List<String> rowValues(String... values) {
-        if (values.length == 11) {
-            String[] expanded = new String[18];
-            expanded[0] = "";
-            expanded[1] = "";
-            expanded[2] = values[0];
-            expanded[3] = values[1];
-            expanded[4] = "";
-            expanded[5] = values[2];
-            expanded[6] = values[3];
-            expanded[7] = values[4];
-            expanded[8] = values[5];
-            expanded[9] = "";
-            String[] period = values[6].split("-", 2);
-            expanded[10] = period.length > 0 ? period[0] : "";
-            expanded[11] = period.length > 1 ? String.valueOf(Integer.parseInt(period[1])) : "";
-            expanded[12] = values[7];
-            expanded[13] = values[8];
-            expanded[14] = values[9];
-            expanded[15] = values[10];
-            expanded[16] = "";
-            expanded[17] = "";
-            return List.of(expanded);
-        }
         return List.of(values);
     }
 
     private List<String> blankRowValues() {
-        return new ArrayList<>(Collections.nCopies(18, ""));
+        return new ArrayList<>(Collections.nCopies(9, ""));
     }
 
     private ICeEmissionActivityDerivedFieldResolver fakeResolver() {
@@ -513,6 +490,8 @@ class CeEmissionActivityImportValidationServiceTest {
                 row.setEmissionSourceName("Natural Gas");
                 row.setUnit("Nm3");
                 row.setEmissionFactorCode("EF-2026-001");
+                row.setResponsibleDept("Production");
+                row.setDataSource("Meter");
                 return row;
             }
         };

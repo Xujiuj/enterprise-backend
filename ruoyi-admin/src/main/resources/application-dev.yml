@@ -79,8 +79,6 @@ redisson:
 carbon:
   enterprise:
     vendor-open-base-url: ${ENTERPRISE_VENDOR_OPEN_BASE_URL:http://localhost:18000}
-  license:
-    install-id: ${ENTERPRISE_INSTALL_ID:INSTALL-ENTERPRISE-LOCAL-001}
 
 --- # mail 邮件发送
 mail:

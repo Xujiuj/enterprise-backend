@@ -24,6 +24,8 @@ public class CeEmissionSourceVo implements Serializable {
 
     private String companyName;
 
+    private String factoryCode;
+
     private String factoryName;
 
     private String sourceCategoryKey;
@@ -49,6 +51,8 @@ public class CeEmissionSourceVo implements Serializable {
     private String dataSource;
 
     private String factorKey;
+
+    private String sourceUnit;
 
     private Boolean enabledFlag;
 
