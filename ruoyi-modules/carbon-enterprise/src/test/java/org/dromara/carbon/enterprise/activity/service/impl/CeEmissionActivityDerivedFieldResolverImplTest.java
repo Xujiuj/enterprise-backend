@@ -49,7 +49,7 @@ class CeEmissionActivityDerivedFieldResolverImplTest {
     }
 
     @Test
-    void resolvesActivityUnitFromEfFactorByEmissionSourceNameWhenSourceUnitIsEmpty() {
+    void resolvesActivityUnitFromLinkedEfFactorWhenSourceUnitIsEmpty() {
         CeEmissionSource source = new CeEmissionSource();
         source.setSourceIdentificationCode("111");
         source.setEmissionSourceName("333");
@@ -57,7 +57,7 @@ class CeEmissionActivityDerivedFieldResolverImplTest {
         source.setFactorKey("1");
         source.setEnabledFlag(true);
         CeDimensionRecordVo factor = new CeDimensionRecordVo();
-        factor.setRecordCode("2");
+        factor.setRecordCode("1");
         factor.setRecordName("333");
         factor.setFactorUnit("kg");
         when(emissionSourceMapper.selectList(any())).thenReturn(List.of(source));

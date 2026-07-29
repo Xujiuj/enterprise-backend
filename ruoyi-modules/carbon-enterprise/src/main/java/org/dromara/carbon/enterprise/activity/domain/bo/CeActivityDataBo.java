@@ -51,7 +51,6 @@ public class CeActivityDataBo implements Serializable {
 
     private String emissionSourceName;
 
-    @NotBlank(message = "活动单位不能为空", groups = { AddGroup.class, EditGroup.class })
     private String activityUnit;
 
     private Integer activityYear;

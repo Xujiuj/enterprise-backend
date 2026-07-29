@@ -7,6 +7,8 @@ import org.dromara.carbon.enterprise.activity.domain.CeActivityData;
 import org.dromara.carbon.enterprise.activity.domain.CeCaptureBatch;
 import org.dromara.carbon.enterprise.activity.domain.CeCaptureCell;
 import org.dromara.carbon.enterprise.activity.domain.CeCaptureRow;
+import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
+import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.greenpower.domain.CeGreenPowerCertificate;
 import org.dromara.carbon.enterprise.intensity.domain.CeIntensityDenominatorFact;
@@ -76,6 +78,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
 
     private final CeActivityDataMapper activityDataMapper;
     private final CeEmissionSourceMapper emissionSourceMapper;
+    private final CeDimensionProjectionMapper dimensionProjectionMapper;
     private final CeGreenPowerCertificateMapper greenPowerCertificateMapper;
     private final CeIntensityDenominatorFactMapper denominatorFactMapper;
     private final CeTemplateSheetMapper templateSheetMapper;
@@ -89,12 +92,15 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     public TableDataInfo<CeActivityDataVo> queryPageList(CeActivityDataBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<CeActivityData> wrapper = applyDefaultListOrder(applyResponsibleDeptScope(buildQueryWrapper(bo)));
         IPage<CeActivityDataVo> page = activityDataMapper.selectVoPage(pageQuery.build(), wrapper);
+        hydrateEfFactorDisplayValues(page.getRecords());
         return TableDataInfo.build(page);
     }
 
     @Override
     public List<CeActivityDataVo> queryList(CeActivityDataBo bo) {
-        return activityDataMapper.selectVoList(applyDefaultListOrder(applyResponsibleDeptScope(buildQueryWrapper(bo))));
+        List<CeActivityDataVo> rows = activityDataMapper.selectVoList(applyDefaultListOrder(applyResponsibleDeptScope(buildQueryWrapper(bo))));
+        hydrateEfFactorDisplayValues(rows);
+        return rows;
     }
 
     private LambdaQueryWrapper<CeActivityData> applyDefaultListOrder(LambdaQueryWrapper<CeActivityData> wrapper) {
@@ -213,7 +219,11 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
     @Override
     public CeActivityDataVo queryById(Long id) {
         CeActivityDataVo row = activityDataMapper.selectVoById(id);
-        return row == null || dataScopeSupport.canAccessDept(row.getResponsibleDept()) ? row : null;
+        if (row == null || !dataScopeSupport.canAccessDept(row.getResponsibleDept())) {
+            return null;
+        }
+        hydrateEfFactorDisplayValues(List.of(row));
+        return row;
     }
 
     @Override
@@ -309,7 +319,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
 
     private void syncActivityFromEmissionSource(CeActivityDataBo bo) {
         if (bo == null || StringUtils.isBlank(bo.getCompanyCode()) || StringUtils.isBlank(bo.getSourceIdentificationCode())) {
-            return;
+            throw new ServiceException("请选择企业下已启用的排放源识别");
         }
         CeEmissionSource source = emissionSourceMapper.selectList(new LambdaQueryWrapper<CeEmissionSource>()
                 .eq(CeEmissionSource::getCompanyCode, bo.getCompanyCode().trim())
@@ -320,7 +330,7 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
             .findFirst()
             .orElse(null);
         if (source == null) {
-            return;
+            throw new ServiceException("排放源识别不存在或未启用：" + bo.getSourceIdentificationCode());
         }
         bo.setCompanyName(firstNonBlank(bo.getCompanyName(), source.getCompanyName()));
         bo.setFactoryCode(firstNonBlank(bo.getFactoryCode(), source.getFactoryCode()));
@@ -332,7 +342,59 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
         bo.setEmissionSourceName(firstNonBlank(bo.getEmissionSourceName(), source.getEmissionSourceName()));
         bo.setResponsibleDept(firstNonBlank(bo.getResponsibleDept(), source.getResponsibleDept()));
         bo.setDataSource(firstNonBlank(bo.getDataSource(), source.getDataSource()));
-        bo.setFactorKey(firstNonBlank(bo.getFactorKey(), source.getFactorKey()));
+        bo.setFactorKey(source.getFactorKey());
+        CeDimensionRecordVo factor = efFactorsByKey().get(normalized(bo.getFactorKey()));
+        if (factor == null) {
+            throw new ServiceException("排放源识别关联的201排放因子不存在，请先维护201数据");
+        }
+        applyEfFactorDisplayValues(bo, factor);
+        if (StringUtils.isBlank(bo.getActivityUnit())) {
+            throw new ServiceException("关联的201排放因子缺少排放源单位或因子单位，请先补齐201数据");
+        }
+    }
+
+    private void hydrateEfFactorDisplayValues(List<CeActivityDataVo> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        Map<String, CeDimensionRecordVo> factors = efFactorsByKey();
+        rows.forEach(row -> applyEfFactorDisplayValues(row, factors.get(normalized(row.getFactorKey()))));
+    }
+
+    private void applyEfFactorDisplayValues(CeActivityDataBo target, CeDimensionRecordVo factor) {
+        if (factor == null) {
+            return;
+        }
+        target.setSourceIdentificationName(efFactorIdentificationName(factor));
+        target.setEmissionSourceName(efFactorEmissionSourceName(factor));
+        target.setActivityUnit(efFactorActivityUnit(factor));
+    }
+
+    private void applyEfFactorDisplayValues(CeActivityDataVo target, CeDimensionRecordVo factor) {
+        if (factor == null) {
+            return;
+        }
+        target.setSourceIdentificationName(efFactorIdentificationName(factor));
+        target.setEmissionSourceName(efFactorEmissionSourceName(factor));
+        target.setActivityUnit(efFactorActivityUnit(factor));
+    }
+
+    private Map<String, CeDimensionRecordVo> efFactorsByKey() {
+        return dimensionProjectionMapper.selectByDimensionCode("ef-factor").stream()
+            .filter(factor -> StringUtils.isNotBlank(normalized(factor.getRecordCode())))
+            .collect(Collectors.toMap(factor -> normalized(factor.getRecordCode()), Function.identity(), (left, right) -> left));
+    }
+
+    private String efFactorIdentificationName(CeDimensionRecordVo factor) {
+        return normalized(factor.getRecordName());
+    }
+
+    private String efFactorEmissionSourceName(CeDimensionRecordVo factor) {
+        return firstNonBlank(factor.getFuelMaterialCategory(), factor.getRecordName());
+    }
+
+    private String efFactorActivityUnit(CeDimensionRecordVo factor) {
+        return firstNonBlank(factor.getSourceUnit(), factor.getFactorUnit());
     }
 
     private ActivityPeriod resolvePeriod(CeActivityDataBo bo) {
@@ -782,6 +844,10 @@ public class CeActivityDataServiceImpl implements ICeActivityDataService {
 
     private static String firstNonBlank(String preferred, String fallback) {
         return StringUtils.isNotBlank(preferred) ? preferred : fallback;
+    }
+
+    private static String normalized(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private static class SubmissionAggregate {

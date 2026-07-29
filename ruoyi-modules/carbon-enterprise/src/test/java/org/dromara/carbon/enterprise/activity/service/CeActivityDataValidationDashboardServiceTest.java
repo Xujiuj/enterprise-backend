@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
 import org.dromara.carbon.enterprise.activity.domain.CeActivityData;
+import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.greenpower.domain.CeGreenPowerCertificate;
 import org.dromara.carbon.enterprise.intensity.domain.CeIntensityDenominatorFact;
@@ -19,6 +20,7 @@ import org.dromara.carbon.enterprise.activity.mapper.CeCaptureBatchMapper;
 import org.dromara.carbon.enterprise.activity.mapper.CeCaptureCellMapper;
 import org.dromara.carbon.enterprise.activity.mapper.CeCaptureRowMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
+import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.greenpower.mapper.CeGreenPowerCertificateMapper;
 import org.dromara.carbon.enterprise.intensity.mapper.CeIntensityDenominatorFactMapper;
 import org.dromara.carbon.enterprise.template.mapper.CeTemplateFieldMapper;
@@ -47,6 +49,7 @@ class CeActivityDataValidationDashboardServiceTest {
 
     private CeActivityDataMapper activityDataMapper;
     private CeEmissionSourceMapper emissionSourceMapper;
+    private CeDimensionProjectionMapper dimensionProjectionMapper;
     private CeGreenPowerCertificateMapper greenPowerCertificateMapper;
     private CeIntensityDenominatorFactMapper denominatorFactMapper;
     private CeTemplateSheetMapper templateSheetMapper;
@@ -70,6 +73,8 @@ class CeActivityDataValidationDashboardServiceTest {
     void setUp() {
         activityDataMapper = mock(CeActivityDataMapper.class);
         emissionSourceMapper = mock(CeEmissionSourceMapper.class);
+        dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
+        when(dimensionProjectionMapper.selectByDimensionCode("ef-factor")).thenReturn(List.of());
         greenPowerCertificateMapper = mock(CeGreenPowerCertificateMapper.class);
         denominatorFactMapper = mock(CeIntensityDenominatorFactMapper.class);
         templateSheetMapper = mock(CeTemplateSheetMapper.class);
@@ -83,6 +88,7 @@ class CeActivityDataValidationDashboardServiceTest {
         service = new CeActivityDataServiceImpl(
             activityDataMapper,
             emissionSourceMapper,
+            dimensionProjectionMapper,
             greenPowerCertificateMapper,
             denominatorFactMapper,
             templateSheetMapper,
@@ -137,6 +143,29 @@ class CeActivityDataValidationDashboardServiceTest {
         assertEquals("活动数据未提交", dashboard.getIssues().get(0).getRuleName());
         assertEquals("活动数据仍处于草稿状态。", dashboard.getIssues().get(0).getDescription());
         assertEquals("请复核草稿数据并提交。", dashboard.getIssues().get(0).getSuggestion());
+    }
+
+    @Test
+    void derivesActivityListFieldsFromLinkedEfFactor() {
+        CeActivityDataVo activity = new CeActivityDataVo();
+        activity.setFactorKey("EF-201-GAS");
+        activity.setSourceIdentificationName("historical value");
+        activity.setEmissionSourceName("historical value");
+        activity.setActivityUnit("historical value");
+        CeDimensionRecordVo factor = new CeDimensionRecordVo();
+        factor.setRecordCode("EF-201-GAS");
+        factor.setRecordName("Natural gas identification");
+        factor.setFuelMaterialCategory("Natural gas");
+        factor.setSourceUnit("m3");
+        when(dimensionProjectionMapper.selectByDimensionCode("ef-factor")).thenReturn(List.of(factor));
+        when(activityDataMapper.selectVoList(any())).thenReturn(List.of(activity));
+
+        List<CeActivityDataVo> result = service.queryList(new CeActivityDataBo());
+
+        assertEquals("EF-201-GAS", result.get(0).getFactorKey());
+        assertEquals("Natural gas identification", result.get(0).getSourceIdentificationName());
+        assertEquals("Natural gas", result.get(0).getEmissionSourceName());
+        assertEquals("m3", result.get(0).getActivityUnit());
     }
 
     @Test

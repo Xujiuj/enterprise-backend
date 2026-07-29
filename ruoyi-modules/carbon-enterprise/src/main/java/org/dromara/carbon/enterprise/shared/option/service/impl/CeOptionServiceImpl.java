@@ -229,7 +229,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
             case "issuing-org" -> collectDistinct(options, greenPowerCertificateMapper, CeGreenPowerCertificate::getIssuingOrg, this::labelForRaw);
             case "confirmed-by" -> collectDistinct(options, factorConfirmationMapper, CeFactorConfirmation::getConfirmedBy, this::labelForRaw);
             case "license-id" -> collectDistinct(options, licenseStateMapper, CeLicenseState::getLicenseId, this::labelForRaw);
-            case "activity-entry-emission-source-name" -> collectEmissionSourceNameOptions(options, safeQuery);
+            case "activity-entry-emission-source-name" -> collectActivityEntryEmissionSourceNameOptions(options, safeQuery);
             case "activity-entry-source-company" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getCompanyName, safeQuery);
             case "activity-entry-source-factory" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getFactoryName, safeQuery);
             case "activity-entry-source-scope" -> collectEmissionSourceFieldOptions(options, CeEmissionSource::getScopeName, safeQuery);
@@ -529,6 +529,35 @@ public class CeOptionServiceImpl implements ICeOptionService {
                 continue;
             }
             optionsByLabel.putIfAbsent(label, new CeOptionVo(label, label, emissionSourceRecord(row, factorNameCache, efFactorUnitCache)));
+        }
+        target.addAll(optionsByLabel.values());
+    }
+
+    private void collectActivityEntryEmissionSourceNameOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
+        Map<String, CeOptionVo> optionsByLabel = new LinkedHashMap<>();
+        Map<String, CeDimensionRecordVo> factorsByKey = dimensionProjectionMapper.selectByDimensionCode("ef-factor")
+            .stream()
+            .filter(factor -> StringUtils.isNotBlank(normalizeValue(factor.getRecordCode())))
+            .collect(java.util.stream.Collectors.toMap(
+                factor -> normalizeValue(factor.getRecordCode()),
+                java.util.function.Function.identity(),
+                (left, right) -> left,
+                LinkedHashMap::new
+            ));
+        for (CeEmissionSource source : selectEnabledEmissionSources(query)) {
+            Map<String, Object> record = emissionSourceRecord(source, Map.of(), Map.of());
+            CeDimensionRecordVo factor = factorsByKey.get(normalizeValue(source.getFactorKey()));
+            if (factor == null) {
+                continue;
+            }
+            record.put("sourceIdentificationName", normalizeValue(factor.getRecordName()));
+            record.put("emissionSourceName", StringUtils.defaultIfBlank(normalizeValue(factor.getFuelMaterialCategory()), normalizeValue(factor.getRecordName())));
+            record.put("sourceUnit", StringUtils.defaultIfBlank(normalizeValue(factor.getSourceUnit()), normalizeValue(factor.getFactorUnit())));
+            String label = normalizeValue(record.get("emissionSourceName"));
+            if (StringUtils.isBlank(label)) {
+                continue;
+            }
+            optionsByLabel.putIfAbsent(label, new CeOptionVo(label, label, record));
         }
         target.addAll(optionsByLabel.values());
     }
