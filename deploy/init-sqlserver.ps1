@@ -7,8 +7,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$WorkspaceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$SqlDir = Join-Path $WorkspaceRoot "deploy\sqlserver"
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+$SqlDir = Join-Path $ProjectRoot "script\sql\sqlserver"
 
 function Get-EnvValue {
     param([string] $Name, [string] $Default = "")
@@ -43,9 +43,9 @@ if ($LASTEXITCODE -ne 0) { throw "Failed to ensure database exists" }
 
 Write-Host "==> Running enterprise initialization data" -ForegroundColor Cyan
 Push-Location $SqlDir
-sqlcmd -S $SqlServer -U $SqlUser -P $SqlPassword -C -b -d $Database -i "enterprise-init.sql"
+sqlcmd -S $SqlServer -U $SqlUser -P $SqlPassword -C -b -d $Database -i "carbon_enterprise_init.sql"
 if ($LASTEXITCODE -ne 0) { throw "enterprise initialization failed" }
-sqlcmd -S $SqlServer -U $SqlUser -P $SqlPassword -C -b -d $Database -i "session-timeout-1h.sql"
+sqlcmd -S $SqlServer -U $SqlUser -P $SqlPassword -C -b -d $Database -i "session-timeout-12h.sql"
 if ($LASTEXITCODE -ne 0) { throw "session timeout initialization failed" }
 Pop-Location
 

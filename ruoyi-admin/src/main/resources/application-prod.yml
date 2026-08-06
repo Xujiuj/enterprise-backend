@@ -77,7 +77,7 @@ spring.data:
     # 端口,默认为6379
     port: ${ENTERPRISE_REDIS_PORT:6379}
     # 数据库索引
-    database: 0
+    database: ${ENTERPRISE_REDIS_DATABASE:0}
     # redis 密码必须配置
     password: ${ENTERPRISE_REDIS_PASSWORD:}
     # 连接超时时间
@@ -88,13 +88,15 @@ spring.data:
 # redisson 配置
 redisson:
   # redis key前缀
-  keyPrefix:
+  keyPrefix: ${ENTERPRISE_REDIS_KEY_PREFIX:}
   # 线程池数量
   threads: 16
   # Netty线程池数量
   nettyThreads: 32
   # 单节点配置
   singleServerConfig:
+    # Redis logical database index; keep it aligned with spring.data.redis.database
+    database: ${ENTERPRISE_REDIS_DATABASE:0}
     # 客户端名称,不能用中文
     clientName: Enterprise-Carbon-Data
     # 最小空闲连接数

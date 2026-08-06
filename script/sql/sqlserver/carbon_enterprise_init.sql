@@ -168,9 +168,6 @@ BEGIN
                    contact_phone = source.contact_phone,
                    company_name = source.company_name,
                    intro = source.intro,
-                   license_number = NULL,
-                   package_id = NULL,
-                   expire_time = NULL,
                    account_count = -1,
                    status = source.status,
                    del_flag = source.del_flag,
@@ -185,12 +182,8 @@ BEGIN
                 source.del_flag, @createBy, NULL, @now, NULL, NULL);
 END;
 
--- Fresh enterprise initialization must start without any authorization state.
--- Operators import a valid license after deployment through the license import flow.
-IF OBJECT_ID(N'dbo.ce_license_state', N'U') IS NOT NULL
-BEGIN
-    DELETE FROM dbo.ce_license_state;
-END;
+-- License state is enterprise-wide operational data. A new database has no rows
+-- by default; repeat initialization must preserve a previously imported license.
 
 IF OBJECT_ID(N'dbo.sys_dept', N'U') IS NOT NULL
 BEGIN
@@ -244,8 +237,8 @@ IF OBJECT_ID(N'dbo.sys_client', N'U') IS NOT NULL
 BEGIN
     MERGE dbo.sys_client AS target
     USING (VALUES
-        (1, N'e5cd7e4891bf95d1d19206ce24a7b32e', N'pc', N'pc123', N'password,social', N'pc', 3600, 3600, N'0', N'0'),
-        (2, N'428a8310cd442757ae699df5d894f051', N'app', N'app123', N'password,sms,social', N'android', 3600, 3600, N'0', N'0')
+        (1, N'e5cd7e4891bf95d1d19206ce24a7b32e', N'pc', N'pc123', N'password,social', N'pc', 43200, 43200, N'0', N'0'),
+        (2, N'428a8310cd442757ae699df5d894f051', N'app', N'app123', N'password,sms,social', N'android', 43200, 43200, N'0', N'0')
     ) AS source(id, client_id, client_key, client_secret, grant_type, device_type, active_timeout, timeout, status, del_flag)
     ON target.client_id = source.client_id
     WHEN MATCHED THEN
@@ -492,6 +485,7 @@ VALUES
     (900281, N'页面生成管理', 900280, 1, N'module-generator', N'enterprise/dynamicModule/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:dynamicModule:list', N'upload', N'上传Excel生成管理页面'),
     (900282, N'Excel预览', 900281, 1, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:dynamicModule:preview', N'#', N'Excel页面结构预览权限'),
     (900283, N'生成页面', 900281, 2, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:dynamicModule:generate', N'#', N'生成动态页面权限'),
+    (900285, N'删除页面', 900281, 3, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:dynamicModule:remove', N'#', N'归档和恢复动态页面权限'),
     (900284, N'Power BI链接配置', 900164, 1, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:reports:powerbi:edit', N'#', N'配置企业Power BI嵌入链接'),
 
     (900100, N'系统授权', 0, 1, N'system-auth', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'link', N'系统授权目录'),

@@ -45,6 +45,11 @@ public class RedissonProperties {
     public static class SingleServerConfig {
 
         /**
+         * Redis logical database index. Keep the default compatible with the existing deployment.
+         */
+        private int database = 0;
+
+        /**
          * 客户端名称
          */
         private String clientName;

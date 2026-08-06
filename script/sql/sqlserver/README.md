@@ -29,9 +29,9 @@ configuration, the default admin account, enterprise portal menus, button
 permissions, and preset roles (`enterprise_admin`, `enterprise_operator`,
 `enterprise_reporter`, `enterprise_reviewer`, `enterprise_report_viewer`).
 
-The initialized enterprise database has no active authorization state:
-`ce_license_state` is emptied and tenant license fields are reset. Operators
-must import a valid License after deployment through the enterprise license
-import flow.
+A new enterprise database has no active authorization state. Operators must
+import a valid License through the enterprise license import flow. Re-running
+the initialization script preserves the enterprise-wide `ce_license_state` and
+tenant license fields, so a redeployment cannot revoke an existing license.
 
 Do not add legacy-compatible enterprise scripts back into this delivery.

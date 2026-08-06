@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.constant.Constants;
 import org.dromara.common.core.constant.SystemConstants;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StreamUtils;
 import org.dromara.common.core.utils.StringUtils;
@@ -19,6 +20,7 @@ import org.dromara.system.domain.SysRole;
 import org.dromara.system.domain.SysRoleMenu;
 import org.dromara.system.domain.SysTenantPackage;
 import org.dromara.system.domain.bo.SysMenuBo;
+import org.dromara.system.event.MenuCascadeDeletedEvent;
 import org.dromara.system.domain.vo.MetaVo;
 import org.dromara.system.domain.vo.RouterVo;
 import org.dromara.system.domain.vo.SysMenuVo;
@@ -27,12 +29,20 @@ import org.dromara.system.mapper.SysRoleMapper;
 import org.dromara.system.mapper.SysRoleMenuMapper;
 import org.dromara.system.mapper.SysTenantPackageMapper;
 import org.dromara.system.service.ISysMenuService;
+import org.dromara.system.service.ISysRoleService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -49,6 +59,8 @@ public class SysMenuServiceImpl implements ISysMenuService {
     private final SysRoleMapper roleMapper;
     private final SysRoleMenuMapper roleMenuMapper;
     private final SysTenantPackageMapper tenantPackageMapper;
+    private final ISysRoleService roleService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 根据用户查询系统菜单列表
@@ -327,7 +339,45 @@ public class SysMenuServiceImpl implements ISysMenuService {
      */
     @Override
     public int deleteMenuById(Long menuId) {
-        return baseMapper.deleteById(menuId);
+        deleteMenuCascadeByIds(List.of(menuId));
+        return 1;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteMenuCascadeByIds(List<Long> menuIds) {
+        if (CollUtil.isEmpty(menuIds)) {
+            throw new ServiceException("请选择至少一个菜单");
+        }
+        Set<Long> requestedIds = new HashSet<>(menuIds);
+        if (requestedIds.contains(null)) {
+            throw new ServiceException("菜单编号不能为空");
+        }
+        List<SysMenu> allMenus = baseMapper.selectList(new LambdaQueryWrapper<SysMenu>()
+            .select(SysMenu::getMenuId, SysMenu::getParentId));
+        Map<Long, Long> parentIds = new HashMap<>(allMenus.size());
+        Map<Long, List<Long>> childrenByParent = new HashMap<>();
+        for (SysMenu menu : allMenus) {
+            parentIds.put(menu.getMenuId(), menu.getParentId());
+            childrenByParent.computeIfAbsent(menu.getParentId(), ignored -> new ArrayList<>()).add(menu.getMenuId());
+        }
+        if (!parentIds.keySet().containsAll(requestedIds)) {
+            throw new ServiceException("部分菜单不存在或已删除");
+        }
+        Set<Long> deletedMenuIds = collectMenuTree(requestedIds, childrenByParent);
+        Set<Long> affectedRoleIds = new HashSet<>(roleMenuMapper.selectList(new LambdaQueryWrapper<SysRoleMenu>()
+            .select(SysRoleMenu::getRoleId)
+            .in(SysRoleMenu::getMenuId, deletedMenuIds))
+            .stream()
+            .map(SysRoleMenu::getRoleId)
+            .toList());
+
+        eventPublisher.publishEvent(new MenuCascadeDeletedEvent(Set.copyOf(deletedMenuIds), Map.copyOf(parentIds),
+            Set.copyOf(affectedRoleIds)));
+        roleMenuMapper.deleteByMenuIds(new ArrayList<>(deletedMenuIds));
+        removeDeletedMenuIdsFromTenantPackages(deletedMenuIds);
+        baseMapper.deleteByIds(deletedMenuIds);
+        expireAffectedRoleSessions(affectedRoleIds);
     }
 
     /**
@@ -339,8 +389,47 @@ public class SysMenuServiceImpl implements ISysMenuService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteMenuById(List<Long> menuIds) {
-        baseMapper.deleteByIds(menuIds);
-        roleMenuMapper.deleteByMenuIds(menuIds);
+        deleteMenuCascadeByIds(menuIds);
+    }
+
+    static Set<Long> collectMenuTree(Collection<Long> rootIds, Map<Long, List<Long>> childrenByParent) {
+        Set<Long> resolvedIds = new HashSet<>();
+        LinkedList<Long> pendingIds = new LinkedList<>(rootIds);
+        while (!pendingIds.isEmpty()) {
+            Long menuId = pendingIds.removeFirst();
+            if (!resolvedIds.add(menuId)) {
+                continue;
+            }
+            pendingIds.addAll(childrenByParent.getOrDefault(menuId, List.of()));
+        }
+        return resolvedIds;
+    }
+
+    private void removeDeletedMenuIdsFromTenantPackages(Set<Long> deletedMenuIds) {
+        List<SysTenantPackage> packages = tenantPackageMapper.selectList(new LambdaQueryWrapper<SysTenantPackage>()
+            .select(SysTenantPackage::getPackageId, SysTenantPackage::getMenuIds));
+        for (SysTenantPackage tenantPackage : packages) {
+            List<Long> remainingIds = StringUtils.splitTo(tenantPackage.getMenuIds(), Convert::toLong).stream()
+                .filter(menuId -> !deletedMenuIds.contains(menuId))
+                .toList();
+            String remainingMenuIds = StringUtils.joinComma(remainingIds);
+            if (!StringUtils.equals(tenantPackage.getMenuIds(), remainingMenuIds)) {
+                tenantPackage.setMenuIds(remainingMenuIds);
+                tenantPackageMapper.updateById(tenantPackage);
+            }
+        }
+    }
+
+    private void expireAffectedRoleSessions(Set<Long> roleIds) {
+        if (roleIds.isEmpty()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                roleIds.forEach(roleService::cleanOnlineUserByRole);
+            }
+        });
     }
 
     /**

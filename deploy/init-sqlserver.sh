@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SQL_DIR="$WORKSPACE_ROOT/deploy/sqlserver"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SQL_DIR="$PROJECT_ROOT/script/sql/sqlserver"
 ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
 
 env_value() {
@@ -39,7 +39,7 @@ sqlcmd -S "$SQL_SERVER" -U "$SQL_USER" -P "$SQL_PASSWORD" -C -b -d master \
   -Q "IF DB_ID(N'$DATABASE') IS NULL EXEC(N'CREATE DATABASE [$DATABASE] COLLATE Chinese_PRC_CI_AS');"
 
 echo "==> Running enterprise initialization data"
-(cd "$SQL_DIR" && sqlcmd -S "$SQL_SERVER" -U "$SQL_USER" -P "$SQL_PASSWORD" -C -b -d "$DATABASE" -i "enterprise-init.sql")
-(cd "$SQL_DIR" && sqlcmd -S "$SQL_SERVER" -U "$SQL_USER" -P "$SQL_PASSWORD" -C -b -d "$DATABASE" -i "session-timeout-1h.sql")
+(cd "$SQL_DIR" && sqlcmd -S "$SQL_SERVER" -U "$SQL_USER" -P "$SQL_PASSWORD" -C -b -d "$DATABASE" -i "carbon_enterprise_init.sql")
+(cd "$SQL_DIR" && sqlcmd -S "$SQL_SERVER" -U "$SQL_USER" -P "$SQL_PASSWORD" -C -b -d "$DATABASE" -i "session-timeout-12h.sql")
 
 echo "Enterprise SQL Server initialization complete."

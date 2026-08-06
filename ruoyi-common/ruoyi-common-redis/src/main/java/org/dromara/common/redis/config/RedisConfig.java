@@ -73,6 +73,7 @@ public class RedisConfig {
                 config.useSingleServer()
                     //设置redis key前缀
                     .setNameMapper(new KeyPrefixHandler(redissonProperties.getKeyPrefix()))
+                    .setDatabase(singleServerConfig.getDatabase())
                     .setTimeout(singleServerConfig.getTimeout())
                     .setClientName(singleServerConfig.getClientName())
                     .setIdleConnectionTimeout(singleServerConfig.getIdleConnectionTimeout())

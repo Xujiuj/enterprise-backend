@@ -146,6 +146,13 @@ public interface ISysMenuService {
     int deleteMenuById(Long menuId);
 
     /**
+     * Recursively deletes each requested menu and all descendants.
+     *
+     * @param menuIds root menu IDs
+     */
+    void deleteMenuCascadeByIds(List<Long> menuIds);
+
+    /**
      * 批量删除菜单管理信息
      *
      * @param menuIds 菜单ID串

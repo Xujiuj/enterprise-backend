@@ -1,6 +1,7 @@
 package org.dromara.carbon.enterprise.dynamic.service;
 
 import org.dromara.common.core.exception.ServiceException;
+import org.dromara.system.event.MenuCascadeDeletedEvent;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -8,6 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Map;
+import java.util.Set;
 
 @Tag("dev")
 class CeDynamicModuleSafetyTest {
@@ -33,5 +37,19 @@ class CeDynamicModuleSafetyTest {
         assertEquals("[valid_column]", CeDynamicModuleService.quote("valid_column"));
         assertEquals("[ce_dyn_supplier_data]", CeDynamicModuleService.quote("ce_dyn_supplier_data"));
         assertThrows(ServiceException.class, () -> CeDynamicModuleService.quote("name]; DROP TABLE sys_user;--"));
+    }
+
+    @Test
+    void archivesDynamicPageWhenItsButtonOrAncestorIsDeleted() {
+        MenuCascadeDeletedEvent childDeletion = new MenuCascadeDeletedEvent(
+            Set.of(102L), Map.of(102L, 101L, 101L, 900280L, 900280L, 0L), Set.of()
+        );
+        MenuCascadeDeletedEvent ancestorDeletion = new MenuCascadeDeletedEvent(
+            Set.of(900280L, 101L, 102L), Map.of(102L, 101L, 101L, 900280L, 900280L, 0L), Set.of()
+        );
+
+        assertTrue(CeDynamicModuleService.isDeletedDynamicPage(101L, childDeletion));
+        assertTrue(CeDynamicModuleService.isDeletedDynamicPage(101L, ancestorDeletion));
+        assertFalse(CeDynamicModuleService.isDeletedDynamicPage(103L, childDeletion));
     }
 }

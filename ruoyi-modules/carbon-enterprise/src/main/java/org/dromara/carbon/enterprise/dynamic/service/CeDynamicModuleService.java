@@ -11,7 +11,10 @@ import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.domain.SysMenu;
+import org.dromara.system.event.MenuCascadeDeletedEvent;
 import org.dromara.system.mapper.SysMenuMapper;
+import org.dromara.system.service.ISysMenuService;
+import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -63,6 +66,7 @@ public class CeDynamicModuleService {
 
     private final JdbcTemplate jdbcTemplate;
     private final SysMenuMapper sysMenuMapper;
+    private final ISysMenuService menuService;
     private final CeDynamicExcelParser excelParser;
 
     public CeDynamicModels.WorkbookPreview preview(MultipartFile file) {
@@ -110,6 +114,73 @@ public class CeDynamicModuleService {
             ORDER BY create_time DESC, id DESC
             """);
         return rows.stream().map(this::toSchema).toList();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void archiveModules(List<String> moduleCodes) {
+        ensureMetadataTables();
+        if (moduleCodes == null || moduleCodes.isEmpty()) {
+            throw new ServiceException("请选择要删除的页面");
+        }
+        Set<String> codes = new HashSet<>();
+        for (String moduleCode : moduleCodes) {
+            validateModuleCode(moduleCode);
+            codes.add(moduleCode.trim().toLowerCase(Locale.ROOT));
+        }
+        for (String moduleCode : codes) {
+            CeDynamicModels.ModuleSchema schema = getSchemaWithoutAuthorization(moduleCode);
+            if (!"0".equals(schema.getStatus())) {
+                throw new ServiceException("页面已归档: " + moduleCode);
+            }
+            if (schema.getMenuId() == null) {
+                archiveModuleById(schema.getId());
+                continue;
+            }
+            menuService.deleteMenuCascadeByIds(List.of(schema.getMenuId()));
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public CeDynamicModels.ModuleSchema restoreModule(String moduleCode) {
+        ensureMetadataTables();
+        validateModuleCode(moduleCode);
+        CeDynamicModels.ModuleSchema schema = getSchemaWithoutAuthorization(moduleCode);
+        if ("0".equals(schema.getStatus())) {
+            throw new ServiceException("页面已启用，无需恢复: " + moduleCode);
+        }
+        if (!tableExists(schema.getTableName())) {
+            throw new ServiceException("页面数据表不存在，无法恢复: " + schema.getTableName());
+        }
+        CeDynamicModels.SheetDefinition definition = new CeDynamicModels.SheetDefinition();
+        definition.setModuleCode(schema.getModuleCode());
+        definition.setModuleName(schema.getModuleName());
+        Long menuId = createMenus(definition, schema.getPermissionPrefix());
+        jdbcTemplate.update("""
+            UPDATE ce_dynamic_module
+            SET menu_id = ?, status = '0', update_by = ?, update_time = ?
+            WHERE id = ?
+            """, menuId, currentUserId(), LocalDateTime.now(), schema.getId());
+        return getSchemaWithoutAuthorization(moduleCode);
+    }
+
+    @EventListener
+    public void archiveDeletedDynamicModules(MenuCascadeDeletedEvent event) {
+        if (!metadataTablesExist() || event.menuIds().isEmpty()) {
+            return;
+        }
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+            SELECT id, menu_id, permission_prefix
+            FROM ce_dynamic_module
+            WHERE status = '0' AND menu_id IS NOT NULL
+            """);
+        Set<Long> pageMenuIds = new HashSet<>();
+        for (Map<String, Object> row : rows) {
+            Long pageMenuId = number(row, "menu_id");
+            if (pageMenuId != null && isDeletedDynamicPage(pageMenuId, event)) {
+                pageMenuIds.add(pageMenuId);
+            }
+        }
+        archiveModulesByMenuIds(pageMenuIds);
     }
 
     public CeDynamicModels.ModuleSchema getSchema(String moduleCode) {
@@ -423,6 +494,69 @@ public class CeDynamicModuleService {
         permissions.add(permissionPrefix + ":add");
         permissions.add(permissionPrefix + ":edit");
         permissions.add(permissionPrefix + ":remove");
+        loginUser.setMenuPermission(permissions);
+    }
+
+    private void archiveModulesByMenuIds(Set<Long> pageMenuIds) {
+        if (pageMenuIds.isEmpty()) {
+            return;
+        }
+        String placeholders = String.join(", ", Collections.nCopies(pageMenuIds.size(), "?"));
+        List<Map<String, Object>> modules = jdbcTemplate.queryForList(
+            "SELECT id, permission_prefix FROM ce_dynamic_module WHERE menu_id IN (" + placeholders + ")",
+            pageMenuIds.toArray()
+        );
+        archiveModuleRows(modules);
+    }
+
+    private void archiveModuleById(Long moduleId) {
+        List<Map<String, Object>> modules = jdbcTemplate.queryForList(
+            "SELECT id, permission_prefix FROM ce_dynamic_module WHERE id = ?", moduleId
+        );
+        archiveModuleRows(modules);
+    }
+
+    private void archiveModuleRows(List<Map<String, Object>> modules) {
+        for (Map<String, Object> module : modules) {
+            jdbcTemplate.update("""
+                UPDATE ce_dynamic_module
+                SET menu_id = NULL, status = '1', update_by = ?, update_time = ?
+                WHERE id = ?
+                """, currentUserId(), LocalDateTime.now(), number(module, "id"));
+            removeCurrentSessionPermissions(string(module, "permission_prefix"));
+        }
+    }
+
+    static boolean isDeletedDynamicPage(Long pageMenuId, MenuCascadeDeletedEvent event) {
+        for (Long deletedMenuId : event.menuIds()) {
+            Long currentMenuId = deletedMenuId;
+            Set<Long> visitedMenuIds = new HashSet<>();
+            while (currentMenuId != null && visitedMenuIds.add(currentMenuId)) {
+                if (pageMenuId.equals(currentMenuId)) {
+                    return true;
+                }
+                currentMenuId = event.parentIds().get(currentMenuId);
+            }
+        }
+        return false;
+    }
+
+    private boolean metadataTablesExist() {
+        Boolean exists = jdbcTemplate.queryForObject("""
+            SELECT CASE WHEN OBJECT_ID(N'dbo.ce_dynamic_module', N'U') IS NOT NULL
+                         AND OBJECT_ID(N'dbo.ce_dynamic_field', N'U') IS NOT NULL
+                        THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END
+            """, Boolean.class);
+        return Boolean.TRUE.equals(exists);
+    }
+
+    private void removeCurrentSessionPermissions(String permissionPrefix) {
+        LoginUser loginUser = LoginHelper.getLoginUser();
+        if (loginUser == null || loginUser.getMenuPermission() == null) {
+            return;
+        }
+        Set<String> permissions = new HashSet<>(loginUser.getMenuPermission());
+        permissions.removeIf(permission -> permission.startsWith(permissionPrefix + ":"));
         loginUser.setMenuPermission(permissions);
     }
 

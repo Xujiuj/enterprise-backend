@@ -60,7 +60,8 @@ INSERT INTO @menus VALUES
     (900280, N'动态数据管理', 0, 7, N'dynamic-data', N'Layout', N'', 1, 0, N'M', N'0', N'0', N'', N'table', N'Excel动态页面目录'),
     (900281, N'页面生成管理', 900280, 1, N'module-generator', N'enterprise/dynamicModule/index', N'', 1, 0, N'C', N'0', N'0', N'enterprise:dynamicModule:list', N'upload', N'上传Excel生成管理页面'),
     (900282, N'Excel预览', 900281, 1, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:dynamicModule:preview', N'#', N'Excel页面结构预览权限'),
-    (900283, N'生成页面', 900281, 2, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:dynamicModule:generate', N'#', N'生成动态页面权限');
+    (900283, N'生成页面', 900281, 2, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:dynamicModule:generate', N'#', N'生成动态页面权限'),
+    (900285, N'删除页面', 900281, 3, N'#', N'', N'', 1, 0, N'F', N'1', N'0', N'enterprise:dynamicModule:remove', N'#', N'归档和恢复动态页面权限');
 
 MERGE dbo.sys_menu AS target
 USING @menus AS source

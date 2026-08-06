@@ -8,8 +8,11 @@ import org.dromara.common.core.domain.R;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.json.utils.JsonUtils;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,5 +52,18 @@ public class CeDynamicModuleController {
     @GetMapping("/list")
     public R<List<CeDynamicModels.ModuleSchema>> list() {
         return R.ok(dynamicModuleService.listModules());
+    }
+
+    @SaCheckPermission("enterprise:dynamicModule:remove")
+    @DeleteMapping("/{moduleCodes}")
+    public R<Void> remove(@PathVariable String[] moduleCodes) {
+        dynamicModuleService.archiveModules(List.of(moduleCodes));
+        return R.ok();
+    }
+
+    @SaCheckPermission("enterprise:dynamicModule:remove")
+    @PutMapping("/{moduleCode}/restore")
+    public R<CeDynamicModels.ModuleSchema> restore(@PathVariable String moduleCode) {
+        return R.ok(dynamicModuleService.restoreModule(moduleCode));
     }
 }
