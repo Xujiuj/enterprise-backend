@@ -7,7 +7,6 @@ import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMappe
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionSqlProvider;
 import org.dromara.carbon.enterprise.dimension.service.impl.CeDimensionRecordServiceImpl;
 import org.dromara.carbon.enterprise.license.mapper.CeLicenseStateMapper;
-import org.dromara.carbon.enterprise.shared.service.ICeCompanyFactoryDeptSyncService;
 import org.dromara.carbon.enterprise.vendor.client.CeVendorDimensionOpenClient;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -33,7 +32,6 @@ class CeDimensionRecordServiceTest {
 
     private CeDimensionProjectionMapper dimensionProjectionMapper;
     private CeVendorDimensionOpenClient vendorDimensionOpenClient;
-    private ICeCompanyFactoryDeptSyncService companyFactoryDeptSyncService;
     private CeDimensionRecordServiceImpl service;
 
     @BeforeEach
@@ -41,12 +39,10 @@ class CeDimensionRecordServiceTest {
         dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
         CeLicenseStateMapper licenseStateMapper = mock(CeLicenseStateMapper.class);
         vendorDimensionOpenClient = mock(CeVendorDimensionOpenClient.class);
-        companyFactoryDeptSyncService = mock(ICeCompanyFactoryDeptSyncService.class);
         service = new CeDimensionRecordServiceImpl(
             dimensionProjectionMapper,
             licenseStateMapper,
-            vendorDimensionOpenClient,
-            companyFactoryDeptSyncService
+            vendorDimensionOpenClient
         );
     }
 
@@ -90,52 +86,14 @@ class CeDimensionRecordServiceTest {
     }
 
     @Test
-    void companyInsertGeneratesCompanySkWhenUserDoesNotProvideIt() {
-        CeDimensionRecordBo bo = new CeDimensionRecordBo();
-        bo.setDimensionCode("company");
-        bo.setRecordCode("COMP-001");
-        bo.setParentCode("FAC-001");
-        bo.setRecordName("Demo Company");
-        bo.setFactoryName("Demo Factory");
-        bo.setStatus("0");
-        when(dimensionProjectionMapper.insertByDimensionCode(any())).thenReturn(1);
-
-        service.insertByBo(bo);
-
-        verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record ->
-            "SK_COMP-001_FAC-001".equals(record.getCompanySk()) && "Y".equals(record.getActiveFlag())
-        ));
-        verify(companyFactoryDeptSyncService).syncCompanyFactoriesToSysDept();
-    }
-
-    @Test
-    void companyStatusOverridesActiveFlag() {
+    void companyInsertIsRejectedBecauseDepartmentManagementOwnsOrganizationData() {
         CeDimensionRecordBo bo = new CeDimensionRecordBo();
         bo.setDimensionCode("company");
         bo.setRecordCode("COMP-001");
         bo.setRecordName("Demo Company");
-        bo.setParentCode("FAC-001");
-        bo.setFactoryName("Demo Factory");
-        bo.setStatus("1");
-        bo.setActiveFlag("Y");
-        when(dimensionProjectionMapper.insertByDimensionCode(any())).thenReturn(1);
-
-        service.insertByBo(bo);
-
-        verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record -> "N".equals(record.getActiveFlag())));
-    }
-
-    @Test
-    void companyInsertRejectsMissingFactoryCodeBeforeDatabaseConstraint() {
-        CeDimensionRecordBo bo = new CeDimensionRecordBo();
-        bo.setDimensionCode("company");
-        bo.setRecordCode("COMP-001");
-        bo.setRecordName("Demo Company");
-        bo.setFactoryName("Demo Factory");
-
         ServiceException exception = assertThrows(ServiceException.class, () -> service.insertByBo(bo));
 
-        assertEquals("工厂编号不能为空", exception.getMessage());
+        assertEquals("公司表由部门管理维护，仅支持查看", exception.getMessage());
         verify(dimensionProjectionMapper, never()).insertByDimensionCode(any());
     }
 
@@ -191,16 +149,12 @@ class CeDimensionRecordServiceTest {
     }
 
     @Test
-    void companyDeleteDisablesSyncedFactoryDepartment() {
-        CeDimensionRecordVo previous = localCompany();
-        previous.setFactoryName("Demo Factory");
-        when(dimensionProjectionMapper.selectByDimensionCodeAndId("company", 1L)).thenReturn(previous);
-        when(dimensionProjectionMapper.deleteByDimensionCodeAndId("company", 1L)).thenReturn(1);
+    void companyDeleteIsRejectedBecauseDepartmentManagementOwnsOrganizationData() {
+        ServiceException exception = assertThrows(ServiceException.class,
+            () -> service.deleteByIds("company", java.util.List.of(1L)));
 
-        boolean changed = service.deleteByIds("company", java.util.List.of(1L));
-
-        assertTrue(changed);
-        verify(companyFactoryDeptSyncService).disableCompanyFactoryDept(eq("COMP-001"), eq("Demo Factory"));
+        assertEquals("公司表由部门管理维护，仅支持查看", exception.getMessage());
+        verify(dimensionProjectionMapper, never()).deleteByDimensionCodeAndId(any(), any());
     }
 
     @Test
@@ -217,14 +171,12 @@ class CeDimensionRecordServiceTest {
     }
 
     @Test
-    void companyWriteSqlBindsNullableDatesAsVarcharBeforeConvertingToSqlServerDate() {
-        String insertSql = new CeDimensionProjectionSqlProvider().insertByDimensionCode();
-        String updateSql = new CeDimensionProjectionSqlProvider().updateByDimensionCode();
+    void companyProjectionReadsCompanyAndFactoryNodesFromDepartmentTree() {
+        String selectSql = new CeDimensionProjectionSqlProvider()
+            .selectByDimensionCode(java.util.Map.of("dimensionCode", "company"));
 
-        assertTrue(insertSql.contains("try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, ''), 23)"));
-        assertTrue(insertSql.contains("try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, ''), 23)"));
-        assertTrue(updateSql.contains("try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, ''), 23)"));
-        assertTrue(updateSql.contains("try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, ''), 23)"));
+        assertTrue(selectSql.contains("from sys_dept factory"));
+        assertTrue(selectSql.contains("join sys_dept company"));
     }
 
     @Test

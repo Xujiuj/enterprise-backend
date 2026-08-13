@@ -6,14 +6,12 @@ import cn.idev.excel.event.AnalysisEventListener;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import lombok.RequiredArgsConstructor;
-import org.dromara.carbon.enterprise.dimension.domain.CeCompanyFactory;
 import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSourceCategory;
 import org.dromara.carbon.enterprise.emission.domain.bo.CeEmissionSourceBo;
 import org.dromara.carbon.enterprise.emission.domain.vo.CeEmissionSourceVo;
-import org.dromara.carbon.enterprise.dimension.mapper.CeCompanyFactoryMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceCategoryMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.shared.service.ICeEmissionSourceService;
@@ -45,7 +43,6 @@ import java.util.Objects;
 public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
 
     private final CeEmissionSourceMapper emissionSourceMapper;
-    private final CeCompanyFactoryMapper companyFactoryMapper;
     private final CeDimensionProjectionMapper dimensionProjectionMapper;
     private final CeEmissionSourceCategoryMapper emissionSourceCategoryMapper;
     private final SysDeptMapper sysDeptMapper;
@@ -78,7 +75,6 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
         validateForeignKeys(bo);
         resolveFactorFromEfFactor(bo);
         bo.setSourceIdentificationCode(nextSourceIdentificationCode(bo.getFactoryCode()));
-        syncResponsibleDept(bo);
         CeEmissionSource add = toEntity(bo);
         if (add.getEnabledFlag() == null) {
             add.setEnabledFlag(Boolean.TRUE);
@@ -101,7 +97,6 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
         if (StringUtils.isBlank(bo.getSourceIdentificationCode())) {
             bo.setSourceIdentificationCode(nextSourceIdentificationCode(bo.getFactoryCode()));
         }
-        syncResponsibleDept(bo);
         CeEmissionSource update = toEntity(bo);
         return emissionSourceMapper.updateById(update) > 0;
     }
@@ -266,13 +261,12 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
         if (StringUtils.isBlank(value)) {
             return;
         }
-        List<CeCompanyFactory> rows = companyFactoryMapper.selectList(new LambdaQueryWrapper<CeCompanyFactory>()
-            .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName));
-        for (CeCompanyFactory row : rows) {
-            if (matchesBusinessLabel(value, row.getCompanyCode(), row.getCompanyName())) {
-                bo.setCompanyCode(row.getCompanyCode());
+        List<SysDept> organization = organizationNodes();
+        for (SysDept row : organization) {
+            if (isCompanyNode(row, organization) && matchesBusinessLabel(value, row.getDeptCategory(), row.getDeptName())) {
+                bo.setCompanyCode(row.getDeptCategory());
                 if (StringUtils.isBlank(bo.getCompanyName())) {
-                    bo.setCompanyName(row.getCompanyName());
+                    bo.setCompanyName(row.getDeptName());
                 }
                 return;
             }
@@ -284,18 +278,15 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
         if (StringUtils.isBlank(factoryValue)) {
             return;
         }
-        LambdaQueryWrapper<CeCompanyFactory> wrapper = new LambdaQueryWrapper<CeCompanyFactory>()
-            .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName);
-        if (StringUtils.isNotBlank(bo.getCompanyCode())) {
-            wrapper.eq(CeCompanyFactory::getCompanyCode, bo.getCompanyCode());
-        }
-        List<CeCompanyFactory> rows = companyFactoryMapper.selectList(wrapper);
-        for (CeCompanyFactory row : rows) {
-            if (matchesBusinessLabel(factoryValue, row.getFactoryCode(), row.getFactoryName())) {
-                bo.setCompanyCode(StringUtils.defaultIfBlank(bo.getCompanyCode(), row.getCompanyCode()));
-                bo.setCompanyName(StringUtils.defaultIfBlank(bo.getCompanyName(), row.getCompanyName()));
+        List<SysDept> organization = organizationNodes();
+        for (SysDept row : organization) {
+            SysDept company = organization.stream().filter(item -> item.getDeptId().equals(row.getParentId())).findFirst().orElse(null);
+            if (isFactoryNode(row, company) && (StringUtils.isBlank(bo.getCompanyCode()) || bo.getCompanyCode().equals(company.getDeptCategory()))
+                && matchesBusinessLabel(factoryValue, row.getFactoryCode(), row.getDeptName())) {
+                bo.setCompanyCode(StringUtils.defaultIfBlank(bo.getCompanyCode(), company.getDeptCategory()));
+                bo.setCompanyName(StringUtils.defaultIfBlank(bo.getCompanyName(), company.getDeptName()));
                 bo.setFactoryCode(row.getFactoryCode());
-                bo.setFactoryName(row.getFactoryName());
+                bo.setFactoryName(row.getDeptName());
                 return;
             }
         }
@@ -435,54 +426,42 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
 
     private void validateForeignKeys(CeEmissionSourceBo bo) {
         if (StringUtils.isNotBlank(bo.getCompanyCode())) {
-            List<CeCompanyFactory> companies = companyFactoryMapper.selectList(
-                new LambdaQueryWrapper<CeCompanyFactory>()
-                    .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName)
-                    .eq(CeCompanyFactory::getCompanyCode, bo.getCompanyCode()));
-            if (companies.isEmpty()) {
+            List<SysDept> organization = organizationNodes();
+            SysDept company = organization.stream().filter(row -> isCompanyNode(row, organization)
+                && bo.getCompanyCode().equals(row.getDeptCategory())).findFirst().orElse(null);
+            if (company == null) {
                 throw new ServiceException("公司编号不存在：" + bo.getCompanyCode());
             }
-            CeCompanyFactory company = companies.get(0);
             if (StringUtils.isBlank(bo.getCompanyName())) {
-                bo.setCompanyName(company.getCompanyName());
+                bo.setCompanyName(company.getDeptName());
             }
         }
         if (StringUtils.isNotBlank(bo.getFactoryCode()) || StringUtils.isNotBlank(bo.getFactoryName())) {
-            LambdaQueryWrapper<CeCompanyFactory> factoryWrapper = new LambdaQueryWrapper<CeCompanyFactory>()
-                .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName);
-            if (StringUtils.isNotBlank(bo.getFactoryCode())) {
-                factoryWrapper.eq(CeCompanyFactory::getFactoryCode, bo.getFactoryCode());
-            } else {
-                factoryWrapper.eq(CeCompanyFactory::getFactoryName, bo.getFactoryName());
-            }
-            if (StringUtils.isNotBlank(bo.getCompanyCode())) {
-                factoryWrapper.eq(CeCompanyFactory::getCompanyCode, bo.getCompanyCode());
-            }
-            List<CeCompanyFactory> factories = companyFactoryMapper.selectList(factoryWrapper);
-            if (factories.isEmpty() && StringUtils.isNotBlank(bo.getFactoryCode())) {
-                LambdaQueryWrapper<CeCompanyFactory> fallbackWrapper = new LambdaQueryWrapper<CeCompanyFactory>()
-                    .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName)
-                    .eq(CeCompanyFactory::getFactoryName, StringUtils.defaultIfBlank(bo.getFactoryName(), bo.getFactoryCode()));
-                if (StringUtils.isNotBlank(bo.getCompanyCode())) {
-                    fallbackWrapper.eq(CeCompanyFactory::getCompanyCode, bo.getCompanyCode());
-                }
-                factories = companyFactoryMapper.selectList(fallbackWrapper);
-            }
-            if (factories.isEmpty()) {
+            List<SysDept> organization = organizationNodes();
+            SysDept factory = organization.stream().filter(row -> {
+                SysDept company = organization.stream().filter(item -> item.getDeptId().equals(row.getParentId())).findFirst().orElse(null);
+                boolean sameCompany = StringUtils.isBlank(bo.getCompanyCode()) || (company != null && bo.getCompanyCode().equals(company.getDeptCategory()));
+                return isFactoryNode(row, company) && sameCompany
+                    && (matchesText(bo.getFactoryCode(), row.getFactoryCode()) || matchesText(bo.getFactoryName(), row.getDeptName()));
+            }).findFirst().orElse(null);
+            if (factory == null) {
                 throw new ServiceException("工厂不存在：" + StringUtils.defaultIfBlank(bo.getFactoryCode(), bo.getFactoryName()));
             }
-            CeCompanyFactory factory = factories.get(0);
+            SysDept company = organization.stream().filter(row -> row.getDeptId().equals(factory.getParentId())).findFirst().orElse(null);
+            if (company == null) {
+                throw new ServiceException("工厂未归属有效公司：" + factory.getDeptName());
+            }
             if (StringUtils.isBlank(bo.getCompanyCode())) {
-                bo.setCompanyCode(factory.getCompanyCode());
+                bo.setCompanyCode(company.getDeptCategory());
             }
             if (StringUtils.isBlank(bo.getCompanyName())) {
-                bo.setCompanyName(factory.getCompanyName());
+                bo.setCompanyName(company.getDeptName());
             }
             if (StringUtils.isBlank(bo.getFactoryCode())) {
                 bo.setFactoryCode(factory.getFactoryCode());
             }
             if (StringUtils.isBlank(bo.getFactoryName())) {
-                bo.setFactoryName(factory.getFactoryName());
+                bo.setFactoryName(factory.getDeptName());
             }
         }
         if (StringUtils.isNotBlank(bo.getSourceCategoryKey())) {
@@ -543,62 +522,24 @@ public class CeEmissionSourceServiceImpl implements ICeEmissionSourceService {
         return StringUtils.isNotBlank(emissionSourceName) && emissionSourceName.equals(recordName);
     }
 
-    private void syncResponsibleDept(CeEmissionSourceBo bo) {
-        String deptName = normalized(bo.getResponsibleDept());
-        if (StringUtils.isBlank(deptName)) {
-            return;
-        }
-        String deptCategory = resolveDeptCategory(bo.getCompanyCode());
-        SysDept factoryDept = resolveFactoryDept(bo, deptCategory);
-        Long parentId = factoryDept == null ? 100L : factoryDept.getDeptId();
-        Long exists = sysDeptMapper.selectCount(new LambdaQueryWrapper<SysDept>()
+    private List<SysDept> organizationNodes() {
+        return sysDeptMapper.selectList(new LambdaQueryWrapper<SysDept>()
+            .select(SysDept::getDeptId, SysDept::getParentId, SysDept::getDeptName, SysDept::getDeptCategory,
+                SysDept::getFactoryCode, SysDept::getStatus, SysDept::getDelFlag)
             .eq(SysDept::getDelFlag, "0")
-            .eq(SysDept::getDeptName, deptName)
-            .eq(SysDept::getParentId, parentId)
-            .eq(SysDept::getDeptCategory, deptCategory));
-        if (exists != null && exists > 0) {
-            return;
-        }
-
-        SysDept dept = new SysDept();
-        dept.setParentId(parentId);
-        dept.setAncestors(factoryDept == null ? "0,100" : normalized(factoryDept.getAncestors()) + "," + factoryDept.getDeptId());
-        dept.setDeptName(deptName);
-        dept.setDeptCategory(deptCategory);
-        dept.setOrderNum(0);
-        dept.setStatus("0");
-        dept.setDelFlag("0");
-        sysDeptMapper.insert(dept);
+            .eq(SysDept::getStatus, "0"));
     }
 
-    private SysDept resolveFactoryDept(CeEmissionSourceBo bo, String deptCategory) {
-        String factoryName = normalized(bo.getFactoryName());
-        if (StringUtils.isBlank(factoryName)) {
-            return null;
-        }
-        List<SysDept> factories = sysDeptMapper.selectList(new LambdaQueryWrapper<SysDept>()
-            .select(SysDept::getDeptId, SysDept::getParentId, SysDept::getAncestors, SysDept::getDeptName, SysDept::getDeptCategory)
-            .eq(SysDept::getDelFlag, "0")
-            .eq(SysDept::getDeptName, factoryName)
-            .eq(SysDept::getDeptCategory, deptCategory));
-        return factories.isEmpty() ? null : factories.get(0);
+    private boolean isCompanyNode(SysDept dept, List<SysDept> organization) {
+        if (dept == null || StringUtils.isBlank(dept.getDeptCategory())) return false;
+        SysDept parent = organization.stream().filter(row -> row.getDeptId().equals(dept.getParentId())).findFirst().orElse(null);
+        return parent == null || StringUtils.isBlank(parent.getDeptCategory());
     }
 
-    private String resolveDeptCategory(String companyCode) {
-        String code = normalized(companyCode);
-        if (StringUtils.isBlank(code)) {
-            return "";
-        }
-        List<CeCompanyFactory> companies = companyFactoryMapper.selectList(
-            new LambdaQueryWrapper<CeCompanyFactory>()
-                .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getFactoryCode)
-                .eq(CeCompanyFactory::getCompanyCode, code)
-                .or()
-                .eq(CeCompanyFactory::getFactoryCode, code));
-        if (companies.isEmpty() || StringUtils.isBlank(companies.get(0).getCompanyCode())) {
-            return code;
-        }
-        return normalized(companies.get(0).getCompanyCode());
+    private boolean isFactoryNode(SysDept dept, SysDept company) {
+        return dept != null && company != null
+            && StringUtils.equals(dept.getDeptCategory(), company.getDeptCategory())
+            && StringUtils.isNotBlank(dept.getFactoryCode());
     }
 
     private String normalized(String value) {

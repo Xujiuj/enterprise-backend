@@ -57,16 +57,43 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         backfillEfFactorRecordCodes();
         removeIndustryMenuIfPresent();
         seedEnterpriseDeptMenuIfMissing();
-        syncCompanyFactoriesToSysDept();
-        syncEmissionSourceDepartmentsToSysDept();
+        addColumnIfMissing("sys_dept", "factory_code", "NVARCHAR(64) NULL");
+        backfillFactoryCodesFromCompanyProjection();
+        syncSysDeptToCompanyFactories();
         updateEnterpriseMenuIcons();
     }
 
-    private void syncCompanyFactoriesToSysDept() {
+    private void syncSysDeptToCompanyFactories() {
         try {
-            companyFactoryDeptSyncService.syncCompanyFactoriesToSysDept();
+            companyFactoryDeptSyncService.syncSysDeptToCompanyFactories();
         } catch (Exception e) {
-            log.warn("[SchemaMigration] company factory department sync skipped: {}", e.getMessage());
+            log.warn("[SchemaMigration] department company projection sync skipped: {}", e.getMessage());
+        }
+    }
+
+    private void backfillFactoryCodesFromCompanyProjection() {
+        try {
+            jdbcTemplate.update("""
+                IF OBJECT_ID(N'dbo.sys_dept', N'U') IS NOT NULL
+                   AND OBJECT_ID(N'dbo.ce_company_factory', N'U') IS NOT NULL
+                BEGIN
+                    UPDATE factory
+                       SET factory.factory_code = source.factory_code,
+                           factory.update_time = SYSDATETIME()
+                      FROM dbo.sys_dept factory
+                      JOIN dbo.sys_dept company ON company.dept_id = factory.parent_id
+                      JOIN dbo.ce_company_factory source
+                        ON source.company_code = company.dept_category
+                       AND source.factory_name = factory.dept_name
+                     WHERE factory.del_flag = N'0'
+                       AND company.del_flag = N'0'
+                       AND factory.dept_category = company.dept_category
+                       AND NULLIF(LTRIM(RTRIM(factory.factory_code)), N'') IS NULL
+                       AND NULLIF(LTRIM(RTRIM(source.factory_code)), N'') IS NOT NULL;
+                END
+                """);
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] factory code backfill skipped: {}", e.getMessage());
         }
     }
 

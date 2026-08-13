@@ -164,17 +164,17 @@ public class CeSourceAImportServiceImpl implements ICeSourceAImportService {
 
         clearSourceAData(data);
         writeAll(data, result);
-        syncCompanyFactoriesToSysDept(result);
+        refreshCompanyFactoryProjection(result);
         validateDatabaseRelationships(result);
         result.setImported(result.getErrors().isEmpty());
         return result;
     }
 
-    private void syncCompanyFactoriesToSysDept(CeSourceAImportResult result) {
+    private void refreshCompanyFactoryProjection(CeSourceAImportResult result) {
         try {
-            companyFactoryDeptSyncService.syncCompanyFactoriesToSysDept();
+            companyFactoryDeptSyncService.syncSysDeptToCompanyFactories();
         } catch (Exception e) {
-            result.issue("warning", "dept.factory-sync", "Factory department sync skipped", 1);
+            result.issue("warning", "dept.company-projection", "Department company projection refresh skipped", 1);
         }
     }
 

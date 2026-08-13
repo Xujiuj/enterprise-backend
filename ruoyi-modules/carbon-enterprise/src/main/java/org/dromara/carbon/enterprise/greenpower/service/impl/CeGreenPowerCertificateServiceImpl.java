@@ -3,8 +3,6 @@ package org.dromara.carbon.enterprise.greenpower.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import lombok.RequiredArgsConstructor;
-import org.dromara.carbon.enterprise.dimension.domain.CeCompanyFactory;
-import org.dromara.carbon.enterprise.dimension.mapper.CeCompanyFactoryMapper;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSourceCategory;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceCategoryMapper;
 import org.dromara.carbon.enterprise.greenpower.domain.CeGreenPowerCertificate;
@@ -17,10 +15,14 @@ import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.system.domain.SysDept;
+import org.dromara.system.mapper.SysDeptMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Enterprise local green electricity and certificate proof service implementation.
@@ -30,8 +32,8 @@ import java.util.List;
 public class CeGreenPowerCertificateServiceImpl implements ICeGreenPowerCertificateService {
 
     private final CeGreenPowerCertificateMapper greenPowerCertificateMapper;
-    private final CeCompanyFactoryMapper companyFactoryMapper;
     private final CeEmissionSourceCategoryMapper emissionSourceCategoryMapper;
+    private final SysDeptMapper sysDeptMapper;
 
     @Override
     public TableDataInfo<CeGreenPowerCertificateVo> queryPageList(CeGreenPowerCertificateBo bo, PageQuery pageQuery) {
@@ -111,31 +113,52 @@ public class CeGreenPowerCertificateServiceImpl implements ICeGreenPowerCertific
         if (StringUtils.isBlank(bo.getFactoryCode()) && StringUtils.isBlank(bo.getFactoryName())) {
             return;
         }
-        CeCompanyFactory factory = findFactory(bo.getFactoryCode(), bo.getFactoryName());
+        SysDept factory = findFactory(bo.getFactoryCode(), bo.getFactoryName());
         if (factory == null) {
             throw new ServiceException("工厂不存在：" + StringUtils.defaultIfBlank(bo.getFactoryCode(), bo.getFactoryName()));
         }
         bo.setFactoryCode(factory.getFactoryCode());
-        bo.setFactoryName(factory.getFactoryName());
+        bo.setFactoryName(factory.getDeptName());
     }
 
-    private CeCompanyFactory findFactory(String factoryCode, String factoryName) {
+    private SysDept findFactory(String factoryCode, String factoryName) {
+        List<SysDept> organization = organizationNodes();
+        Map<Long, SysDept> byId = new HashMap<>();
+        organization.forEach(row -> byId.put(row.getDeptId(), row));
         if (StringUtils.isNotBlank(factoryCode)) {
-            List<CeCompanyFactory> factories = companyFactoryMapper.selectList(new LambdaQueryWrapper<CeCompanyFactory>()
-                .select(CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName)
-                .eq(CeCompanyFactory::getFactoryCode, factoryCode));
-            if (!factories.isEmpty()) {
-                return factories.get(0);
+            for (SysDept factory : organization) {
+                if (StringUtils.equals(factory.getFactoryCode(), factoryCode)
+                    && isFactory(factory, byId)) {
+                    return factory;
+                }
             }
         }
         String nameLookup = StringUtils.defaultIfBlank(factoryName, factoryCode);
         if (StringUtils.isBlank(nameLookup)) {
             return null;
         }
-        List<CeCompanyFactory> factories = companyFactoryMapper.selectList(new LambdaQueryWrapper<CeCompanyFactory>()
-            .select(CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName)
-            .eq(CeCompanyFactory::getFactoryName, nameLookup));
-        return factories.isEmpty() ? null : factories.get(0);
+        return organization.stream()
+            .filter(factory -> isFactory(factory, byId) && StringUtils.equals(factory.getDeptName(), nameLookup))
+            .findFirst()
+            .orElse(null);
+    }
+
+    private List<SysDept> organizationNodes() {
+        return sysDeptMapper.selectList(new LambdaQueryWrapper<SysDept>()
+            .select(SysDept::getDeptId, SysDept::getParentId, SysDept::getDeptName, SysDept::getDeptCategory,
+                SysDept::getFactoryCode, SysDept::getStatus, SysDept::getDelFlag)
+            .eq(SysDept::getDelFlag, "0")
+            .eq(SysDept::getStatus, "0"));
+    }
+
+    private boolean isFactory(SysDept dept, Map<Long, SysDept> byId) {
+        if (dept == null || StringUtils.isBlank(dept.getFactoryCode())) {
+            return false;
+        }
+        SysDept company = byId.get(dept.getParentId());
+        return company != null && StringUtils.isNotBlank(company.getDeptCategory())
+            && StringUtils.equals(company.getDeptCategory(), dept.getDeptCategory())
+            && (byId.get(company.getParentId()) == null || StringUtils.isBlank(byId.get(company.getParentId()).getDeptCategory()));
     }
 
     private void resolveSourceCategory(CeGreenPowerCertificateBo bo) {

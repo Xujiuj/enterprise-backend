@@ -45,6 +45,12 @@ public class SysDeptBo extends BaseEntity {
     private String deptCategory;
 
     /**
+     * Factory code. Required for a factory node.
+     */
+    @Size(max = 64, message = "工厂编号长度不能超过{max}个字符")
+    private String factoryCode;
+
+    /**
      * 显示顺序
      */
     @NotNull(message = "显示顺序不能为空")

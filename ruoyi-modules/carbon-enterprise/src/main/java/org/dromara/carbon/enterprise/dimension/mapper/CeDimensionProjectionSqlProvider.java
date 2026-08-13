@@ -71,34 +71,45 @@ public class CeDimensionProjectionSqlProvider {
                  order by coalesce(sort_order, id), division_code
                 """;
             case "company" -> """
-                select id,
+                select factory.dept_id as id,
                        'company' as dimension_code,
-                       company_code as record_code,
-                       company_name as record_name,
-                       factory_code as parent_code,
-                       company_sk as company_sk,
-                       factory_name as factory_name,
-                       province_code as province_code,
-                       province_name as province_name,
-                       factory_type as factory_type,
-                       industry_section_code as industry_section_code,
-                       industry_section_name as industry_section_name,
-                       industry_division_code as industry_division_code,
-                       industry_division_name as industry_division_name,
-                       industry_group_code as industry_group_code,
-                       industry_group_name as industry_group_name,
-                       industry_class_code as industry_class_code,
-                       industry_class_name as industry_class_name,
-                       cast(effective_date as char) as effective_date,
-                       cast(expiry_date as char) as expiry_date,
-                       is_active as active_flag,
-                       id as sort_order,
-                       case when is_active = 'Y' then '0' else '1' end as status,
-                       create_time,
-                       update_time,
-                       remark
-                  from ce_company_factory
-                 order by company_code, factory_code
+                       company.dept_category as record_code,
+                       company.dept_name as record_name,
+                       factory.factory_code as parent_code,
+                       concat('SK_', company.dept_category, '_', factory.factory_code) as company_sk,
+                       factory.dept_name as factory_name,
+                       null as province_code,
+                       null as province_name,
+                       null as factory_type,
+                       null as industry_section_code,
+                       null as industry_section_name,
+                       null as industry_division_code,
+                       null as industry_division_name,
+                       null as industry_group_code,
+                       null as industry_group_name,
+                       null as industry_class_code,
+                       null as industry_class_name,
+                       null as effective_date,
+                       null as expiry_date,
+                       case when company.status = '0' and factory.status = '0' then 'Y' else 'N' end as active_flag,
+                       factory.order_num as sort_order,
+                       case when company.status = '0' and factory.status = '0' then '0' else '1' end as status,
+                       factory.create_time,
+                       factory.update_time,
+                       null as remark
+                  from sys_dept factory
+                  join sys_dept company on company.dept_id = factory.parent_id
+                 where factory.del_flag = '0'
+                   and company.del_flag = '0'
+                   and factory.dept_category = company.dept_category
+                   and nullif(ltrim(rtrim(factory.factory_code)), '') is not null
+                   and not exists (
+                       select 1 from sys_dept company_parent
+                        where company_parent.dept_id = company.parent_id
+                          and company_parent.del_flag = '0'
+                          and nullif(ltrim(rtrim(company_parent.dept_category)), '') is not null
+                   )
+                 order by company.dept_category, factory.factory_code
                 """;
             case "industry" -> """
                 select id,
@@ -404,28 +415,6 @@ public class CeDimensionProjectionSqlProvider {
         return """
             <script>
             <choose>
-              <when test="record.dimensionCode == 'company'">
-                insert into ce_company_factory (
-                  company_sk, company_code, factory_code, company_name, factory_name,
-                  province_code, province_name, factory_type,
-                  industry_section_code, industry_section_name,
-                  industry_division_code, industry_division_name,
-                  industry_group_code, industry_group_name,
-                  industry_class_code, industry_class_name,
-                  effective_date, expiry_date, is_active, remark
-                ) values (
-                  #{record.companySk}, #{record.recordCode}, #{record.parentCode}, #{record.recordName}, #{record.factoryName},
-                  #{record.provinceCode}, #{record.provinceName}, #{record.factoryType},
-                  #{record.industrySectionCode}, #{record.industrySectionName},
-                  #{record.industryDivisionCode}, #{record.industryDivisionName},
-                  #{record.industryGroupCode}, #{record.industryGroupName},
-                  #{record.industryClassCode}, #{record.industryClassName},
-                  try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, ''), 23),
-                  try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, ''), 23),
-                  case when #{record.status} = '1' then 'N' else coalesce(#{record.activeFlag}, 'Y') end,
-                  #{record.remark}
-                )
-              </when>
               <when test="record.dimensionCode == 'industry'">
                 insert into ce_industry_classification (
                   industry_section_code, industry_section_name,
@@ -526,31 +515,6 @@ public class CeDimensionProjectionSqlProvider {
         return """
             <script>
             <choose>
-              <when test="record.dimensionCode == 'company'">
-                update ce_company_factory
-                   set company_sk = #{record.companySk},
-                       company_code = #{record.recordCode},
-                       factory_code = #{record.parentCode},
-                       company_name = #{record.recordName},
-                       factory_name = #{record.factoryName},
-                       province_code = #{record.provinceCode},
-                       province_name = #{record.provinceName},
-                       factory_type = #{record.factoryType},
-                       industry_section_code = #{record.industrySectionCode},
-                       industry_section_name = #{record.industrySectionName},
-                       industry_division_code = #{record.industryDivisionCode},
-                       industry_division_name = #{record.industryDivisionName},
-                       industry_group_code = #{record.industryGroupCode},
-                       industry_group_name = #{record.industryGroupName},
-                       industry_class_code = #{record.industryClassCode},
-                       industry_class_name = #{record.industryClassName},
-                       effective_date = try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, ''), 23),
-                       expiry_date = try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, ''), 23),
-                       is_active = case when #{record.status} = '1' then 'N' else coalesce(#{record.activeFlag}, 'Y') end,
-                       update_time = SYSDATETIME(),
-                       remark = #{record.remark}
-                 where id = #{record.id}
-              </when>
               <when test="record.dimensionCode == 'industry'">
                 update ce_industry_classification
                    set industry_section_code = #{record.industrySectionCode},

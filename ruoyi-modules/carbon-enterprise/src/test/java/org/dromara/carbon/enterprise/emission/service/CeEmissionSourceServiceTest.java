@@ -6,9 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.core.toolkit.LambdaUtils;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
-import org.dromara.carbon.enterprise.dimension.domain.CeCompanyFactory;
 import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
-import org.dromara.carbon.enterprise.dimension.mapper.CeCompanyFactoryMapper;
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSourceCategory;
@@ -32,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,7 +37,6 @@ import static org.mockito.Mockito.when;
 class CeEmissionSourceServiceTest {
 
     private CeEmissionSourceMapper emissionSourceMapper;
-    private CeCompanyFactoryMapper companyFactoryMapper;
     private CeDimensionProjectionMapper dimensionProjectionMapper;
     private CeEmissionSourceCategoryMapper emissionSourceCategoryMapper;
     private SysDeptMapper sysDeptMapper;
@@ -48,7 +44,6 @@ class CeEmissionSourceServiceTest {
 
     @BeforeAll
     static void initializeLambdaCache() {
-        initializeEntityLambdaCache(CeCompanyFactoryMapper.class, CeCompanyFactory.class);
         initializeEntityLambdaCache(CeEmissionSourceCategoryMapper.class, CeEmissionSourceCategory.class);
         initializeEntityLambdaCache(CeEmissionSourceMapper.class, CeEmissionSource.class);
         initializeEntityLambdaCache(SysDeptMapper.class, SysDept.class);
@@ -57,7 +52,6 @@ class CeEmissionSourceServiceTest {
     @BeforeEach
     void setUp() {
         emissionSourceMapper = mock(CeEmissionSourceMapper.class);
-        companyFactoryMapper = mock(CeCompanyFactoryMapper.class);
         dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
         emissionSourceCategoryMapper = mock(CeEmissionSourceCategoryMapper.class);
         sysDeptMapper = mock(SysDeptMapper.class);
@@ -71,7 +65,6 @@ class CeEmissionSourceServiceTest {
         when(dataScopeSupport.canAccessDept(any())).thenReturn(true);
         service = new CeEmissionSourceServiceImpl(
             emissionSourceMapper,
-            companyFactoryMapper,
             dimensionProjectionMapper,
             emissionSourceCategoryMapper,
             sysDeptMapper,
@@ -102,12 +95,7 @@ class CeEmissionSourceServiceTest {
 
     @Test
     void validatesCompanyCodeAgainstCompanyFactoryCompanyCode() {
-        CeCompanyFactory company = new CeCompanyFactory();
-        company.setCompanyCode("1");
-        company.setCompanyName("Company A");
-        company.setFactoryCode("11");
-        company.setFactoryName("Factory AA");
-        when(companyFactoryMapper.selectList(any())).thenReturn(java.util.List.of(company));
+        when(sysDeptMapper.selectList(any())).thenReturn(java.util.List.of(companyNode(), factoryNode("11", "Factory AA")));
         CeEmissionSourceCategory category = new CeEmissionSourceCategory();
         category.setCategorySk("101");
         category.setGhgScope("Scope 1");
@@ -117,10 +105,6 @@ class CeEmissionSourceServiceTest {
 
         service.insertByBo(validBo());
 
-        ArgumentCaptor<LambdaQueryWrapper<CeCompanyFactory>> wrapperCaptor = ArgumentCaptor.captor();
-        verify(companyFactoryMapper, atLeastOnce()).selectList(wrapperCaptor.capture());
-        assertThat(wrapperCaptor.getAllValues().get(0).getSqlSegment()).contains("companyCode");
-        assertThat(wrapperCaptor.getAllValues().get(0).getSqlSegment()).doesNotContain("factoryCode");
         ArgumentCaptor<CeEmissionSource> sourceCaptor = ArgumentCaptor.forClass(CeEmissionSource.class);
         verify(emissionSourceMapper).insert(sourceCaptor.capture());
         assertThat(sourceCaptor.getValue().getCompanyName()).isEqualTo("Company A");
@@ -131,12 +115,7 @@ class CeEmissionSourceServiceTest {
 
     @Test
     void generatesSourceIdentificationCodeFromFactoryCodeAndSequence() {
-        CeCompanyFactory factory = new CeCompanyFactory();
-        factory.setCompanyCode("1");
-        factory.setCompanyName("Company A");
-        factory.setFactoryCode("F001");
-        factory.setFactoryName("AA");
-        when(companyFactoryMapper.selectList(any())).thenReturn(java.util.List.of(factory));
+        when(sysDeptMapper.selectList(any())).thenReturn(java.util.List.of(companyNode(), factoryNode("F001", "AA")));
         CeEmissionSourceCategory category = new CeEmissionSourceCategory();
         category.setCategorySk("101");
         category.setGhgScope("Scope 1");
@@ -160,12 +139,7 @@ class CeEmissionSourceServiceTest {
 
     @Test
     void fillsFactorKeyAndUnitFromEfFactorByEmissionSourceName() {
-        CeCompanyFactory factory = new CeCompanyFactory();
-        factory.setCompanyCode("1");
-        factory.setCompanyName("Company A");
-        factory.setFactoryCode("F001");
-        factory.setFactoryName("AA");
-        when(companyFactoryMapper.selectList(any())).thenReturn(java.util.List.of(factory));
+        when(sysDeptMapper.selectList(any())).thenReturn(java.util.List.of(companyNode(), factoryNode("F001", "AA")));
         CeEmissionSourceCategory category = new CeEmissionSourceCategory();
         category.setCategorySk("101");
         category.setGhgScope("Scope 1");
@@ -193,12 +167,7 @@ class CeEmissionSourceServiceTest {
 
     @Test
     void rejectsEmissionSourceOutsideEfFactorDimension() {
-        CeCompanyFactory factory = new CeCompanyFactory();
-        factory.setCompanyCode("1");
-        factory.setCompanyName("Company A");
-        factory.setFactoryCode("F001");
-        factory.setFactoryName("AA");
-        when(companyFactoryMapper.selectList(any())).thenReturn(java.util.List.of(factory));
+        when(sysDeptMapper.selectList(any())).thenReturn(java.util.List.of(companyNode(), factoryNode("F001", "AA")));
         CeEmissionSourceCategory category = new CeEmissionSourceCategory();
         category.setCategorySk("101");
         category.setGhgScope("Scope 1");
@@ -273,6 +242,29 @@ class CeEmissionSourceServiceTest {
         factor.setRecordCode("1");
         factor.setRecordName("333");
         return factor;
+    }
+
+    private SysDept companyNode() {
+        SysDept dept = new SysDept();
+        dept.setDeptId(1L);
+        dept.setParentId(100L);
+        dept.setDeptCategory("1");
+        dept.setDeptName("Company A");
+        dept.setStatus("0");
+        dept.setDelFlag("0");
+        return dept;
+    }
+
+    private SysDept factoryNode(String code, String name) {
+        SysDept dept = new SysDept();
+        dept.setDeptId(2L);
+        dept.setParentId(1L);
+        dept.setDeptCategory("1");
+        dept.setFactoryCode(code);
+        dept.setDeptName(name);
+        dept.setStatus("0");
+        dept.setDelFlag("0");
+        return dept;
     }
 
     private static void initializeEntityLambdaCache(Class<?> mapperType, Class<?> entityType) {

@@ -61,6 +61,11 @@ public class SysDeptVo implements Serializable {
     private String deptCategory;
 
     /**
+     * Factory code.
+     */
+    private String factoryCode;
+
+    /**
      * 显示顺序
      */
     private Integer orderNum;

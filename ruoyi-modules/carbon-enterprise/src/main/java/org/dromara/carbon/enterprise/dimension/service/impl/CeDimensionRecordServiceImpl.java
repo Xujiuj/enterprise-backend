@@ -11,7 +11,6 @@ import org.dromara.carbon.enterprise.vendor.domain.CeVendorDimensionRecord;
 import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.license.mapper.CeLicenseStateMapper;
-import org.dromara.carbon.enterprise.shared.service.ICeCompanyFactoryDeptSyncService;
 import org.dromara.carbon.enterprise.shared.service.ICeDimensionRecordService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
@@ -20,7 +19,6 @@ import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -54,7 +52,6 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private static final Set<String> ALLOWED_LOCAL_PROJECTION_CODES = Set.of(
         "admin-division",
-        "company",
         "industry",
         "emission-source-category",
         "emission-source-category-history",
@@ -85,7 +82,6 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     private final CeDimensionProjectionMapper dimensionProjectionMapper;
     private final CeLicenseStateMapper licenseStateMapper;
     private final CeVendorDimensionOpenClient vendorDimensionOpenClient;
-    private final ICeCompanyFactoryDeptSyncService companyFactoryDeptSyncService;
 
     @Override
     public TableDataInfo<CeDimensionRecordVo> queryPageList(CeDimensionRecordBo bo, PageQuery pageQuery) {
@@ -114,61 +110,27 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     public Boolean insertByBo(CeDimensionRecordBo bo) {
         validateEditableDimensionCode(bo.getDimensionCode());
         normalizeEditableRecord(bo);
-        boolean changed = dimensionProjectionMapper.insertByDimensionCode(bo) > 0;
-        if (changed && isCompanyDimension(bo.getDimensionCode())) {
-            companyFactoryDeptSyncService.syncCompanyFactoriesToSysDept();
-        }
-        return changed;
+        return dimensionProjectionMapper.insertByDimensionCode(bo) > 0;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean updateByBo(CeDimensionRecordBo bo) {
         validateEditableDimensionCode(bo.getDimensionCode());
-        CeDimensionRecordVo previous = isCompanyDimension(bo.getDimensionCode())
-            ? dimensionProjectionMapper.selectByDimensionCodeAndId(bo.getDimensionCode(), bo.getId())
-            : null;
         normalizeEditableRecord(bo);
-        boolean changed = dimensionProjectionMapper.updateByDimensionCode(bo) > 0;
-        if (changed && previous != null) {
-            companyFactoryDeptSyncService.syncCompanyFactoryChange(
-                previous.getRecordCode(),
-                previous.getFactoryName(),
-                bo.getRecordCode(),
-                bo.getFactoryName(),
-                bo.getActiveFlag()
-            );
-        }
-        return changed;
+        return dimensionProjectionMapper.updateByDimensionCode(bo) > 0;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean deleteByIds(String dimensionCode, Collection<Long> ids) {
         validateEditableDimensionCode(dimensionCode);
-        List<CeDimensionRecordVo> deletedCompanies = new ArrayList<>();
         boolean changed = false;
         for (Long id : ids) {
-            CeDimensionRecordVo previous = isCompanyDimension(dimensionCode)
-                ? dimensionProjectionMapper.selectByDimensionCodeAndId(dimensionCode, id)
-                : null;
             boolean rowChanged = dimensionProjectionMapper.deleteByDimensionCodeAndId(dimensionCode, id) > 0;
-            if (rowChanged && previous != null) {
-                deletedCompanies.add(previous);
-            }
             changed = rowChanged || changed;
         }
-        for (CeDimensionRecordVo deletedCompany : deletedCompanies) {
-            companyFactoryDeptSyncService.disableCompanyFactoryDept(
-                deletedCompany.getRecordCode(),
-                deletedCompany.getFactoryName()
-            );
-        }
         return changed;
-    }
-
-    private boolean isCompanyDimension(String dimensionCode) {
-        return COMPANY_DIMENSION_CODE.equals(dimensionCode);
     }
 
     private void validateDimensionCode(String dimensionCode) {
@@ -183,7 +145,9 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     private void validateEditableDimensionCode(String dimensionCode) {
         validateDimensionCode(dimensionCode);
         if (!ENTERPRISE_EDITABLE_DIMENSION_CODES.contains(dimensionCode)) {
-            throw new ServiceException("当前维度不允许企业端编辑：" + dimensionCode);
+            throw new ServiceException(COMPANY_DIMENSION_CODE.equals(dimensionCode)
+                ? "公司表由部门管理维护，仅支持查看"
+                : "当前维度不允许企业端编辑：" + dimensionCode);
         }
     }
 

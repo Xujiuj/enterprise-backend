@@ -6,7 +6,6 @@ import com.baomidou.mybatisplus.core.toolkit.LambdaUtils;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.ibatis.session.Configuration;
 import org.dromara.carbon.enterprise.activity.domain.CeActivityData;
-import org.dromara.carbon.enterprise.dimension.domain.CeCompanyFactory;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.factor.domain.CeFactorCacheRecord;
 import org.dromara.carbon.enterprise.factor.domain.CeFactorConfirmation;
@@ -17,7 +16,6 @@ import org.dromara.carbon.enterprise.shared.option.domain.bo.CeOptionQueryBo;
 import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.activity.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.activity.mapper.CeCaptureBatchMapper;
-import org.dromara.carbon.enterprise.dimension.mapper.CeCompanyFactoryMapper;
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceCategoryMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
@@ -53,7 +51,6 @@ class CeOptionServiceTest {
     private CeIntensityMetricMapper intensityMetricMapper;
     private CeIntensityDenominatorFactMapper denominatorFactMapper;
     private CeActivityDataMapper activityDataMapper;
-    private CeCompanyFactoryMapper companyFactoryMapper;
     private CeEmissionSourceMapper emissionSourceMapper;
     private CeGreenPowerCertificateMapper greenPowerCertificateMapper;
     private CeDimensionProjectionMapper dimensionProjectionMapper;
@@ -66,7 +63,6 @@ class CeOptionServiceTest {
     @BeforeAll
     static void initializeLambdaCache() {
         initializeEntityLambdaCache(CeActivityDataMapper.class, CeActivityData.class);
-        initializeEntityLambdaCache(CeCompanyFactoryMapper.class, CeCompanyFactory.class);
         initializeEntityLambdaCache(CeIntensityMetricMapper.class, CeIntensityMetric.class);
         initializeEntityLambdaCache(CeIntensityDenominatorFactMapper.class, CeIntensityDenominatorFact.class);
         initializeEntityLambdaCache(CeEmissionSourceMapper.class, CeEmissionSource.class);
@@ -83,7 +79,6 @@ class CeOptionServiceTest {
         intensityMetricMapper = mock(CeIntensityMetricMapper.class);
         denominatorFactMapper = mock(CeIntensityDenominatorFactMapper.class);
         activityDataMapper = mock(CeActivityDataMapper.class);
-        companyFactoryMapper = mock(CeCompanyFactoryMapper.class);
         emissionSourceMapper = mock(CeEmissionSourceMapper.class);
         greenPowerCertificateMapper = mock(CeGreenPowerCertificateMapper.class);
         dimensionProjectionMapper = mock(CeDimensionProjectionMapper.class);
@@ -94,7 +89,6 @@ class CeOptionServiceTest {
         when(dimensionProjectionMapper.selectByDimensionCode(any())).thenReturn(List.of());
         service = new CeOptionServiceImpl(
             activityDataMapper,
-            companyFactoryMapper,
             emissionSourceMapper,
             mock(CeEmissionSourceCategoryMapper.class),
             greenPowerCertificateMapper,
@@ -123,10 +117,7 @@ class CeOptionServiceTest {
 
     @Test
     void factoryCodeOptionsDoNotQueryNonPersistentEmissionSourceFactoryCode() {
-        when(companyFactoryMapper.selectList(any())).thenReturn(List.of());
-        when(activityDataMapper.selectList(any())).thenReturn(List.of());
-        when(emissionSourceMapper.selectList(any())).thenReturn(List.of());
-        when(greenPowerCertificateMapper.selectList(any())).thenReturn(List.of());
+        when(sysDeptMapper.selectList(any())).thenReturn(List.of());
 
         var options = service.listOptions("factory-code", null);
 
@@ -135,14 +126,7 @@ class CeOptionServiceTest {
 
     @Test
     void companyCodeOptionsCarryCompanyRecordForAutofill() {
-        CeCompanyFactory factory = new CeCompanyFactory();
-        factory.setCompanyCode("C001");
-        factory.setCompanyName("A公司");
-        factory.setFactoryCode("F001");
-        factory.setFactoryName("一厂");
-        when(companyFactoryMapper.selectList(any())).thenReturn(List.of(factory));
-        when(activityDataMapper.selectList(any())).thenReturn(List.of());
-        when(emissionSourceMapper.selectList(any())).thenReturn(List.of());
+        when(sysDeptMapper.selectList(any())).thenReturn(List.of(companyNode(1L, 100L, "C001", "A公司")));
 
         var options = service.listOptions("company-code", null);
 
@@ -151,22 +135,14 @@ class CeOptionServiceTest {
             .containsExactly("C001");
         assertThat(options.get(0).getRecord())
             .containsEntry("companyCode", "C001")
-            .containsEntry("companyName", "A公司")
-            .containsEntry("factoryCode", "F001")
-            .containsEntry("factoryName", "一厂");
+            .containsEntry("companyName", "A公司");
     }
 
     @Test
     void factoryNameOptionsCarryCompanyFactoryRecordForAutofill() {
-        CeCompanyFactory factory = new CeCompanyFactory();
-        factory.setCompanyCode("C001");
-        factory.setCompanyName("Company A");
-        factory.setFactoryCode("F001");
-        factory.setFactoryName("Factory One");
-        when(companyFactoryMapper.selectList(any())).thenReturn(List.of(factory));
-        when(activityDataMapper.selectList(any())).thenReturn(List.of());
-        when(emissionSourceMapper.selectList(any())).thenReturn(List.of());
-        when(greenPowerCertificateMapper.selectList(any())).thenReturn(List.of());
+        SysDept company = companyNode(1L, 100L, "C001", "Company A");
+        SysDept factory = factoryNode(2L, 1L, "C001", "F001", "Factory One");
+        when(sysDeptMapper.selectList(any())).thenReturn(List.of(company, factory));
 
         var options = service.listOptions("factory-name", null);
 
@@ -182,18 +158,16 @@ class CeOptionServiceTest {
 
     @Test
     void responsibleDeptOptionsComeFromSystemDeptOnly() {
-        SysDept dept = new SysDept();
-        dept.setDeptId(10L);
-        dept.setParentId(1L);
-        dept.setDeptName("Production");
-        dept.setStatus("0");
-        when(sysDeptMapper.selectList(any())).thenReturn(List.of(dept));
+        SysDept company = companyNode(1L, 100L, "C001", "Company");
+        SysDept factory = factoryNode(2L, 1L, "C001", "F001", "Factory");
+        SysDept dept = departmentNode(10L, 2L, "C001", "Production");
+        when(sysDeptMapper.selectList(any())).thenReturn(List.of(company, factory, dept));
 
         var options = service.listOptions("responsible-dept", null);
 
         assertThat(options)
             .extracting(option -> String.valueOf(option.getValue()))
-            .containsExactly("Production");
+            .containsExactly("Factory|Production");
         assertThat(options.get(0).getRecord())
             .containsEntry("deptId", 10L)
             .containsEntry("deptName", "Production");
@@ -242,7 +216,6 @@ class CeOptionServiceTest {
         var categoryMapper = mock(CeEmissionSourceCategoryMapper.class);
         service = new CeOptionServiceImpl(
             activityDataMapper,
-            companyFactoryMapper,
             emissionSourceMapper,
             categoryMapper,
             greenPowerCertificateMapper,
@@ -822,6 +795,26 @@ class CeOptionServiceTest {
         source.setFactorKey("factor-" + code);
         source.setEnabledFlag(true);
         return source;
+    }
+
+    private SysDept companyNode(Long deptId, Long parentId, String companyCode, String companyName) {
+        SysDept dept = new SysDept();
+        dept.setDeptId(deptId);
+        dept.setParentId(parentId);
+        dept.setDeptCategory(companyCode);
+        dept.setDeptName(companyName);
+        dept.setStatus("0");
+        return dept;
+    }
+
+    private SysDept factoryNode(Long deptId, Long parentId, String companyCode, String factoryCode, String factoryName) {
+        SysDept dept = companyNode(deptId, parentId, companyCode, factoryName);
+        dept.setFactoryCode(factoryCode);
+        return dept;
+    }
+
+    private SysDept departmentNode(Long deptId, Long parentId, String companyCode, String departmentName) {
+        return companyNode(deptId, parentId, companyCode, departmentName);
     }
 
     private static void initializeEntityLambdaCache(Class<?> mapperType, Class<?> entityType) {

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 
@@ -85,7 +86,8 @@ class SysDeptExcelImportTest {
     }
 
     private SysDeptServiceImpl service(SysDeptMapper deptMapper) {
-        return new SysDeptServiceImpl(deptMapper, mock(SysRoleMapper.class), mock(SysUserMapper.class));
+        return new SysDeptServiceImpl(deptMapper, mock(SysRoleMapper.class), mock(SysUserMapper.class),
+            mock(ApplicationEventPublisher.class));
     }
 
     private SysDeptImportVo importRow(String company, String factory, String departmentName) {

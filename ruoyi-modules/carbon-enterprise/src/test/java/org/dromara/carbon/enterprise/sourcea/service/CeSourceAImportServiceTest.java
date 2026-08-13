@@ -69,7 +69,7 @@ class CeSourceAImportServiceTest {
         CeSourceAImportResult result = new CeSourceAImportServiceImpl(jdbcTemplate, companyFactoryDeptSyncService).importDirectory(sourceDir.toString());
 
         assertTrue(result.isImported(), () -> "errors=" + result.getErrors() + ", warnings=" + result.getWarnings());
-        verify(companyFactoryDeptSyncService).syncCompanyFactoriesToSysDept();
+        verify(companyFactoryDeptSyncService).syncSysDeptToCompanyFactories();
         assertTrue(result.getWarnings().stream().anyMatch(warning -> warning.contains("de-duplicated")));
         assertFalse(result.getTableRows().getOrDefault("ce_company_factory", 0) == 0);
         assertFalse(result.getTableRows().getOrDefault("ce_emission_source", 0) == 0);

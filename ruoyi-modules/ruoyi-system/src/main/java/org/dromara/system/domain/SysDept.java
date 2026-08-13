@@ -48,6 +48,11 @@ public class SysDept extends TenantEntity {
     private String deptCategory;
 
     /**
+     * Factory code. Populated only for factory nodes.
+     */
+    private String factoryCode;
+
+    /**
      * 显示顺序
      */
     private Integer orderNum;

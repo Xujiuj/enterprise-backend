@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.carbon.enterprise.activity.domain.CeActivityData;
 import org.dromara.carbon.enterprise.activity.domain.CeCaptureBatch;
-import org.dromara.carbon.enterprise.dimension.domain.CeCompanyFactory;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSource;
 import org.dromara.carbon.enterprise.emission.domain.CeEmissionSourceCategory;
 import org.dromara.carbon.enterprise.factor.domain.CeFactorCacheRecord;
@@ -22,7 +21,6 @@ import org.dromara.carbon.enterprise.dimension.domain.vo.CeDimensionRecordVo;
 import org.dromara.carbon.enterprise.shared.option.domain.vo.CeOptionVo;
 import org.dromara.carbon.enterprise.activity.mapper.CeActivityDataMapper;
 import org.dromara.carbon.enterprise.activity.mapper.CeCaptureBatchMapper;
-import org.dromara.carbon.enterprise.dimension.mapper.CeCompanyFactoryMapper;
 import org.dromara.carbon.enterprise.dimension.mapper.CeDimensionProjectionMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceMapper;
 import org.dromara.carbon.enterprise.emission.mapper.CeEmissionSourceCategoryMapper;
@@ -44,6 +42,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -135,7 +134,6 @@ public class CeOptionServiceImpl implements ICeOptionService {
     );
 
     private final CeActivityDataMapper activityDataMapper;
-    private final CeCompanyFactoryMapper companyFactoryMapper;
     private final CeEmissionSourceMapper emissionSourceMapper;
     private final CeEmissionSourceCategoryMapper emissionSourceCategoryMapper;
     private final CeGreenPowerCertificateMapper greenPowerCertificateMapper;
@@ -156,16 +154,16 @@ public class CeOptionServiceImpl implements ICeOptionService {
         List<CeOptionVo> options = new ArrayList<>();
         switch (optionCode) {
             case "company-code" -> {
-                collectCompanyCodeOptions(options);
+                collectOrganizationCompanyOptions(options);
             }
             case "company-name" -> {
-                collectDistinct(options, companyFactoryMapper, CeCompanyFactory::getCompanyName, this::labelForRaw);
+                collectOrganizationCompanyNameOptions(options);
             }
             case "factory-code" -> {
-                collectCompanyFactoryCodeOptions(options);
+                collectOrganizationFactoryOptions(options, true);
             }
             case "factory-name" -> {
-                collectCompanyFactoryNameOptions(options);
+                collectOrganizationFactoryOptions(options, false);
             }
             case "source-category-key" -> {
                 collectSourceCategoryOptions(options);
@@ -271,36 +269,48 @@ public class CeOptionServiceImpl implements ICeOptionService {
         }
     }
 
-    private void collectCompanyCodeOptions(List<CeOptionVo> target) {
-        List<CeCompanyFactory> rows = companyFactoryMapper.selectList(new LambdaQueryWrapper<CeCompanyFactory>()
-            .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName)
-            .isNotNull(CeCompanyFactory::getCompanyCode)
-            .orderByAsc(CeCompanyFactory::getCompanyCode)
-            .orderByAsc(CeCompanyFactory::getFactoryCode));
-        for (CeCompanyFactory row : rows) {
-            addOption(target, businessNameLabel(row.getCompanyCode(), row.getCompanyName()), row.getCompanyCode(), companyFactoryRecord(row));
+    private Map<Long, SysDept> loadActiveOrganization() {
+        return sysDeptMapper.selectList(new LambdaQueryWrapper<SysDept>()
+                .select(SysDept::getDeptId, SysDept::getParentId, SysDept::getDeptName, SysDept::getDeptCategory,
+                    SysDept::getFactoryCode, SysDept::getStatus, SysDept::getOrderNum)
+                .eq(SysDept::getStatus, "0")
+                .isNotNull(SysDept::getDeptName)
+                .orderByAsc(SysDept::getOrderNum)
+                .orderByAsc(SysDept::getDeptId))
+            .stream()
+            .collect(LinkedHashMap::new, (map, dept) -> map.put(dept.getDeptId(), dept), Map::putAll);
+    }
+
+    private void collectOrganizationCompanyOptions(List<CeOptionVo> target) {
+        Map<Long, SysDept> organization = loadActiveOrganization();
+        for (SysDept company : organization.values()) {
+            if (!isCompanyDept(company, organization)) {
+                continue;
+            }
+            addOption(target, businessNameLabel(company.getDeptCategory(), company.getDeptName()), company.getDeptCategory(),
+                organizationRecord(company, null));
         }
     }
 
-    private void collectCompanyFactoryCodeOptions(List<CeOptionVo> target) {
-        List<CeCompanyFactory> rows = companyFactoryMapper.selectList(new LambdaQueryWrapper<CeCompanyFactory>()
-            .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName)
-            .isNotNull(CeCompanyFactory::getFactoryCode)
-            .orderByAsc(CeCompanyFactory::getCompanyCode)
-            .orderByAsc(CeCompanyFactory::getFactoryCode));
-        for (CeCompanyFactory row : rows) {
-            addOption(target, businessNameLabel(row.getFactoryCode(), row.getFactoryName()), row.getFactoryCode(), companyFactoryRecord(row));
+    private void collectOrganizationCompanyNameOptions(List<CeOptionVo> target) {
+        Map<Long, SysDept> organization = loadActiveOrganization();
+        for (SysDept company : organization.values()) {
+            if (isCompanyDept(company, organization)) {
+                addOption(target, labelForRaw(company.getDeptName()), company.getDeptName(), organizationRecord(company, null));
+            }
         }
     }
 
-    private void collectCompanyFactoryNameOptions(List<CeOptionVo> target) {
-        List<CeCompanyFactory> rows = companyFactoryMapper.selectList(new LambdaQueryWrapper<CeCompanyFactory>()
-            .select(CeCompanyFactory::getCompanyCode, CeCompanyFactory::getCompanyName, CeCompanyFactory::getFactoryCode, CeCompanyFactory::getFactoryName)
-            .isNotNull(CeCompanyFactory::getFactoryName)
-            .orderByAsc(CeCompanyFactory::getCompanyCode)
-            .orderByAsc(CeCompanyFactory::getFactoryCode));
-        for (CeCompanyFactory row : rows) {
-            addOption(target, labelForRaw(row.getFactoryName()), row.getFactoryName(), companyFactoryRecord(row));
+    private void collectOrganizationFactoryOptions(List<CeOptionVo> target, boolean byCode) {
+        Map<Long, SysDept> organization = loadActiveOrganization();
+        for (SysDept factory : organization.values()) {
+            SysDept company = organization.get(factory.getParentId());
+            if (!isFactoryDept(factory, organization) || company == null) {
+                continue;
+            }
+            Object value = byCode ? factory.getFactoryCode() : factory.getDeptName();
+            String label = byCode ? businessNameLabel(factory.getFactoryCode(), factory.getDeptName()) : labelForRaw(factory.getDeptName());
+            addOption(target, label, value, organizationRecord(company, factory));
         }
     }
 
@@ -436,23 +446,53 @@ public class CeOptionServiceImpl implements ICeOptionService {
     }
 
     private void collectSystemDeptOptions(List<CeOptionVo> target, CeOptionQueryBo query) {
-        Map<Long, SysDept> activeDeptById = sysDeptMapper.selectList(new LambdaQueryWrapper<SysDept>()
-            .select(SysDept::getDeptId, SysDept::getParentId, SysDept::getDeptName, SysDept::getDeptCategory, SysDept::getStatus)
-            .eq(SysDept::getStatus, "0")
-            .isNotNull(SysDept::getDeptName)
-            .orderByAsc(SysDept::getOrderNum)
-            .orderByAsc(SysDept::getDeptId))
-            .stream()
-            .collect(LinkedHashMap::new, (map, dept) -> map.put(dept.getDeptId(), dept), Map::putAll);
+        Map<Long, SysDept> activeDeptById = loadActiveOrganization();
         for (SysDept dept : activeDeptById.values()) {
-            SysDept factory = activeDeptById.get(dept.getParentId());
-            if (!isFactoryDept(factory, activeDeptById) || !matchesFactoryFilter(factory, query)) {
+            SysDept factory = findFactoryAncestor(dept, activeDeptById);
+            if (factory == null || !matchesFactoryFilter(factory, query)) {
                 continue;
             }
-            String label = normalizeValue(factory.getDeptName()) + " / " + normalizeValue(dept.getDeptName());
-            String value = normalizeValue(factory.getDeptName()) + "|" + normalizeValue(dept.getDeptName());
+            String label = organizationPathLabel(dept, factory, activeDeptById);
+            String value = organizationPathValue(dept, factory, activeDeptById);
             addOption(target, label, value, systemDeptRecord(dept, factory));
         }
+    }
+
+    private SysDept findFactoryAncestor(SysDept dept, Map<Long, SysDept> activeDeptById) {
+        SysDept current = dept;
+        Set<Long> visited = new HashSet<>();
+        while (current != null && current.getDeptId() != null && visited.add(current.getDeptId())) {
+            if (isFactoryDept(current, activeDeptById)) {
+                return current;
+            }
+            current = activeDeptById.get(current.getParentId());
+        }
+        return null;
+    }
+
+    private String organizationPathLabel(SysDept dept, SysDept factory, Map<Long, SysDept> activeDeptById) {
+        List<String> names = organizationPath(dept, factory, activeDeptById);
+        return String.join(" / ", names);
+    }
+
+    private String organizationPathValue(SysDept dept, SysDept factory, Map<Long, SysDept> activeDeptById) {
+        List<String> names = organizationPath(dept, factory, activeDeptById);
+        return String.join("|", names);
+    }
+
+    private List<String> organizationPath(SysDept dept, SysDept factory, Map<Long, SysDept> activeDeptById) {
+        List<String> names = new ArrayList<>();
+        SysDept current = dept;
+        Set<Long> visited = new HashSet<>();
+        while (current != null && current.getDeptId() != null && visited.add(current.getDeptId())) {
+            names.add(normalizeValue(current.getDeptName()));
+            if (current.getDeptId().equals(factory.getDeptId())) {
+                break;
+            }
+            current = activeDeptById.get(current.getParentId());
+        }
+        java.util.Collections.reverse(names);
+        return names;
     }
 
     private boolean isFactoryDept(SysDept dept, Map<Long, SysDept> activeDeptById) {
@@ -460,7 +500,17 @@ public class CeOptionServiceImpl implements ICeOptionService {
             return false;
         }
         SysDept company = activeDeptById.get(dept.getParentId());
-        return company != null && dept.getDeptCategory() != null && dept.getDeptCategory().equals(company.getDeptCategory());
+        return company != null && isCompanyDept(company, activeDeptById)
+            && dept.getDeptCategory() != null && dept.getDeptCategory().equals(company.getDeptCategory())
+            && StringUtils.isNotBlank(dept.getFactoryCode());
+    }
+
+    private boolean isCompanyDept(SysDept dept, Map<Long, SysDept> activeDeptById) {
+        if (dept == null || StringUtils.isBlank(dept.getDeptCategory())) {
+            return false;
+        }
+        SysDept parent = activeDeptById.get(dept.getParentId());
+        return parent == null || StringUtils.isBlank(parent.getDeptCategory());
     }
 
     private boolean matchesFactoryFilter(SysDept factory, CeOptionQueryBo query) {
@@ -592,12 +642,12 @@ public class CeOptionServiceImpl implements ICeOptionService {
         target.addAll(optionsByCode.values());
     }
 
-    private Map<String, Object> companyFactoryRecord(CeCompanyFactory factory) {
+    private Map<String, Object> organizationRecord(SysDept company, SysDept factory) {
         Map<String, Object> record = new LinkedHashMap<>();
-        record.put("companyCode", factory.getCompanyCode());
-        record.put("companyName", factory.getCompanyName());
-        record.put("factoryCode", factory.getFactoryCode());
-        record.put("factoryName", factory.getFactoryName());
+        record.put("companyCode", normalizeValue(company.getDeptCategory()));
+        record.put("companyName", normalizeValue(company.getDeptName()));
+        record.put("factoryCode", factory == null ? "" : normalizeValue(factory.getFactoryCode()));
+        record.put("factoryName", factory == null ? "" : normalizeValue(factory.getDeptName()));
         return record;
     }
 
@@ -608,6 +658,7 @@ public class CeOptionServiceImpl implements ICeOptionService {
         record.put("deptName", normalizeValue(dept.getDeptName()));
         record.put("responsibleDept", normalizeValue(dept.getDeptName()));
         record.put("factoryDeptId", factory == null ? null : factory.getDeptId());
+        record.put("factoryCode", factory == null ? "" : normalizeValue(factory.getFactoryCode()));
         record.put("factoryName", factory == null ? "" : normalizeValue(factory.getDeptName()));
         record.put("companyCode", normalizeValue(dept.getDeptCategory()));
         record.put("status", normalizeValue(dept.getStatus()));

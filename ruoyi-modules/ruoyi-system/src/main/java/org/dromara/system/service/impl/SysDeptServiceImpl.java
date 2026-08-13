@@ -28,6 +28,7 @@ import org.dromara.system.domain.SysUser;
 import org.dromara.system.domain.bo.SysDeptBo;
 import org.dromara.system.domain.vo.SysDeptVo;
 import org.dromara.system.domain.vo.SysDeptImportVo;
+import org.dromara.system.event.DepartmentTreeChangedEvent;
 import org.dromara.system.mapper.SysDeptMapper;
 import org.dromara.system.mapper.SysRoleMapper;
 import org.dromara.system.mapper.SysUserMapper;
@@ -35,6 +36,7 @@ import org.dromara.system.service.ISysDeptService;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +55,7 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
     private final SysDeptMapper baseMapper;
     private final SysRoleMapper roleMapper;
     private final SysUserMapper userMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 分页查询部门管理数据
@@ -312,7 +315,9 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
     @CacheEvict(cacheNames = CacheNames.SYS_DEPT_AND_CHILD, allEntries = true)
     @Override
     public int insertDept(SysDeptBo bo) {
-        return baseMapper.insert(prepareDeptForInsert(bo));
+        int result = baseMapper.insert(prepareDeptForInsert(bo));
+        publishDepartmentTreeChanged(result);
+        return result;
     }
 
     @CacheEvict(cacheNames = CacheNames.SYS_DEPT_AND_CHILD, allEntries = true)
@@ -377,6 +382,7 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
                     "”，请使用工厂下的部门名称或“一级部门/二级部门”路径");
             }
         }
+        publishDepartmentTreeChanged(imported);
         return imported;
     }
 
@@ -390,8 +396,8 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
             throw new ServiceException("部门停用，不允许新增");
         }
         SysDept dept = MapstructUtils.convert(bo, SysDept.class);
-        validateSameCompanyParent(dept, info);
-        validateNotCompanyDirectParent(info);
+        validateOrganizationParent(dept, info);
+        validateFactoryCodeUnique(dept);
         dept.setAncestors(info.getAncestors() + StringUtils.SEPARATOR + dept.getParentId());
         return dept;
     }
@@ -544,9 +550,9 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
             throw new ServiceException("部门不存在，无法修改");
         }
         SysDept parentDept = baseMapper.selectById(dept.getParentId());
-        validateSameCompanyParent(dept, parentDept);
+        validateOrganizationParent(dept, parentDept);
+        validateFactoryCodeUnique(dept);
         if (!oldDept.getParentId().equals(dept.getParentId())) {
-            validateNotCompanyDirectParent(parentDept);
             // 如果是新父部门 则校验是否具有新父部门权限 避免越权
             this.checkDeptDataScope(dept.getParentId());
             SysDept newParentDept = parentDept;
@@ -567,6 +573,7 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
             // 如果该部门是启用状态，则启用该部门的所有上级部门
             updateParentDeptStatusNormal(dept);
         }
+        publishDepartmentTreeChanged(result);
         return result;
     }
 
@@ -581,13 +588,57 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
         }
     }
 
-    private void validateNotCompanyDirectParent(SysDept parentDept) {
-        if (ObjectUtil.isNull(parentDept) || StringUtils.isBlank(parentDept.getDeptCategory())) {
+    private void validateOrganizationParent(SysDept dept, SysDept parentDept) {
+        validateSameCompanyParent(dept, parentDept);
+        if (ObjectUtil.isNull(parentDept)) {
+            throw new ServiceException("请选择有效的上级组织");
+        }
+        SysDept grandParent = baseMapper.selectById(parentDept.getParentId());
+        boolean parentIsRoot = StringUtils.isBlank(parentDept.getDeptCategory());
+        boolean parentIsCompany = StringUtils.isNotBlank(parentDept.getDeptCategory())
+            && (ObjectUtil.isNull(grandParent) || StringUtils.isBlank(grandParent.getDeptCategory()));
+        if (parentIsRoot) {
+            requireCompanyNode(dept);
             return;
         }
-        SysDept grandParentDept = baseMapper.selectById(parentDept.getParentId());
-        if (ObjectUtil.isNull(grandParentDept) || StringUtils.isBlank(grandParentDept.getDeptCategory())) {
-            throw new ServiceException("部门必须归属于工厂，不能直接挂在公司下");
+        if (parentIsCompany) {
+            requireFactoryNode(dept, parentDept);
+            return;
+        }
+        if (StringUtils.isNotBlank(dept.getFactoryCode())) {
+            throw new ServiceException("工厂只能归属于公司节点");
+        }
+    }
+
+    private void requireCompanyNode(SysDept dept) {
+        if (StringUtils.isBlank(dept.getDeptCategory())) {
+            throw new ServiceException("公司编号不能为空");
+        }
+        if (StringUtils.isNotBlank(dept.getFactoryCode())) {
+            throw new ServiceException("公司节点不能填写工厂编号");
+        }
+    }
+
+    private void requireFactoryNode(SysDept dept, SysDept company) {
+        if (StringUtils.isBlank(dept.getFactoryCode())) {
+            throw new ServiceException("工厂编号不能为空");
+        }
+        if (!StringUtils.equals(dept.getDeptCategory(), company.getDeptCategory())) {
+            throw new ServiceException("工厂必须归属于所属公司");
+        }
+    }
+
+    private void validateFactoryCodeUnique(SysDept dept) {
+        if (StringUtils.isBlank(dept.getFactoryCode())) {
+            return;
+        }
+        Long duplicateCount = baseMapper.selectCount(new LambdaQueryWrapper<SysDept>()
+            .eq(SysDept::getDeptCategory, dept.getDeptCategory())
+            .eq(SysDept::getFactoryCode, dept.getFactoryCode().trim())
+            .eq(SysDept::getDelFlag, SystemConstants.NORMAL)
+            .ne(dept.getDeptId() != null, SysDept::getDeptId, dept.getDeptId()));
+        if (duplicateCount != null && duplicateCount > 0) {
+            throw new ServiceException("同一公司下工厂编号不能重复");
         }
     }
 
@@ -640,7 +691,15 @@ public class SysDeptServiceImpl implements ISysDeptService, DeptService {
     })
     @Override
     public int deleteDeptById(Long deptId) {
-        return baseMapper.deleteById(deptId);
+        int result = baseMapper.deleteById(deptId);
+        publishDepartmentTreeChanged(result);
+        return result;
+    }
+
+    private void publishDepartmentTreeChanged(int result) {
+        if (result > 0) {
+            eventPublisher.publishEvent(new DepartmentTreeChangedEvent());
+        }
     }
 
 
