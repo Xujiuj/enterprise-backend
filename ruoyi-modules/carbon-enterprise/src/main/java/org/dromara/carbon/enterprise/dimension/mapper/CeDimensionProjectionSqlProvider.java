@@ -71,45 +71,61 @@ public class CeDimensionProjectionSqlProvider {
                  order by coalesce(sort_order, id), division_code
                 """;
             case "company" -> """
-                select factory.dept_id as id,
+                select company_factory.id as id,
                        'company' as dimension_code,
-                       company.dept_category as record_code,
-                       company.dept_name as record_name,
-                       factory.factory_code as parent_code,
-                       concat('SK_', company.dept_category, '_', factory.factory_code) as company_sk,
-                       factory.dept_name as factory_name,
-                       null as province_code,
-                       null as province_name,
-                       null as factory_type,
-                       null as industry_section_code,
-                       null as industry_section_name,
-                       null as industry_division_code,
-                       null as industry_division_name,
-                       null as industry_group_code,
-                       null as industry_group_name,
-                       null as industry_class_code,
-                       null as industry_class_name,
-                       null as effective_date,
-                       null as expiry_date,
-                       case when company.status = '0' and factory.status = '0' then 'Y' else 'N' end as active_flag,
-                       factory.order_num as sort_order,
-                       case when company.status = '0' and factory.status = '0' then '0' else '1' end as status,
-                       factory.create_time,
-                       factory.update_time,
-                       null as remark
-                  from sys_dept factory
-                  join sys_dept company on company.dept_id = factory.parent_id
-                 where factory.del_flag = '0'
+                       coalesce(company.dept_category, company_factory.company_code) as record_code,
+                       coalesce(company.dept_name, company_factory.company_name) as record_name,
+                       coalesce(factory.factory_code, company_factory.factory_code) as parent_code,
+                       concat('SK_',
+                           coalesce(company.dept_category, company_factory.company_code),
+                           '_',
+                           coalesce(factory.factory_code, company_factory.factory_code)
+                       ) as company_sk,
+                       coalesce(factory.dept_name, company_factory.factory_name) as factory_name,
+                       company_factory.province_code as province_code,
+                       company_factory.province_name as province_name,
+                       company_factory.factory_type as factory_type,
+                       company_factory.industry_section_code as industry_section_code,
+                       company_factory.industry_section_name as industry_section_name,
+                       company_factory.industry_division_code as industry_division_code,
+                       company_factory.industry_division_name as industry_division_name,
+                       company_factory.industry_group_code as industry_group_code,
+                       company_factory.industry_group_name as industry_group_name,
+                       company_factory.industry_class_code as industry_class_code,
+                       company_factory.industry_class_name as industry_class_name,
+                       cast(company_factory.effective_date as char) as effective_date,
+                       cast(company_factory.expiry_date as char) as expiry_date,
+                       case
+                           when company.dept_id is not null and factory.dept_id is not null
+                               then case when company.status = '0' and factory.status = '0' then 'Y' else 'N' end
+                           else company_factory.is_active
+                       end as active_flag,
+                       company_factory.id as sort_order,
+                       case
+                           when company.dept_id is not null and factory.dept_id is not null
+                               then case when company.status = '0' and factory.status = '0' then '0' else '1' end
+                           when company_factory.is_active = 'Y' then '0'
+                           else '1'
+                       end as status,
+                       company_factory.create_time,
+                       company_factory.update_time,
+                       company_factory.remark
+                  from ce_company_factory company_factory
+             left join sys_dept factory
+                    on factory.del_flag = '0'
+                   and nullif(ltrim(rtrim(factory.factory_code)), '') = nullif(ltrim(rtrim(company_factory.factory_code)), '')
+             left join sys_dept company
+                    on company.dept_id = factory.parent_id
                    and company.del_flag = '0'
-                   and factory.dept_category = company.dept_category
-                   and nullif(ltrim(rtrim(factory.factory_code)), '') is not null
+                   and company.dept_category = factory.dept_category
                    and not exists (
                        select 1 from sys_dept company_parent
                         where company_parent.dept_id = company.parent_id
                           and company_parent.del_flag = '0'
                           and nullif(ltrim(rtrim(company_parent.dept_category)), '') is not null
                    )
-                 order by company.dept_category, factory.factory_code
+                 order by coalesce(company.dept_category, company_factory.company_code),
+                          coalesce(factory.factory_code, company_factory.factory_code)
                 """;
             case "industry" -> """
                 select id,

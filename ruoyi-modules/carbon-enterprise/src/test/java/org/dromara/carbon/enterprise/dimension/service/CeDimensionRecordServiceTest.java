@@ -171,12 +171,17 @@ class CeDimensionRecordServiceTest {
     }
 
     @Test
-    void companyProjectionReadsCompanyAndFactoryNodesFromDepartmentTree() {
+    void companyProjectionPreservesCompanyTableFieldsAndReadsOrganizationFieldsFromDepartmentTree() {
         String selectSql = new CeDimensionProjectionSqlProvider()
             .selectByDimensionCode(java.util.Map.of("dimensionCode", "company"));
 
-        assertTrue(selectSql.contains("from sys_dept factory"));
-        assertTrue(selectSql.contains("join sys_dept company"));
+        assertTrue(selectSql.contains("from ce_company_factory company_factory"));
+        assertTrue(selectSql.contains("left join sys_dept factory"));
+        assertTrue(selectSql.contains("left join sys_dept company"));
+        assertTrue(selectSql.contains("coalesce(company.dept_category, company_factory.company_code) as record_code"));
+        assertTrue(selectSql.contains("company_factory.province_code as province_code"));
+        assertTrue(selectSql.contains("company_factory.industry_section_code as industry_section_code"));
+        assertTrue(selectSql.contains("company_factory.remark"));
     }
 
     @Test

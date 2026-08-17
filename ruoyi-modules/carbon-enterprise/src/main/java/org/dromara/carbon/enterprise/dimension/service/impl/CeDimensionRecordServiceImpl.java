@@ -52,6 +52,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
 
     private static final Set<String> ALLOWED_LOCAL_PROJECTION_CODES = Set.of(
         "admin-division",
+        "company",
         "industry",
         "emission-source-category",
         "emission-source-category-history",
@@ -68,7 +69,6 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     );
 
     private static final Set<String> ENTERPRISE_EDITABLE_DIMENSION_CODES = Set.of(
-        "company",
         "industry",
         "base-year",
         "ef-factor",
