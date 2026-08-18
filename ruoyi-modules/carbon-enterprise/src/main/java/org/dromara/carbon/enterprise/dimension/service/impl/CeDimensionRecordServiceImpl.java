@@ -69,6 +69,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     );
 
     private static final Set<String> ENTERPRISE_EDITABLE_DIMENSION_CODES = Set.of(
+        "company",
         "industry",
         "base-year",
         "ef-factor",
@@ -117,6 +118,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     @Transactional(rollbackFor = Exception.class)
     public Boolean updateByBo(CeDimensionRecordBo bo) {
         validateEditableDimensionCode(bo.getDimensionCode());
+        restoreCompanyOrganizationFields(bo);
         normalizeEditableRecord(bo);
         return dimensionProjectionMapper.updateByDimensionCode(bo) > 0;
     }
@@ -145,9 +147,7 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
     private void validateEditableDimensionCode(String dimensionCode) {
         validateDimensionCode(dimensionCode);
         if (!ENTERPRISE_EDITABLE_DIMENSION_CODES.contains(dimensionCode)) {
-            throw new ServiceException(COMPANY_DIMENSION_CODE.equals(dimensionCode)
-                ? "公司表由部门管理维护，仅支持查看"
-                : "当前维度不允许企业端编辑：" + dimensionCode);
+            throw new ServiceException("当前维度不允许企业端编辑：" + dimensionCode);
         }
     }
 
@@ -208,13 +208,34 @@ public class CeDimensionRecordServiceImpl implements ICeDimensionRecordService {
         if (StringUtils.isBlank(bo.getParentCode())) {
             throw new ServiceException("工厂编号不能为空");
         }
-        if (StringUtils.isBlank(bo.getFactoryName())) {
-            throw new ServiceException("工厂名称不能为空");
+        CeDimensionRecordVo organization = dimensionProjectionMapper
+            .selectCompanyOrganizationByFactoryCode(bo.getParentCode());
+        if (organization == null) {
+            throw new ServiceException("所选工厂不存在或已停用，请到部门管理维护组织架构");
         }
-        if (StringUtils.isBlank(bo.getCompanySk())) {
-            bo.setCompanySk(buildCompanySk(bo));
+        applyCompanyOrganizationFields(bo, organization);
+    }
+
+    private void restoreCompanyOrganizationFields(CeDimensionRecordBo bo) {
+        if (!COMPANY_DIMENSION_CODE.equals(bo.getDimensionCode()) || bo.getId() == null) {
+            return;
         }
-        bo.setActiveFlag("1".equals(bo.getStatus()) ? "N" : "Y");
+        CeDimensionRecordVo existing = dimensionProjectionMapper
+            .selectByDimensionCodeAndId(COMPANY_DIMENSION_CODE, bo.getId());
+        if (existing == null) {
+            throw new ServiceException("公司表记录不存在：" + bo.getId());
+        }
+        applyCompanyOrganizationFields(bo, existing);
+    }
+
+    private void applyCompanyOrganizationFields(CeDimensionRecordBo bo, CeDimensionRecordVo organization) {
+        bo.setRecordCode(organization.getRecordCode());
+        bo.setRecordName(organization.getRecordName());
+        bo.setParentCode(organization.getParentCode());
+        bo.setFactoryName(organization.getFactoryName());
+        bo.setCompanySk(StringUtils.isNotBlank(organization.getCompanySk())
+            ? organization.getCompanySk()
+            : buildCompanySk(bo));
     }
 
     private void normalizeIndustryRecord(CeDimensionRecordBo bo) {

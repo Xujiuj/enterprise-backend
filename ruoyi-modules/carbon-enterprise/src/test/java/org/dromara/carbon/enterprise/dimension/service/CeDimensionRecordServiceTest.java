@@ -86,15 +86,26 @@ class CeDimensionRecordServiceTest {
     }
 
     @Test
-    void companyInsertIsRejectedBecauseDepartmentManagementOwnsOrganizationData() {
+    void companyInsertUsesTheFactoryFromDepartmentManagement() {
         CeDimensionRecordBo bo = new CeDimensionRecordBo();
         bo.setDimensionCode("company");
-        bo.setRecordCode("COMP-001");
-        bo.setRecordName("Demo Company");
-        ServiceException exception = assertThrows(ServiceException.class, () -> service.insertByBo(bo));
+        bo.setRecordCode("forged-company-code");
+        bo.setRecordName("Forged company name");
+        bo.setParentCode("FAC-001");
+        CeDimensionRecordVo organization = localCompany();
+        organization.setParentCode("FAC-001");
+        organization.setFactoryName("Demo Factory");
+        when(dimensionProjectionMapper.selectCompanyOrganizationByFactoryCode("FAC-001")).thenReturn(organization);
+        when(dimensionProjectionMapper.insertByDimensionCode(any())).thenReturn(1);
 
-        assertEquals("公司表由部门管理维护，仅支持查看", exception.getMessage());
-        verify(dimensionProjectionMapper, never()).insertByDimensionCode(any());
+        service.insertByBo(bo);
+
+        verify(dimensionProjectionMapper).insertByDimensionCode(argThat(record ->
+            "COMP-001".equals(record.getRecordCode())
+                && "Demo Company".equals(record.getRecordName())
+                && "FAC-001".equals(record.getParentCode())
+                && "Demo Factory".equals(record.getFactoryName())
+        ));
     }
 
     @Test
@@ -149,12 +160,11 @@ class CeDimensionRecordServiceTest {
     }
 
     @Test
-    void companyDeleteIsRejectedBecauseDepartmentManagementOwnsOrganizationData() {
-        ServiceException exception = assertThrows(ServiceException.class,
-            () -> service.deleteByIds("company", java.util.List.of(1L)));
+    void companyDeleteClearsSupplementaryDataWithoutDeletingOrganization() {
+        when(dimensionProjectionMapper.deleteByDimensionCodeAndId("company", 1L)).thenReturn(1);
 
-        assertEquals("公司表由部门管理维护，仅支持查看", exception.getMessage());
-        verify(dimensionProjectionMapper, never()).deleteByDimensionCodeAndId(any(), any());
+        assertTrue(service.deleteByIds("company", java.util.List.of(1L)));
+        verify(dimensionProjectionMapper).deleteByDimensionCodeAndId("company", 1L);
     }
 
     @Test
@@ -182,6 +192,42 @@ class CeDimensionRecordServiceTest {
         assertTrue(selectSql.contains("company_factory.province_code as province_code"));
         assertTrue(selectSql.contains("company_factory.industry_section_code as industry_section_code"));
         assertTrue(selectSql.contains("company_factory.remark"));
+    }
+
+    @Test
+    void companyPageQueryStripsTheMultilineProjectionOrderByForSqlServerPagination() {
+        CeDimensionRecordBo query = new CeDimensionRecordBo();
+        query.setDimensionCode("company");
+
+        String pageSql = new CeDimensionProjectionSqlProvider()
+            .selectPageByDimensionCode(java.util.Map.of("query", query));
+
+        assertFalse(pageSql.contains("coalesce(company.dept_category, company_factory.company_code),\n"
+            + "                          coalesce(factory.factory_code, company_factory.factory_code)"));
+        assertTrue(pageSql.contains("order by sort_order, record_code"));
+    }
+
+    @Test
+    void companyWriteSqlKeepsOrganizationColumnsOutOfUpdatesAndDeletes() {
+        CeDimensionProjectionSqlProvider provider = new CeDimensionProjectionSqlProvider();
+        String insertSql = provider.insertByDimensionCode();
+        String updateSql = provider.updateByDimensionCode();
+        String deleteSql = provider.deleteByDimensionCodeAndId(java.util.Map.of("dimensionCode", "company"));
+        String companyUpdateSql = companyBranch(updateSql);
+
+        assertTrue(insertSql.contains("where company_code = #{record.recordCode}"));
+        assertTrue(companyUpdateSql.contains("where id = #{record.id}"));
+        assertFalse(companyUpdateSql.contains("set company_code"));
+        assertFalse(companyUpdateSql.contains("set factory_code"));
+        assertTrue(deleteSql.contains("set province_code = null"));
+        assertFalse(deleteSql.contains("delete from ce_company_factory"));
+    }
+
+    private String companyBranch(String sql) {
+        String marker = "<when test=\"record.dimensionCode == 'company'\">";
+        int start = sql.indexOf(marker);
+        int end = sql.indexOf("</when>", start);
+        return sql.substring(start, end);
     }
 
     @Test

@@ -423,14 +423,56 @@ public class CeDimensionProjectionSqlProvider {
         return "select * from (" + stripTrailingOrderBy(projectionSql((String) params.get("dimensionCode"))) + ") dimension_projection where id = #{id}";
     }
 
+    public String selectCompanyOrganizationByFactoryCode() {
+        return """
+            select top 1
+                   company.dept_category as record_code,
+                   company.dept_name as record_name,
+                   factory.factory_code as parent_code,
+                   factory.dept_name as factory_name,
+                   concat('SK_', company.dept_category, '_', factory.factory_code) as company_sk
+              from sys_dept factory
+              join sys_dept company on company.dept_id = factory.parent_id
+             where factory.del_flag = '0'
+               and company.del_flag = '0'
+               and factory.dept_category = company.dept_category
+               and nullif(ltrim(rtrim(factory.factory_code)), '') = #{factoryCode}
+               and not exists (
+                   select 1 from sys_dept company_parent
+                    where company_parent.dept_id = company.parent_id
+                      and company_parent.del_flag = '0'
+                      and nullif(ltrim(rtrim(company_parent.dept_category)), '') is not null
+               )
+            """;
+    }
+
     private String stripTrailingOrderBy(String sql) {
-        return sql.replaceFirst("(?is)\\s+order\\s+by\\s+[^\\n]+\\s*$", "");
+        return sql.replaceFirst("(?is)\\s+order\\s+by\\s+.*\\s*$", "");
     }
 
     public String insertByDimensionCode() {
         return """
             <script>
             <choose>
+              <when test="record.dimensionCode == 'company'">
+                update ce_company_factory
+                   set province_code = #{record.provinceCode},
+                       province_name = #{record.provinceName},
+                       factory_type = #{record.factoryType},
+                       industry_section_code = #{record.industrySectionCode},
+                       industry_section_name = #{record.industrySectionName},
+                       industry_division_code = #{record.industryDivisionCode},
+                       industry_division_name = #{record.industryDivisionName},
+                       industry_group_code = #{record.industryGroupCode},
+                       industry_group_name = #{record.industryGroupName},
+                       industry_class_code = #{record.industryClassCode},
+                       industry_class_name = #{record.industryClassName},
+                       effective_date = try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, '')),
+                       expiry_date = try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, '')),
+                       update_time = SYSDATETIME()
+                 where company_code = #{record.recordCode}
+                   and factory_code = #{record.parentCode}
+              </when>
               <when test="record.dimensionCode == 'industry'">
                 insert into ce_industry_classification (
                   industry_section_code, industry_section_name,
@@ -531,6 +573,24 @@ public class CeDimensionProjectionSqlProvider {
         return """
             <script>
             <choose>
+              <when test="record.dimensionCode == 'company'">
+                update ce_company_factory
+                   set province_code = #{record.provinceCode},
+                       province_name = #{record.provinceName},
+                       factory_type = #{record.factoryType},
+                       industry_section_code = #{record.industrySectionCode},
+                       industry_section_name = #{record.industrySectionName},
+                       industry_division_code = #{record.industryDivisionCode},
+                       industry_division_name = #{record.industryDivisionName},
+                       industry_group_code = #{record.industryGroupCode},
+                       industry_group_name = #{record.industryGroupName},
+                       industry_class_code = #{record.industryClassCode},
+                       industry_class_name = #{record.industryClassName},
+                       effective_date = try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, '')),
+                       expiry_date = try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, '')),
+                       update_time = SYSDATETIME()
+                 where id = #{record.id}
+              </when>
               <when test="record.dimensionCode == 'industry'">
                 update ce_industry_classification
                    set industry_section_code = #{record.industrySectionCode},
@@ -654,7 +714,25 @@ public class CeDimensionProjectionSqlProvider {
 
     public String deleteByDimensionCodeAndId(Map<String, Object> params) {
         return switch ((String) params.get("dimensionCode")) {
-            case "company" -> "delete from ce_company_factory where id = #{id}";
+            case "company" -> """
+                update ce_company_factory
+                   set province_code = null,
+                       province_name = null,
+                       factory_type = null,
+                       industry_section_code = null,
+                       industry_section_name = null,
+                       industry_division_code = null,
+                       industry_division_name = null,
+                       industry_group_code = null,
+                       industry_group_name = null,
+                       industry_class_code = null,
+                       industry_class_name = null,
+                       effective_date = null,
+                       expiry_date = null,
+                       remark = null,
+                       update_time = SYSDATETIME()
+                 where id = #{id}
+                """;
             case "industry" -> "delete from ce_industry_classification where id = #{id}";
             case "base-year" -> "delete from ce_base_year where id = #{id}";
             case "ef-factor" -> "delete from ce_ef_factor where id = #{id}";

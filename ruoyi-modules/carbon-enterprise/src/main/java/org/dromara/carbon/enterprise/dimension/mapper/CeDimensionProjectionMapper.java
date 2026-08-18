@@ -29,6 +29,9 @@ public interface CeDimensionProjectionMapper {
     @SelectProvider(type = CeDimensionProjectionSqlProvider.class, method = "selectByDimensionCodeAndId")
     CeDimensionRecordVo selectByDimensionCodeAndId(@Param("dimensionCode") String dimensionCode, @Param("id") Long id);
 
+    @SelectProvider(type = CeDimensionProjectionSqlProvider.class, method = "selectCompanyOrganizationByFactoryCode")
+    CeDimensionRecordVo selectCompanyOrganizationByFactoryCode(@Param("factoryCode") String factoryCode);
+
     @InsertProvider(type = CeDimensionProjectionSqlProvider.class, method = "insertByDimensionCode")
     int insertByDimensionCode(@Param("record") CeDimensionRecordBo record);
 
