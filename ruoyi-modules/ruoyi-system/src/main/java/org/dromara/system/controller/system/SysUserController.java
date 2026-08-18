@@ -1,6 +1,7 @@
 package org.dromara.system.controller.system;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.lang.tree.Tree;
 import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.ObjectUtil;
@@ -56,6 +57,7 @@ public class SysUserController extends BaseController {
     private final ISysPostService postService;
     private final ISysDeptService deptService;
     private final ISysTenantService tenantService;
+    private final ISysPermissionService permissionService;
 
     /**
      * 获取用户列表
@@ -112,6 +114,11 @@ public class SysUserController extends BaseController {
             // 超级管理员 如果重新加载用户信息需清除动态租户
             TenantHelper.clearDynamic();
         }
+
+        // Role and menu changes must take effect for an existing login after a page refresh.
+        loginUser.setMenuPermission(permissionService.getMenuPermission(loginUser.getUserId()));
+        loginUser.setRolePermission(permissionService.getRolePermission(loginUser.getUserId()));
+        StpUtil.getTokenSession().set(LoginHelper.LOGIN_USER_KEY, loginUser);
 
         SysUserVo user = DataPermissionHelper.ignore(() -> userService.selectUserById(loginUser.getUserId()));
         if (ObjectUtil.isNull(user)) {
