@@ -14,6 +14,7 @@ class CeDimensionProjectionSqlProviderTest {
         String sql = new CeDimensionProjectionSqlProvider().insertByDimensionCode();
 
         assertTrue(sql.contains("insert into ce_company_factory"));
+        assertTrue(sql.contains("company_sk"));
         assertFalse(sql.contains("update ce_company_factory"));
     }
 }

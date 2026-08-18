@@ -456,7 +456,7 @@ public class CeDimensionProjectionSqlProvider {
             <choose>
               <when test="record.dimensionCode == 'company'">
                 insert into ce_company_factory (
-                  company_code, company_name, factory_code, factory_name,
+                  company_sk, company_code, company_name, factory_code, factory_name,
                   province_code, province_name, factory_type,
                   industry_section_code, industry_section_name,
                   industry_division_code, industry_division_name,
@@ -464,7 +464,7 @@ public class CeDimensionProjectionSqlProvider {
                   industry_class_code, industry_class_name,
                   effective_date, expiry_date, is_active, create_time, update_time, remark
                 ) values (
-                  #{record.recordCode}, #{record.recordName}, #{record.parentCode}, #{record.factoryName},
+                  #{record.companySk}, #{record.recordCode}, #{record.recordName}, #{record.parentCode}, #{record.factoryName},
                   #{record.provinceCode}, #{record.provinceName}, #{record.factoryType},
                   #{record.industrySectionCode}, #{record.industrySectionName},
                   #{record.industryDivisionCode}, #{record.industryDivisionName},
