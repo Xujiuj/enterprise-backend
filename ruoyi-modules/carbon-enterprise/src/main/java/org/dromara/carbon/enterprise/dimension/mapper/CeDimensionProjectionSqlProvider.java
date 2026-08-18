@@ -455,23 +455,25 @@ public class CeDimensionProjectionSqlProvider {
             <script>
             <choose>
               <when test="record.dimensionCode == 'company'">
-                update ce_company_factory
-                   set province_code = #{record.provinceCode},
-                       province_name = #{record.provinceName},
-                       factory_type = #{record.factoryType},
-                       industry_section_code = #{record.industrySectionCode},
-                       industry_section_name = #{record.industrySectionName},
-                       industry_division_code = #{record.industryDivisionCode},
-                       industry_division_name = #{record.industryDivisionName},
-                       industry_group_code = #{record.industryGroupCode},
-                       industry_group_name = #{record.industryGroupName},
-                       industry_class_code = #{record.industryClassCode},
-                       industry_class_name = #{record.industryClassName},
-                       effective_date = try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, '')),
-                       expiry_date = try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, '')),
-                       update_time = SYSDATETIME()
-                 where company_code = #{record.recordCode}
-                   and factory_code = #{record.parentCode}
+                insert into ce_company_factory (
+                  company_code, company_name, factory_code, factory_name,
+                  province_code, province_name, factory_type,
+                  industry_section_code, industry_section_name,
+                  industry_division_code, industry_division_name,
+                  industry_group_code, industry_group_name,
+                  industry_class_code, industry_class_name,
+                  effective_date, expiry_date, is_active, create_time, update_time, remark
+                ) values (
+                  #{record.recordCode}, #{record.recordName}, #{record.parentCode}, #{record.factoryName},
+                  #{record.provinceCode}, #{record.provinceName}, #{record.factoryType},
+                  #{record.industrySectionCode}, #{record.industrySectionName},
+                  #{record.industryDivisionCode}, #{record.industryDivisionName},
+                  #{record.industryGroupCode}, #{record.industryGroupName},
+                  #{record.industryClassCode}, #{record.industryClassName},
+                  try_convert(date, nullif(#{record.effectiveDate,jdbcType=VARCHAR}, '')),
+                  try_convert(date, nullif(#{record.expiryDate,jdbcType=VARCHAR}, '')),
+                  case when #{record.status} = '1' then 'N' else 'Y' end, SYSDATETIME(), SYSDATETIME(), #{record.remark}
+                )
               </when>
               <when test="record.dimensionCode == 'industry'">
                 insert into ce_industry_classification (
