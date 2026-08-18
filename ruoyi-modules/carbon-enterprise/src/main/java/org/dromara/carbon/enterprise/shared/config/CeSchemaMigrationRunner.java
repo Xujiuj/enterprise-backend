@@ -61,6 +61,7 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         backfillFactoryCodesFromCompanyProjection();
         syncSysDeptToCompanyFactories();
         updateEnterpriseMenuIcons();
+        dropCompanyFactoryUniquenessConstraintIfPresent();
     }
 
     private void syncSysDeptToCompanyFactories() {
@@ -769,6 +770,28 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
             log.info("[SchemaMigration] added unique constraint {} on {} ({})", constraintName, tableName, columns);
         } catch (Exception e) {
             log.warn("[SchemaMigration] failed to add unique constraint {} on {}: {}", constraintName, tableName, e.getMessage());
+        }
+    }
+
+    private void dropCompanyFactoryUniquenessConstraintIfPresent() {
+        try {
+            jdbcTemplate.execute("""
+                IF OBJECT_ID(N'dbo.ce_company_factory', N'U') IS NOT NULL
+                   AND EXISTS (
+                       SELECT 1
+                         FROM sys.key_constraints
+                        WHERE parent_object_id = OBJECT_ID(N'dbo.ce_company_factory')
+                          AND name = N'uk_ce_company_factory'
+                          AND type = 'UQ'
+                   )
+                BEGIN
+                    ALTER TABLE dbo.ce_company_factory
+                    DROP CONSTRAINT [uk_ce_company_factory];
+                END
+                """);
+            log.info("[SchemaMigration] removed legacy unique constraint uk_ce_company_factory when present");
+        } catch (Exception e) {
+            log.warn("[SchemaMigration] company factory uniqueness constraint cleanup skipped: {}", e.getMessage());
         }
     }
 

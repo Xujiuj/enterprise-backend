@@ -74,6 +74,7 @@ class CeSchemaMigrationRunnerTest {
         );
         verifyEmissionActivityFieldRepair(jdbcTemplate, 20L);
         verifyIndustryClassificationSeed(jdbcTemplate);
+        verifyCompanyFactoryUniquenessConstraintCleanup(jdbcTemplate);
     }
 
     @Test
@@ -98,6 +99,7 @@ class CeSchemaMigrationRunnerTest {
         );
         verifyEmissionActivityFieldRepair(jdbcTemplate, 20L);
         verifyIndustryClassificationSeed(jdbcTemplate);
+        verifyCompanyFactoryUniquenessConstraintCleanup(jdbcTemplate);
     }
 
     private JdbcTemplate baseJdbcTemplate() {
@@ -244,5 +246,22 @@ class CeSchemaMigrationRunnerTest {
             eq("DELETE FROM sys_menu WHERE menu_id = ? OR path = ? OR menu_name = N'107 行业代码表'"),
             eq(900116L), eq("industry")
         );
+    }
+
+    private void verifyCompanyFactoryUniquenessConstraintCleanup(JdbcTemplate jdbcTemplate) {
+        verify(jdbcTemplate).execute(eq("""
+            IF OBJECT_ID(N'dbo.ce_company_factory', N'U') IS NOT NULL
+               AND EXISTS (
+                   SELECT 1
+                     FROM sys.key_constraints
+                    WHERE parent_object_id = OBJECT_ID(N'dbo.ce_company_factory')
+                      AND name = N'uk_ce_company_factory'
+                      AND type = 'UQ'
+               )
+            BEGIN
+                ALTER TABLE dbo.ce_company_factory
+                DROP CONSTRAINT [uk_ce_company_factory];
+            END
+            """));
     }
 }
