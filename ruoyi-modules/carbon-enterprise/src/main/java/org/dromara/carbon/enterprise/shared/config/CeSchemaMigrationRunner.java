@@ -44,6 +44,10 @@ public class CeSchemaMigrationRunner implements CommandLineRunner {
         addColumnIfMissing("ce_activity_data", "emission_source_id", "BIGINT NULL");
         addColumnIfMissing("ce_activity_data", "activity_period", "NVARCHAR(32) NULL");
         addColumnIfMissing("ce_activity_data", "factory_code", "NVARCHAR(64) NULL");
+        addColumnIfMissing("ce_emission_source_category", "parent_code", "NVARCHAR(64) NULL");
+        addColumnIfMissing("ce_emission_source_category", "category_name_en", "NVARCHAR(255) NULL");
+        addColumnIfMissing("ce_emission_source_category", "sort_order", "INT NULL");
+        addColumnIfMissing("ce_emission_source_category", "status", "NCHAR(1) NULL");
         addColumnIfMissing("ce_factor_cache_record", "custom_fields", "NVARCHAR(MAX) NULL");
         addColumnIfMissing("ce_factor_cache_record", "remark", "NVARCHAR(500) NULL");
         addColumnIfMissing("ce_template_field", "business_field_code", "NVARCHAR(64) NULL");

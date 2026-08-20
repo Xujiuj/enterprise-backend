@@ -75,6 +75,7 @@ class CeSchemaMigrationRunnerTest {
         verifyEmissionActivityFieldRepair(jdbcTemplate, 20L);
         verifyIndustryClassificationSeed(jdbcTemplate);
         verifyCompanyFactoryUniquenessConstraintCleanup(jdbcTemplate);
+        verifyEmissionSourceCategorySchemaRepair(jdbcTemplate);
     }
 
     @Test
@@ -100,6 +101,7 @@ class CeSchemaMigrationRunnerTest {
         verifyEmissionActivityFieldRepair(jdbcTemplate, 20L);
         verifyIndustryClassificationSeed(jdbcTemplate);
         verifyCompanyFactoryUniquenessConstraintCleanup(jdbcTemplate);
+        verifyEmissionSourceCategorySchemaRepair(jdbcTemplate);
     }
 
     private JdbcTemplate baseJdbcTemplate() {
@@ -263,5 +265,21 @@ class CeSchemaMigrationRunnerTest {
                 DROP CONSTRAINT [uk_ce_company_factory];
             END
             """));
+    }
+
+    private void verifyEmissionSourceCategorySchemaRepair(JdbcTemplate jdbcTemplate) {
+        String columnCheckSql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = SCHEMA_NAME() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+        verify(jdbcTemplate).queryForObject(
+            eq(columnCheckSql), eq(Integer.class), eq("ce_emission_source_category"), eq("parent_code")
+        );
+        verify(jdbcTemplate).queryForObject(
+            eq(columnCheckSql), eq(Integer.class), eq("ce_emission_source_category"), eq("category_name_en")
+        );
+        verify(jdbcTemplate).queryForObject(
+            eq(columnCheckSql), eq(Integer.class), eq("ce_emission_source_category"), eq("sort_order")
+        );
+        verify(jdbcTemplate).queryForObject(
+            eq(columnCheckSql), eq(Integer.class), eq("ce_emission_source_category"), eq("status")
+        );
     }
 }
